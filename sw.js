@@ -14,15 +14,18 @@
 // (Network-first already serves fresh code when online, but the version bump
 // catches the rare case where a corrupted cache entry sticks around.)
 
-const CACHE_VERSION = 'arise-v1.0.0';
+const CACHE_VERSION = 'arise-v1.0.1';
 const CACHE_NAME = `${CACHE_VERSION}-shell`;
 
 // Pre-cache the app shell on install so the app works offline immediately
 // after install. Network-first fetch will keep these fresh thereafter.
+// NOTE: only list paths that are ACTUALLY deployed. The dev file
+// ARISE_Fitness_System.html lives only in the source repo; the live site
+// serves it as index.html. Any 404 here triggers a soft warning via the
+// try/catch in the install handler, but it's cleaner to omit phantom paths.
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/ARISE_Fitness_System.html',
   '/manifest.json',
   '/arise-logo-mark.svg',
   '/arise-logo.png',
@@ -129,7 +132,7 @@ async function networkFirst(req) {
     if (cached) return cached;
     // Last-ditch fallback for root or HTML — serve the cached app shell
     if (APP_SHELL_PATTERN.test(req.url) || req.url.endsWith('/')) {
-      const shell = await cache.match('/ARISE_Fitness_System.html') || await cache.match('/index.html');
+      const shell = await cache.match('/') || await cache.match('/index.html');
       if (shell) return shell;
     }
     throw err;

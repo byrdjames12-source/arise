@@ -2,7 +2,7 @@
   "name": "ARISE Fitness System",
   "short_name": "ARISE",
   "description": "Hunter-themed fitness tracker — train, log, level up.",
-  "start_url": "/ARISE_Fitness_System.html",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
