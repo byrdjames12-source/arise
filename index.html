@@ -3004,12 +3004,55 @@
   <div id="app" class="app">
     <!-- ONBOARDING -->
     <div id="onboarding" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <!-- T34.9 — Landing splash. Shown ONCE per browser (gated by
+           arise_landing_seen flag) before the ARIA intro plays. Gives cold
+           visitors a fast value-prop summary so they know what they're signing
+           up for before committing to the 8-minute onboarding. Returning
+           users skip this entirely. -->
+      <div id="ob-landing" class="ob-screen" style="background:var(--bg);align-items:center;justify-content:center;padding:24px;">
+        <div style="max-width:480px;width:100%;text-align:center;display:flex;flex-direction:column;gap:24px;">
+          <img src="arise-logo-mark.svg" alt="ARISE" style="width:96px;height:96px;margin:0 auto;filter:drop-shadow(0 0 24px rgba(127,119,221,0.55));" onerror="this.src='arise-logo.png';this.onerror=()=>this.style.display='none';">
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:3px;font-size:32px;color:var(--text);margin-bottom:6px;">ARISE</div>
+            <div style="font-family:'Rajdhani',sans-serif;letter-spacing:2px;font-size:13px;color:var(--accent2);">FITNESS SYSTEM</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <div style="font-size:20px;flex-shrink:0;">⚔️</div>
+              <div>
+                <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Train smarter</div>
+                <div style="font-size:12px;color:var(--text3);line-height:1.5;">Multi-week programs, real-time tracking, smart deloads when an injury flags. Built around your equipment, schedule, and goals.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <div style="font-size:20px;flex-shrink:0;">📊</div>
+              <div>
+                <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Track everything</div>
+                <div style="font-size:12px;color:var(--text3);line-height:1.5;">Workouts, macros, water, sleep, body stats. Barcode scanner for packaged food. ARIA, your AI coach, sees it all and adapts the plan.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <div style="font-size:20px;flex-shrink:0;">🏆</div>
+              <div>
+                <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Level up</div>
+                <div style="font-size:12px;color:var(--text3);line-height:1.5;">Daily quests, streaks, hunter ranks, unlockable titles. The discipline of a serious training log with the loop of a game.</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn btn-primary aria-begin-glow" onclick="finishLandingSplash()" style="background:linear-gradient(135deg, #ffd76e 0%, #f0a500 50%, #b97a00 100%);border-color:#f0a500;color:#0a0c10;font-weight:700;letter-spacing:1px;justify-content:center;text-align:center;padding:14px 18px;font-size:14px;">Get Started</button>
+            <button onclick="finishLandingSplash(true)" style="background:transparent;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline;padding:6px;">I already have an account</button>
+          </div>
+          <div style="font-size:10px;color:var(--text3);line-height:1.5;">Free. Your data stays yours. <a href="mailto:support.arisefitness@gmail.com" style="color:var(--text3);">support.arisefitness@gmail.com</a></div>
+        </div>
+      </div>
+
       <!-- T30.4 — ARIA intro screen. On desktop: visual orb on the left
            (right-adjusted toward center) + caption on the right (left-adjusted).
            On mobile: stacked, orb on top, caption below. Caption uses a typewriter
            reveal where each new line REPLACES the previous one (not stacks).
            Skipped on return visits via arise_intro_seen flag. -->
-      <div id="ob-intro" class="ob-screen active" style="background:var(--bg);">
+      <div id="ob-intro" class="ob-screen" style="background:var(--bg);">
         <div class="aria-intro-stage">
           <!-- Visual side: video looping behind the logo mark, both inside a
                circular orb with a soft glow. Video has a fallback for browsers
@@ -4119,6 +4162,18 @@
             <button class="btn btn-sm btn-with-icon" onclick="startTutorial()"><span class="icon-title-slot"
                 data-icon="sparkles"></span>Replay Tour</button>
           </div>
+          <!-- T34.9 — Contact & feedback. A direct mailto so confused or stuck
+               users have a place to land. Pre-fills a subject line. -->
+          <div class="section-label" style="margin-top:4px;">SUPPORT & FEEDBACK</div>
+          <div class="card">
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
+              Found a bug, have an idea, or stuck on something? Drop us a line — usually answered within 24 hours.
+            </div>
+            <a href="mailto:support.arisefitness@gmail.com?subject=ARISE%20Fitness%20Feedback" class="btn btn-sm btn-with-icon" style="text-decoration:none;display:inline-flex;">
+              <span class="icon-title-slot" data-icon="message"></span>Email support
+            </a>
+            <div style="font-size:10px;color:var(--text3);margin-top:8px;">support.arisefitness@gmail.com</div>
+          </div>
           <div class="section-label" style="margin-top:4px;">BACKUP & EXPORT</div>
           <div class="card">
             <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Even with cloud sync,
@@ -4664,6 +4719,12 @@
       </div>
       <div id="auth-info"
         style="display:none;font-size:11px;color:var(--accent2);background:rgba(79,142,255,0.08);border:1px solid var(--accent2);border-radius:6px;padding:8px 10px;margin-bottom:10px;line-height:1.4;">
+      </div>
+      <!-- T34.9 — Forgot password link. Shown only on the Sign In tab (hidden
+           on Create Account via JS in setAuthTab). Triggers Supabase's
+           resetPasswordForEmail which sends a reset link to the user's email. -->
+      <div id="auth-forgot-row" style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button onclick="handleForgotPassword()" style="background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;text-decoration:underline;padding:0;">Forgot password?</button>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-full" onclick="closeModal('modal-cloud-auth')">Cancel</button>
@@ -5425,6 +5486,32 @@ create trigger trg_user_state_updated_at
       // Clear messages on tab switch
       const err = document.getElementById('auth-error'); if (err) err.style.display = 'none';
       const info = document.getElementById('auth-info'); if (info) info.style.display = 'none';
+      // T34.9 — forgot-password link only makes sense on Sign In
+      const forgotRow = document.getElementById('auth-forgot-row');
+      if (forgotRow) forgotRow.style.display = (which === 'signin') ? '' : 'none';
+    }
+    // T34.9 — Trigger Supabase's "send me a password reset email" flow.
+    // The user receives a link that lets them set a new password, and the
+    // session their reset link creates is what brings them back to the app.
+    async function handleForgotPassword() {
+      const email = (document.getElementById('auth-email')?.value || '').trim();
+      const errEl = document.getElementById('auth-error');
+      const infoEl = document.getElementById('auth-info');
+      const showErr = msg => { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } if (infoEl) infoEl.style.display = 'none'; };
+      const showInfo = msg => { if (infoEl) { infoEl.textContent = msg; infoEl.style.display = 'block'; } if (errEl) errEl.style.display = 'none'; };
+      if (!email || !email.includes('@')) return showErr('Enter the email you signed up with, then tap Forgot password.');
+      if (!_supabaseClient) return showErr('Cloud sync not configured — see SETUP.');
+      try {
+        // redirectTo is where Supabase sends the user after they click the
+        // email link. Sending them back to the app means their new session
+        // is live the moment they land.
+        const redirectTo = window.location.origin + '/';
+        const { error } = await _supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) throw error;
+        showInfo(`Reset link sent to ${email}. Check your inbox (and spam folder) — the link expires in an hour.`);
+      } catch (err) {
+        showErr(err?.message || 'Could not send reset email. Try again in a minute.');
+      }
     }
     async function submitAuthForm() {
       const email = (document.getElementById('auth-email')?.value || '').trim();
@@ -5524,6 +5611,10 @@ create trigger trg_user_state_updated_at
            local so you land on the path picker and can start fresh or import a backup. -->
       <button class="btn btn-sm" style="text-align:center;justify-content:center;" onclick="handleLogoutAndOnboard()" title="Sign out, clear this device's data, and return to the start screen">Log Out</button>
       <button class="btn btn-sm" style="grid-column:1 / -1;text-align:center;justify-content:center;color:var(--red2);border-color:var(--red2);" onclick="handleDeleteCloudData()">Delete Cloud Data</button>
+    </div>
+    <!-- T34.9 — Privacy line. Reassures users their data isn't a product. -->
+    <div style="font-size:10px;color:var(--text3);margin-top:10px;line-height:1.5;border-top:1px solid var(--border);padding-top:8px;">
+      Your data lives in your browser and an encrypted Supabase row tied to your account. It's yours — export it as JSON anytime from <strong>Backup &amp; Export</strong>. We don't sell or share it.
     </div>
   `;
     }
@@ -6560,6 +6651,15 @@ create trigger trg_user_state_updated_at
           return;
         }
       } catch (e) {}
+      // T34.9 — Make sure ob-intro is the active screen. If the user came
+      // through the landing splash, ob-landing was active and ob-intro was
+      // hidden — we need to flip the active class over before playing.
+      try {
+        const landing = document.getElementById('ob-landing');
+        const intro = document.getElementById('ob-intro');
+        if (landing) landing.classList.remove('active');
+        if (intro) intro.classList.add('active');
+      } catch (e) {}
       _ariaIntroAborted = false;
       _ariaIntroTimers.forEach(t => clearTimeout(t));
       _ariaIntroTimers = [];
@@ -6567,6 +6667,24 @@ create trigger trg_user_state_updated_at
       // T31.6 — force pure black on every parent so no color seams show through
       try { document.body.classList.add('intro-mode'); } catch (e) {}
       _ariaPlayIntro();
+    }
+    // T34.9 — Landing splash → ARIA intro transition. Called by the "Get
+    // Started" button. Sets the seen flag so this screen never auto-shows
+    // again, then starts the ARIA intro. If `skipToSignIn` is true (i.e. the
+    // user tapped "I already have an account"), we open the cloud sign-in
+    // modal so they can pull their data without sitting through the intro.
+    function finishLandingSplash(skipToSignIn) {
+      try { localStorage.setItem('arise_landing_seen', '1'); } catch (e) {}
+      if (skipToSignIn) {
+        // Returning user with existing cloud account. Keep them on the
+        // landing screen visually but open the sign-in modal. Once they
+        // sign in, cloudPullAndMerge brings down their profile and bumps
+        // them into the main app automatically.
+        try { openCloudAuthModal(); } catch (e) { console.warn('open auth modal:', e); }
+        return;
+      }
+      // Normal path — start the ARIA intro.
+      try { startAriaIntro(); } catch (e) { console.warn('intro start:', e); }
     }
     function skipAriaIntro() {
       _ariaIntroAborted = true;
@@ -12544,7 +12662,7 @@ create trigger trg_user_state_updated_at
         // Extra logged meals
         meals.forEach(m => allMeals.push(m));
         if (allMeals.length === 0) {
-          mealList.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">No meals logged yet today.</div>';
+          mealList.innerHTML = '<div style="text-align:center;padding:20px 14px;color:var(--text3);font-size:13px;line-height:1.5;">No meals logged today yet.<br><span style="font-size:11px;">Tap <strong>+ Add Meal</strong> below to log food. Scan a barcode 📷 or search the library to fill macros instantly.</span></div>';
         } else {
           mealList.innerHTML = allMeals.map((m, i) => `
         <div class="meal-entry">
@@ -14015,7 +14133,7 @@ create trigger trg_user_state_updated_at
       </div>
       ${s.notes ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;font-style:italic;">${s.notes}</div>` : ''}
     </div>`;
-      }).join('') || '<div style="color:var(--text3);text-align:center;padding:16px;">No sessions yet.</div>';
+      }).join('') || '<div style="color:var(--text3);text-align:center;padding:24px 12px;font-size:13px;line-height:1.5;">No sessions logged for this exercise yet.<br><span style="font-size:11px;">Once you log it from the tracker, every set will show up here with weight, reps, and your estimated 1RM trend.</span></div>';
       openModal('modal-exercise-history');
       hydrateIcons();
     }
@@ -14378,6 +14496,12 @@ create trigger trg_user_state_updated_at
         ).join(' ');
         remSlot.innerHTML = `
       <div style="padding:10px;display:flex;flex-direction:column;gap:14px;">
+        <!-- T34.9 — Set expectations clearly: reminders only fire while the
+             app is open. iOS Safari does NOT allow PWA push notifications;
+             Android Chrome supports them when not added to Home Screen. -->
+        <div style="font-size:10px;color:var(--text3);background:rgba(244,182,63,0.08);border:1px solid rgba(244,182,63,0.3);border-radius:6px;padding:8px 10px;line-height:1.5;">
+          <strong style="color:var(--gold);">Heads-up:</strong> reminders fire only while ARISE is open (or pinned in the background). iOS Safari doesn't allow background push for web apps yet — for true alarm-style reminders set a phone alarm at the same times.
+        </div>
         <div style="font-size:10px;color:var(--text3);">Browser permission: ${permLabel}</div>
         <div>
           <div class="toggle-wrap" style="margin-bottom:6px;">
@@ -16423,9 +16547,19 @@ create trigger trg_user_state_updated_at
       try { document.body.classList.add('app-ready'); } catch (e) { }
       initApp();
     } else {
-      // Fresh user — start the ARIA intro experience (or skip to path picker
-      // if they've seen it before). startAriaIntro() handles the seen flag.
-      try { startAriaIntro(); } catch (e) { console.warn('intro:', e); }
+      // T34.9 — Fresh user — decide which onboarding screen to show first.
+      // Three states (in order of precedence):
+      //   1. Never seen the landing splash → show ob-landing
+      //   2. Seen landing but not ARIA intro → start ARIA intro
+      //   3. Seen both → finishAriaIntro short-circuits to ob0 (path picker)
+      let showLanding = false;
+      try { showLanding = !localStorage.getItem('arise_landing_seen'); } catch (e) {}
+      if (showLanding) {
+        const landing = document.getElementById('ob-landing');
+        if (landing) landing.classList.add('active');
+      } else {
+        try { startAriaIntro(); } catch (e) { console.warn('intro:', e); }
+      }
       // Seed one empty goal entry for the experienced path so Step 2 isn't blank if they navigate to it.
       addGoalEntry();
     }
