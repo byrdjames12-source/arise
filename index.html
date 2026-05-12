@@ -2050,6 +2050,62 @@
       justify-content: center;
       isolation: isolate; /* so blend-mode is scoped to this wrap, not the page */
     }
+    /* T34.7 — CSS-animated rings as a fallback for when the video can't
+       autoplay. iOS disables video autoplay in Low Power Mode regardless of
+       muted/playsinline, leaving an otherwise-static orb. These pseudo-element
+       rings animate purely in CSS and stay live no matter what. When the
+       video DOES play (normal battery), the video overlays them with its own
+       brighter content — they layer cleanly behind without conflict. */
+    .aria-intro-orb-wrap::before,
+    .aria-intro-orb-wrap::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Outer slow rotating gradient halo */
+    .aria-intro-orb-wrap::before {
+      inset: 0;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        rgba(127, 119, 221, 0.55) 18%,
+        transparent 36%,
+        rgba(79, 142, 255, 0.55) 60%,
+        transparent 78%,
+        rgba(127, 119, 221, 0.35) 100%
+      );
+      filter: blur(14px);
+      animation: ariaFallbackRotate 6s linear infinite;
+    }
+    /* Inner pulsing ring */
+    .aria-intro-orb-wrap::after {
+      inset: 12%;
+      border: 2px solid rgba(127, 119, 221, 0.4);
+      box-shadow: 0 0 24px rgba(127, 119, 221, 0.35) inset,
+                  0 0 30px rgba(79, 142, 255, 0.35);
+      animation: ariaFallbackPulse 2.6s ease-in-out infinite;
+    }
+    @keyframes ariaFallbackRotate {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes ariaFallbackPulse {
+      0%, 100% { transform: scale(1);     opacity: 0.55; }
+      50%      { transform: scale(1.08);  opacity: 0.85; }
+    }
+    /* When ARIA finishes speaking, the fallback rings slow + dim to match
+       the settled video state — keeps both animation paths visually aligned. */
+    .aria-intro-orb-wrap.aria-intro-settled::before {
+      animation-duration: 14s;
+      opacity: 0.45;
+    }
+    .aria-intro-orb-wrap.aria-intro-settled::after {
+      animation: none;
+      opacity: 0.3;
+      transform: scale(1.02);
+    }
     .aria-intro-video {
       position: absolute;
       inset: 0;
@@ -2060,6 +2116,7 @@
       mix-blend-mode: screen; /* dark pixels → transparent; bright pixels → visible */
       filter: saturate(1.4) brightness(1.1);
       border-radius: 50%;
+      z-index: 1; /* layer above CSS fallback rings when actually playing */
     }
     /* No more dark inner circle — the video's own dark center is now transparent
        thanks to screen blending, so the page background shows through there.
@@ -2139,6 +2196,13 @@
       align-items: center;
       flex-wrap: wrap;
       justify-content: center;
+    }
+    /* T34.7 — Defensive CSS rule: hide Skip whenever Begin is showing. The
+       JS already does this in _ariaPlayIntro, but tying it to CSS makes
+       absolutely sure they're never visible together (e.g. if a future code
+       path forgets the JS toggle). Uses :has() — supported on iOS 15.4+. */
+    .aria-intro-controls:has(#aria-intro-begin:not([style*="display: none"]):not([style*="display:none"])) #aria-intro-skip {
+      display: none !important;
     }
     /* T31.8 — Pulsing gold glow around the Begin button. Once the orb pulse
        and video both stop, this is the only animated element on screen — it
