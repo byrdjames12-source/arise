@@ -7652,79 +7652,87 @@ create trigger trg_user_state_updated_at
     }
     // ===== T33.2 — Tutorial / Hunter Orientation =====
     // Opt-in spotlight tour shown after onboarding. Five stops:
-    //   1. Quest list  2. Bottom nav  3. Workouts → Programs
-    //   4. ARIA FAB    5. Replay note (final card)
+    //   1. Quests tab  2. Progress tab  3. Workouts tab  4. Fuel tab
+    //   5. Profile tab 6. ARIA FAB      7. Replay note (final card)
+    // T34.10 — Reworked from the original 5-step layout. Now walks through
+    // every nav tab one by one, highlighting each tab's nav button while
+    // briefly switching to its screen, so the user gets a tour of what
+    // lives where. Closes with the ARIA FAB and a "you're ready" card.
     // Persists "seen" state in localStorage.arise_tutorial_seen so it only
     // auto-prompts once. User can replay anytime from Profile → Tour & Tips.
+
+    // Resolve the nav button for a given tab name. On desktop returns the
+    // sidebar button (#app-sidebar .sidebar-nav-btn); on mobile returns the
+    // bottom-nav button inside the currently active screen. Matches by onclick
+    // text so we don't need separate IDs on every button.
+    function _getNavButton(tabName) {
+      const isDesktop = window.innerWidth >= 1024;
+      const container = isDesktop
+        ? document.querySelector('#app-sidebar .sidebar-nav')
+        : (document.querySelector('.screen.active .nav') || document.querySelector('.nav'));
+      if (!container) return null;
+      const btns = container.querySelectorAll('button[onclick]');
+      for (const b of btns) {
+        const oc = b.getAttribute('onclick') || '';
+        if (oc.includes(`'${tabName}'`)) return b;
+      }
+      return null;
+    }
+
     const TUTORIAL_STEPS = [
       {
         id: 'quests',
-        selectorFn: () => document.querySelector('#screen-quests.active #quest-list-container') || document.getElementById('quest-list-container'),
-        title: 'Daily Quests',
-        body: 'These are your tasks for the day — workout, hydration, food log, AI quest. Tap one to mark it complete. Streaks compound XP and coin rewards.',
+        selectorFn: () => _getNavButton('quests'),
+        title: 'Quests',
+        body: 'Your home base. Daily quests, your hunter rank, streaks, XP, and a quick read on today\'s training and hydration. This is where every day starts.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('quests'); } catch(e){} },
       },
       {
-        id: 'nav',
-        // T33.3 — On desktop the bottom .nav is hidden; the real nav lives in
-        // the left sidebar (#app-sidebar). Pick the visible one based on viewport.
-        selectorFn: () => {
-          const isDesktop = window.innerWidth >= 1024;
-          if (isDesktop) {
-            return document.getElementById('app-sidebar') ||
-                   document.querySelector('.sidebar-nav');
-          }
-          return document.querySelector('#screen-quests.active .nav') ||
-                 document.querySelector('.screen.active .nav') ||
-                 document.querySelector('.nav');
-        },
-        title: 'Navigation',
-        body: 'Switch between Quests, Progress, Workouts, Fuel (nutrition), and Profile. Quests is your home base — everything else flows from here.',
-        placement: 'auto', // 'top' on mobile, 'right' on desktop — auto picks
-        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+        id: 'progress',
+        selectorFn: () => _getNavButton('progress'),
+        title: 'Progress',
+        body: 'The numbers behind your work. Body stats, weight + body-fat trends, weekly training volume, and your goals dashboard. Open this when you want to see how the last 4 weeks went.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('progress'); } catch(e){} },
       },
       {
-        id: 'programs',
-        // T33.3 — On desktop the tab buttons (#work-tab-prog) are hidden — all
-        // four panes render side-by-side. Target the visible pane instead so
-        // the spotlight has a real area to highlight.
-        selectorFn: () => {
-          const isDesktop = window.innerWidth >= 1024;
-          if (isDesktop) {
-            return document.getElementById('work-pane-prog') ||
-                   document.getElementById('work-tab-prog');
-          }
-          return document.getElementById('work-tab-prog');
-        },
-        title: 'Workout Programs',
-        body: 'Build multi-week training programs, or ask ARIA to draft one for you. The Workouts tab also holds your live tracker, exercise library, and full session history.',
+        id: 'workouts',
+        selectorFn: () => _getNavButton('workouts'),
+        title: 'Workouts',
+        body: 'Log live sessions in the tracker, browse the exercise library (including warm-ups), review your full history, and pick or build multi-week programs. ARIA can also draft a custom program if the presets don\'t fit.',
         placement: 'auto',
-        beforeShow: () => {
-          try { switchTab('workouts'); } catch(e){}
-          try { if (typeof switchWorkoutTab === 'function') switchWorkoutTab('prog'); } catch(e){}
-          // T33.3 — If Programs pane was previously collapsed on desktop,
-          // expand it so the spotlight has something to land on.
-          try {
-            const prog = document.getElementById('work-pane-prog');
-            if (prog && prog.classList.contains('pane-collapsed')) {
-              prog.classList.remove('pane-collapsed');
-            }
-          } catch(e){}
-        },
+        beforeShow: () => { try { switchTab('workouts'); } catch(e){} },
+      },
+      {
+        id: 'nutrition',
+        selectorFn: () => _getNavButton('nutrition'),
+        title: 'Fuel',
+        body: 'Calories, macros, water, meals, blocklist, meal prep, and saved recipes. Use the barcode scanner 📷 to log packaged food in seconds — protein, carbs, and fat fill in automatically.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('nutrition'); } catch(e){} },
+      },
+      {
+        id: 'profile',
+        selectorFn: () => _getNavButton('profile'),
+        title: 'Profile',
+        body: 'Your hunter status, biometrics, training split, equipment, recovery mode, reminders, cloud sync, and support. Most settings live here — also where you replay this tour.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('profile'); } catch(e){} },
       },
       {
         id: 'aria',
         selectorFn: () => document.getElementById('fab-coach'),
         title: 'Meet ARIA',
-        body: 'Your AI coach lives here. Ask about form, request a plan tweak, get macro math, or talk through training questions. ARIA reads your profile and recent training to give context-aware advice.',
+        body: 'Your AI coach lives in this button — always one tap away. Ask about form, request a plan tweak, get macro math, or talk through training questions. ARIA reads your profile and recent training to give context-aware advice.',
         placement: 'left',
+        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
       },
       {
         id: 'replay',
         selectorFn: null, // final card, no target
         title: 'You\'re Ready, Hunter',
-        body: 'That\'s the whirlwind tour. You can replay it anytime from Profile → Settings → Replay Tour. Now go log your first quest.',
+        body: 'That\'s the tour. You can replay it anytime from Profile → Tour & Tips → Replay Tour. Now go log your first quest.',
         placement: 'center',
         beforeShow: () => { try { switchTab('quests'); } catch(e){} },
       },
