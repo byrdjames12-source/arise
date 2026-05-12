@@ -4250,6 +4250,11 @@
   <!-- T22.1 — Floating ARIA button. Position: fixed so it stays anchored at the
        bottom-right of the viewport regardless of scroll. Uses CSS pulse for the
        glow effect (no JS animation overhead). Hidden by default until app-ready. -->
+  <!-- T34.16 — Pure-black overlay used for the ARIA intro → ob0 transition.
+       Sits on top of everything (z-index above the FAB), transparent at rest,
+       fades to opaque via .active during finishAriaIntro then fades out
+       once ob0 is showing. Pointer-events:none so it never blocks taps. -->
+  <div id="aria-intro-fade" style="position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:200;transition:opacity 0.6s ease;"></div>
   <button class="fab-coach" id="fab-coach" onclick="openAICoachModal()" aria-label="Ask ARIA" title="Ask ARIA">
     <span class="icon-title-slot" data-icon="sparkles"></span>
   </button>
@@ -6632,15 +6637,26 @@ create trigger trg_user_state_updated_at
               _ariaSetLine('');
               _ariaTimeout(() => { i++; playNext(); }, clearMs);
             } else {
-              // T34.13 — Last line: don't erase. Settle the orb after a beat,
-              // then auto-advance to the path picker. Previously this revealed
-              // a "Begin Your Journey" button; auto-advance feels more
-              // cinematic and removes one tap.
+              // T34.13 / T34.16 — Last line: don't erase. Settle the orb,
+              // then fade-to-black, swap to ob0, fade back in. Whole
+              // transition is ~1500ms — faster than the original 2.4s but
+              // still cinematic thanks to the crossfade.
               i++;
               _ariaTimeout(() => {
                 _ariaSettleOrb();
-                _ariaTimeout(() => { finishAriaIntro(); }, 1800);
-              }, 600);
+                const fade = document.getElementById('aria-intro-fade');
+                // Step 1: fade-to-black over 600ms
+                if (fade) fade.style.opacity = '1';
+                // Step 2: at ~600ms (mid-fade), swap screens behind the curtain
+                _ariaTimeout(() => {
+                  finishAriaIntro();
+                  // Step 3: fade the black overlay back out over 600ms,
+                  // revealing the path picker underneath
+                  _ariaTimeout(() => {
+                    if (fade) fade.style.opacity = '0';
+                  }, 50);
+                }, 600);
+              }, 300);
             }
           }, holdMs);
         });
