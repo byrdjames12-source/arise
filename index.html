@@ -4276,6 +4276,9 @@
       <div class="tutorial-step-counter" id="tutorial-tt-counter"></div>
       <div class="tutorial-tooltip-actions">
         <button class="tutorial-btn" onclick="tutorialSkip()" id="tutorial-tt-skip">Skip</button>
+        <!-- T34.12 — Back button — lets the user step backward through the
+             tour without restarting. Hidden on step 0 (nothing prior to it). -->
+        <button class="tutorial-btn" onclick="tutorialBack()" id="tutorial-tt-back" style="display:none;">Back</button>
         <button class="tutorial-btn tutorial-btn-primary" onclick="tutorialNext()" id="tutorial-tt-next">Next</button>
       </div>
     </div>
@@ -7781,6 +7784,11 @@ create trigger trg_user_state_updated_at
       if (_tutorialIdx >= TUTORIAL_STEPS.length - 1) { tutorialEnd(); return; }
       _tutorialShowStep(_tutorialIdx + 1);
     }
+    // T34.12 — Step backward. No-op on step 0 (the Back button is hidden there).
+    function tutorialBack() {
+      if (_tutorialIdx <= 0) return;
+      _tutorialShowStep(_tutorialIdx - 1);
+    }
     function tutorialSkip() { tutorialEnd(); }
     function tutorialEnd() {
       _tutorialActive = false;
@@ -7805,11 +7813,14 @@ create trigger trg_user_state_updated_at
       const counter = document.getElementById('tutorial-tt-counter');
       const nextBtn = document.getElementById('tutorial-tt-next');
       const skipBtn = document.getElementById('tutorial-tt-skip');
+      const backBtn = document.getElementById('tutorial-tt-back');
       if (title) title.textContent = step.title;
       if (body) body.textContent = step.body;
       if (counter) counter.textContent = `Step ${idx + 1} of ${TUTORIAL_STEPS.length}`;
       if (nextBtn) nextBtn.textContent = (idx === TUTORIAL_STEPS.length - 1) ? 'Done' : 'Next';
       if (skipBtn) skipBtn.style.display = (idx === TUTORIAL_STEPS.length - 1) ? 'none' : '';
+      // T34.12 — Back button only makes sense from step 1 onward
+      if (backBtn) backBtn.style.display = (idx > 0) ? '' : 'none';
       // Wait two animation frames — first for the screen-switch to apply,
       // second for layout to settle — then measure and position.
       requestAnimationFrame(() => requestAnimationFrame(() => _tutorialPositionForStep(step)));
