@@ -2016,7 +2016,8 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      /* T34.14 — tightened from 12 → 4 so ARIA's orb sits closer to her caption */
+      gap: 4px;
       padding: 16px 12px;
       width: 100%;
       box-sizing: border-box;
@@ -2043,11 +2044,11 @@
        floating in space with the mark in its center. */
     .aria-intro-orb-wrap {
       position: relative;
-      /* T34.14 — bumped from 280 → 320 on mobile (~14% larger) so ARIA feels
-         more present in the opening sequence. Desktop override below stays
-         at 520 since it had no presence problem. */
-      width: 320px;
-      height: 320px;
+      /* T34.14 → T34.15 — pushed mobile size up again (320 → 384, +20%)
+         so ARIA is even more present in the opening sequence. Desktop
+         override below stays at 520. */
+      width: 384px;
+      height: 384px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -6631,11 +6632,14 @@ create trigger trg_user_state_updated_at
               _ariaSetLine('');
               _ariaTimeout(() => { i++; playNext(); }, clearMs);
             } else {
-              // Last line: don't erase, show button + settle orb after a beat
+              // T34.13 — Last line: don't erase. Settle the orb after a beat,
+              // then auto-advance to the path picker. Previously this revealed
+              // a "Begin Your Journey" button; auto-advance feels more
+              // cinematic and removes one tap.
               i++;
               _ariaTimeout(() => {
-                if (beginBtn) beginBtn.style.display = '';
                 _ariaSettleOrb();
+                _ariaTimeout(() => { finishAriaIntro(); }, 1800);
               }, 600);
             }
           }, holdMs);
