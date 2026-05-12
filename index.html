@@ -3097,7 +3097,7 @@
           <div class="aria-intro-text">
             <div class="aria-intro-line" id="aria-intro-line" aria-live="polite"><span class="aria-intro-cursor"></span></div>
             <div class="aria-intro-controls">
-              <button id="aria-intro-skip" class="btn btn-sm" onclick="skipAriaIntro()" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">Skip intro</button>
+              <button id="aria-intro-skip" class="btn btn-sm" onclick="skipAriaIntro()" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">Skip Intro</button>
             </div>
           </div>
         </div>
@@ -4074,12 +4074,10 @@
           <div class="card" style="padding:10px;">
             <table class="split-table" id="split-table-display"></table>
             <div id="split-actions-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
-              <button class="btn btn-sm" onclick="promptSaveCurrentSplit()" style="font-size:11px;">Save current as
-                preset…</button>
-              <button class="btn btn-sm" onclick="showRecommenderCard()" style="font-size:11px;">Get a
-                recommendation</button>
+              <button class="btn btn-sm" onclick="promptSaveCurrentSplit()" style="font-size:11px;">Save Current as Preset…</button>
+              <button class="btn btn-sm" onclick="showRecommenderCard()" style="font-size:11px;">Get a Recommendation</button>
               <button class="btn btn-sm" onclick="clearWorkoutSplit()"
-                style="font-size:11px;color:var(--red2);border-color:var(--red2);">Clear split</button>
+                style="font-size:11px;color:var(--red2);border-color:var(--red2);">Clear Split</button>
             </div>
           </div>
           <div id="split-tips-slot"></div>
@@ -4148,7 +4146,7 @@
                 <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Recovery mode <span
                     style="color:var(--text3);font-size:10px;">— route around injured muscle groups</span>
                 </div>
-                <button class="btn btn-sm" id="injury-mode-button" onclick="openInjuryModal()" style="font-size:12px;padding:6px 10px;text-align:left;">Manage active injuries…</button>
+                <button class="btn btn-sm" id="injury-mode-button" onclick="openInjuryModal()" style="font-size:12px;padding:6px 10px;">Manage Active Injuries…</button>
               </div>
             </div>
           </div>
@@ -4787,7 +4785,7 @@
         </p>
         <div id="injury-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
         <div id="injury-impact-note" style="font-size:10px;color:var(--text3);line-height:1.5;margin-bottom:10px;"></div>
-        <button class="btn btn-sm" id="injury-clear-btn" onclick="clearInjuries()" style="color:var(--gold);border-color:var(--gold);font-size:11px;">Clear groups</button>
+        <button class="btn btn-sm" id="injury-clear-btn" onclick="clearInjuries()" style="color:var(--gold);border-color:var(--gold);font-size:11px;">Clear Groups</button>
       </details>
 
       <button class="btn btn-full" onclick="closeModal('modal-injuries')">Done</button>
@@ -13816,13 +13814,13 @@ create trigger trg_user_state_updated_at
       if (!title || !body) return;
       title.innerHTML = `<span class="icon-title-slot" data-icon="dumbbell"></span>Substitutes for "${escapeHtml(exerciseName)}"`;
       const equipmentNote = equip.length
-        ? `<div style="font-size:11px;color:var(--text3);margin-bottom:10px;">Filtered to your available equipment: ${equip.map(e => `<span class="avatar-chip">${escapeHtml(e)}</span>`).join(' ')}<button onclick="this.closest('.modal').querySelector('#sub-modal-show-all').click()" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:11px;text-decoration:underline;margin-left:6px;">Show all</button></div>`
+        ? `<div style="font-size:11px;color:var(--text3);margin-bottom:10px;">Filtered to your available equipment: ${equip.map(e => `<span class="avatar-chip">${escapeHtml(e)}</span>`).join(' ')}<button onclick="this.closest('.modal').querySelector('#sub-modal-show-all').click()" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:11px;text-decoration:underline;margin-left:6px;">Show All</button></div>`
         : `<div style="font-size:11px;color:var(--text3);margin-bottom:10px;">Tip: set your available equipment in <strong>Profile</strong> to filter these results.</div>`;
       body.innerHTML = `
         ${equipmentNote}
         <div style="font-size:11px;color:var(--accent2);font-family:'Rajdhani',sans-serif;letter-spacing:1px;font-weight:600;margin-bottom:6px;">${(group || 'OTHER').toUpperCase()} ALTERNATIVES</div>
         <div id="sub-modal-list" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto;"></div>
-        <button id="sub-modal-show-all" onclick="renderSubstituteList(${JSON.stringify(exerciseName)}, true)" style="display:none;">Show all</button>
+        <button id="sub-modal-show-all" onclick="renderSubstituteList(${JSON.stringify(exerciseName)}, true)" style="display:none;">Show All</button>
       `;
       hydrateIcons();
       renderSubstituteList(exerciseName, !equip.length);
@@ -14578,7 +14576,7 @@ create trigger trg_user_state_updated_at
           </div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm" onclick="testReminderNotification()" style="font-size:11px;">Test notification</button>
+          <button class="btn btn-sm" onclick="testReminderNotification()" style="font-size:11px;">Test Notification</button>
         </div>
       </div>`;
       }
