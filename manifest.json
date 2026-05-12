@@ -1,0 +1,26 @@
+{
+  "name": "ARISE Fitness System",
+  "short_name": "ARISE",
+  "description": "Hunter-themed fitness tracker — train, log, level up.",
+  "start_url": "/ARISE_Fitness_System.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0c10",
+  "theme_color": "#0a0c10",
+  "icons": [
+    {
+      "src": "/arise-logo-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/arise-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["fitness", "health", "lifestyle"]
+}
