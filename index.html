@@ -2043,8 +2043,11 @@
        floating in space with the mark in its center. */
     .aria-intro-orb-wrap {
       position: relative;
-      width: 280px;
-      height: 280px;
+      /* T34.14 — bumped from 280 → 320 on mobile (~14% larger) so ARIA feels
+         more present in the opening sequence. Desktop override below stays
+         at 520 since it had no presence problem. */
+      width: 320px;
+      height: 320px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -2140,16 +2143,9 @@
       flex-wrap: wrap;
       justify-content: center;
     }
-    /* T34.7 — Defensive CSS rule: hide Skip whenever Begin is showing. The
-       JS already does this in _ariaPlayIntro, but tying it to CSS makes
-       absolutely sure they're never visible together (e.g. if a future code
-       path forgets the JS toggle). Uses :has() — supported on iOS 15.4+. */
-    .aria-intro-controls:has(#aria-intro-begin:not([style*="display: none"]):not([style*="display:none"])) #aria-intro-skip {
-      display: none !important;
-    }
-    /* T31.8 — Pulsing gold glow around the Begin button. Once the orb pulse
-       and video both stop, this is the only animated element on screen — it
-       commands attention without being aggressive. */
+    /* T31.8 — Pulsing gold glow around the Begin / Get Started button. Used
+       by the landing splash "Get Started" CTA. (The ARIA intro's previous
+       Begin button was removed in T34.13 — intro now auto-advances.) */
     .aria-begin-glow {
       position: relative;
       animation: ariaBeginPulse 2.2s ease-in-out infinite;
@@ -3018,21 +3014,23 @@
           </div>
           <div style="display:flex;flex-direction:column;gap:14px;text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
             <div style="display:flex;gap:12px;align-items:flex-start;">
-              <div style="font-size:20px;flex-shrink:0;">⚔️</div>
+              <!-- T34.13 — line-art SVG icons via the site's icon-title-slot
+                   system, matched in style to the rest of the app. -->
+              <span class="icon-title-slot" data-icon="swords" data-icon-size="22" style="flex-shrink:0;margin:2px 0 0 0;color:var(--gold);"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Train smarter</div>
                 <div style="font-size:12px;color:var(--text3);line-height:1.5;">Multi-week programs, real-time tracking, smart deloads when an injury flags. Built around your equipment, schedule, and goals.</div>
               </div>
             </div>
             <div style="display:flex;gap:12px;align-items:flex-start;">
-              <div style="font-size:20px;flex-shrink:0;">📊</div>
+              <span class="icon-title-slot" data-icon="trending" data-icon-size="22" style="flex-shrink:0;margin:2px 0 0 0;color:var(--gold);"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Track everything</div>
                 <div style="font-size:12px;color:var(--text3);line-height:1.5;">Workouts, macros, water, sleep, body stats. Barcode scanner for packaged food. ARIA, your AI coach, sees it all and adapts the plan.</div>
               </div>
             </div>
             <div style="display:flex;gap:12px;align-items:flex-start;">
-              <div style="font-size:20px;flex-shrink:0;">🏆</div>
+              <span class="icon-title-slot" data-icon="trophy" data-icon-size="22" style="flex-shrink:0;margin:2px 0 0 0;color:var(--gold);"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Level up</div>
                 <div style="font-size:12px;color:var(--text3);line-height:1.5;">Daily quests, streaks, hunter ranks, unlockable titles. The discipline of a serious training log with the loop of a game.</div>
@@ -3080,11 +3078,13 @@
             </div>
           </div>
           <!-- Text side: single line at a time via typewriter. -->
+          <!-- T34.13 — Begin button removed; intro auto-advances after the
+               last line. Skip stays available throughout for users who
+               want to bail before the auto-transition fires. -->
           <div class="aria-intro-text">
             <div class="aria-intro-line" id="aria-intro-line" aria-live="polite"><span class="aria-intro-cursor"></span></div>
             <div class="aria-intro-controls">
               <button id="aria-intro-skip" class="btn btn-sm" onclick="skipAriaIntro()" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">Skip intro</button>
-              <button id="aria-intro-begin" class="btn btn-primary aria-begin-glow" onclick="finishAriaIntro()" style="display:none;background:linear-gradient(135deg, #ffd76e 0%, #f0a500 50%, #b97a00 100%);border-color:#f0a500;color:#0a0c10;font-weight:700;letter-spacing:1px;justify-content:center;text-align:center;">Begin Your Journey</button>
             </div>
           </div>
         </div>
@@ -6607,8 +6607,6 @@ create trigger trg_user_state_updated_at
       } catch (e) {}
     }
     function _ariaPlayIntro() {
-      const beginBtn = document.getElementById('aria-intro-begin');
-      const skipBtn = document.getElementById('aria-intro-skip');
       const charDelay = 30; // ms per character — feels brisk but readable
       const holdMs = 1300;  // ms to hold a complete line before clearing
       const clearMs = 200;  // small pause after clearing before next line types
@@ -6616,13 +6614,13 @@ create trigger trg_user_state_updated_at
       const playNext = () => {
         if (_ariaIntroAborted) return;
         if (i >= ARIA_INTRO_LINES.length) {
-          // Reveal the Begin button + hide Skip + settle the orb. Skip is
-          // pointless once the intro has fully played — Begin replaces it.
-          _ariaTimeout(() => {
-            if (beginBtn) beginBtn.style.display = '';
-            if (skipBtn) skipBtn.style.display = 'none';
-            _ariaSettleOrb();
-          }, 100);
+          // T34.13 — Last line is done. Settle the orb (stop the video) and
+          // auto-advance to the path picker after a beat. Previously this
+          // revealed a "Begin Your Journey" button; the auto-advance feels
+          // more cinematic and removes one tap. Skip stays visible the
+          // whole time in case the user wants to bail before the auto.
+          _ariaSettleOrb();
+          _ariaTimeout(() => { finishAriaIntro(); }, 2200);
           return;
         }
         const line = ARIA_INTRO_LINES[i];
@@ -16576,6 +16574,10 @@ create trigger trg_user_state_updated_at
       if (showLanding) {
         const landing = document.getElementById('ob-landing');
         if (landing) landing.classList.add('active');
+        // T34.13 — Hydrate the landing splash's icon-title-slot spans before
+        // the user sees them. Without this, the data-icon attributes haven't
+        // been swapped for SVGs yet and the cards would render blank.
+        try { hydrateIcons(); } catch (e) { console.warn('icons:', e); }
       } else {
         try { startAriaIntro(); } catch (e) { console.warn('intro:', e); }
       }
