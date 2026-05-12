@@ -4143,7 +4143,7 @@
                 </select>
               </div>
               <div style="display:flex;flex-direction:column;gap:4px;">
-                <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Recovery mode <span
+                <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Recovery Mode <span
                     style="color:var(--text3);font-size:10px;">— route around injured muscle groups</span>
                 </div>
                 <button class="btn btn-sm" id="injury-mode-button" onclick="openInjuryModal()" style="font-size:12px;padding:6px 10px;">Manage Active Injuries…</button>
@@ -4181,7 +4181,7 @@
               Found a bug, have an idea, or stuck on something? Drop us a line — usually answered within 24 hours.
             </div>
             <a href="mailto:support.arisefitness@gmail.com?subject=ARISE%20Fitness%20Feedback" class="btn btn-sm btn-with-icon" style="text-decoration:none;display:inline-flex;align-items:center;">
-              <span class="icon-title-slot" data-icon="mail"></span>Email support
+              <span class="icon-title-slot" data-icon="mail"></span>Email Support
             </a>
             <div style="font-size:10px;color:var(--text3);margin-top:8px;">support.arisefitness@gmail.com</div>
           </div>
@@ -6282,7 +6282,7 @@ create trigger trg_user_state_updated_at
           deadline.setDate(deadline.getDate() + (parseInt(g.deadline_weeks) || 12) * 7);
           state.goals.push({
             id: Date.now() + Math.random(),
-            name: g.name,
+            name: toTitleCase(g.name),
             cat: g.cat || 'habit',
             current: g.current || '',
             target: g.target || '',
@@ -6941,7 +6941,7 @@ create trigger trg_user_state_updated_at
         if (!name) return;
         goals.push({
           id: Date.now() + Math.random(),
-          name, cat: inputs[1].value,
+          name: toTitleCase(name), cat: inputs[1].value,
           current: inputs[2].value, target: inputs[3].value,
           date: inputs[4].value, progress: 0,
           milestones: (inputs[5].value || '').split(',').filter(m => m.trim()).map(m => ({ text: m.trim(), done: false }))
@@ -8246,6 +8246,29 @@ create trigger trg_user_state_updated_at
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
+    // T34.21 — Convert a user-supplied string to Title Case using AP-style
+    // rules: capitalize the first letter of every word EXCEPT short articles,
+    // conjunctions, and prepositions (a, an, and, as, at, by, etc.), unless
+    // those words are the first or last word in the string (those always
+    // capitalize). Digits and punctuation pass through unchanged.
+    // Used to normalize goal names so users get consistent display regardless
+    // of how they type their input ("squat 1.5x bodyweight" → "Squat 1.5x Bodyweight").
+    function toTitleCase(str) {
+      if (!str || typeof str !== 'string') return str;
+      const minor = /^(a|an|and|as|at|but|by|for|in|nor|of|on|or|so|the|to|up|yet|vs)$/i;
+      // Capture word positions so we can detect first/last for AP rules.
+      const matches = [];
+      str.replace(/\b[a-zA-Z]\w*\b/g, (m, idx) => { matches.push({ word: m, idx }); return m; });
+      if (matches.length === 0) return str;
+      const firstIdx = matches[0].idx;
+      const lastIdx = matches[matches.length - 1].idx;
+      return str.replace(/\b[a-zA-Z]\w*\b/g, (word, idx) => {
+        const lower = word.toLowerCase();
+        const isEdge = idx === firstIdx || idx === lastIdx;
+        if (!isEdge && minor.test(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      });
+    }
 
     // T33.4 — Position the glossary tooltip in viewport coordinates so it
     // escapes any clipping ancestor (overflow:hidden scrolling panes like
@@ -8677,7 +8700,7 @@ create trigger trg_user_state_updated_at
       deadline.setDate(deadline.getDate() + 90);
       const goal = {
         id: Date.now() + Math.random(),
-        name: sample.name,
+        name: toTitleCase(sample.name),
         cat: sample.cat,
         current: sample.current,
         target: sample.target,
@@ -8688,7 +8711,7 @@ create trigger trg_user_state_updated_at
       state.goals = state.goals || [];
       state.goals.push(goal);
       save();
-      showNotif(`Goal added: ${sample.name}`, 'var(--green)');
+      showNotif(`Goal added: ${goal.name}`, 'var(--green)');
       // Re-render the goals list if it's mounted; close the modal so user sees the result.
       try { renderGoals(); } catch (e) { }
       closeModal('modal-sample-goals');
@@ -11883,7 +11906,8 @@ create trigger trg_user_state_updated_at
         const g = state.goals.find(x => x.id == editId);
         if (!g) { showNotif('Goal not found'); return; }
         const prev = { name: g.name, cat: g.cat, current: g.current, target: g.target, date: g.date };
-        g.name = name;
+        // T34.21 — normalize on edit too, so renamed goals stay Title-Cased
+        g.name = toTitleCase(name);
         g.cat = cat;
         g.current = current;
         g.target = target;
@@ -11915,8 +11939,9 @@ create trigger trg_user_state_updated_at
         return;
       }
       // ===== CREATE PATH =====
+      // T34.21 — normalize goal name to Title Case regardless of how user typed it
       const goal = {
-        id: Date.now(), name, cat, current, target, date, progress,
+        id: Date.now(), name: toTitleCase(name), cat, current, target, date, progress,
         milestones: manual.length ? manual : [],
         createdAt: todayStr()
       };
@@ -14504,7 +14529,7 @@ create trigger trg_user_state_updated_at
           injBtn.style.borderColor = '#c084fc';
           injBtn.style.color = 'var(--text)';
         } else {
-          injBtn.textContent = 'Manage active injuries…';
+          injBtn.textContent = 'Manage Active Injuries…';
           injBtn.style.borderColor = '';
           injBtn.style.color = '';
         }
