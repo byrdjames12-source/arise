@@ -260,8 +260,12 @@
       background: var(--bg2);
       border-top: 1px solid var(--border);
       display: flex;
-      padding: 8px 0 12px;
-      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+      /* T34.17 — bumped top from 8 → 14 and bottom from 12 → 20 so the nav
+         has more presence on mobile / PWA. iOS PWAs in particular had the
+         buttons sitting too close to the home indicator. The safe-area-inset
+         layer below still adds the actual indicator height on top of this. */
+      padding: 14px 0 20px;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
       flex-shrink: 0;
     }
 
@@ -270,11 +274,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
+      gap: 4px;
       background: none;
       border: none;
       cursor: pointer;
-      padding: 4px 2px;
+      /* T34.17 — bumped from 4 → 8 so each button has more vertical weight */
+      padding: 8px 2px;
       min-width: 0;
       color: #e8ecf4;
       transition: color .18s ease, filter .18s ease;
@@ -2144,6 +2149,13 @@
       flex-wrap: wrap;
       justify-content: center;
     }
+    /* T34.18 — Landing splash cards use a bigger icon size than the rest of
+       the app's icon-title-slot (which forces 20px svg via global CSS).
+       Override here so the swords/trending/trophy icons feel commanding. */
+    #ob-landing .icon-title-slot svg {
+      width: 32px !important;
+      height: 32px !important;
+    }
     /* T31.8 — Pulsing gold glow around the Begin / Get Started button. Used
        by the landing splash "Get Started" CTA. (The ARIA intro's previous
        Begin button was removed in T34.13 — intro now auto-advances.) */
@@ -3017,21 +3029,21 @@
             <div style="display:flex;gap:12px;align-items:flex-start;">
               <!-- T34.13 — line-art SVG icons via the site's icon-title-slot
                    system, matched in style to the rest of the app. -->
-              <span class="icon-title-slot" data-icon="swords" data-icon-size="22" style="flex-shrink:0;margin:2px 0 0 0;color:var(--gold);"></span>
+              <span class="icon-title-slot" data-icon="swords" data-icon-size="32" style="flex-shrink:0;margin:0;color:var(--gold);width:32px;height:32px;"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Train smarter</div>
                 <div style="font-size:12px;color:var(--text3);line-height:1.5;">Multi-week programs, real-time tracking, smart deloads when an injury flags. Built around your equipment, schedule, and goals.</div>
               </div>
             </div>
             <div style="display:flex;gap:12px;align-items:flex-start;">
-              <span class="icon-title-slot" data-icon="trending" data-icon-size="22" style="flex-shrink:0;margin:2px 0 0 0;color:var(--gold);"></span>
+              <span class="icon-title-slot" data-icon="trending" data-icon-size="32" style="flex-shrink:0;margin:0;color:var(--gold);width:32px;height:32px;"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Track everything</div>
                 <div style="font-size:12px;color:var(--text3);line-height:1.5;">Workouts, macros, water, sleep, body stats. Barcode scanner for packaged food. ARIA, your AI coach, sees it all and adapts the plan.</div>
               </div>
             </div>
             <div style="display:flex;gap:12px;align-items:flex-start;">
-              <span class="icon-title-slot" data-icon="trophy" data-icon-size="22" style="flex-shrink:0;margin:2px 0 0 0;color:var(--gold);"></span>
+              <span class="icon-title-slot" data-icon="trophy" data-icon-size="32" style="flex-shrink:0;margin:0;color:var(--gold);width:32px;height:32px;"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Level up</div>
                 <div style="font-size:12px;color:var(--text3);line-height:1.5;">Daily quests, streaks, hunter ranks, unlockable titles. The discipline of a serious training log with the loop of a game.</div>
