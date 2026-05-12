@@ -8594,7 +8594,7 @@ create trigger trg_user_state_updated_at
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
               <span style="font-size:9px;font-weight:700;letter-spacing:0.1em;color:${color};">${catLabel[g.cat] || g.cat.toUpperCase()}</span>
             </div>
-            <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:var(--text);">${g.name}</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;color:var(--text);">${escapeHtml(toTitleCase(g.name))}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.45;">${g.desc}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:4px;">
               <span style="color:var(--text3);">From:</span> ${g.current} <span style="color:var(--text3);">→</span> <strong>${g.target}</strong>
@@ -11811,7 +11811,7 @@ create trigger trg_user_state_updated_at
           div.innerHTML = `
         <div class="goal-header">
           <div>
-            <div class="goal-name">${goal.name}</div>
+            <div class="goal-name">${escapeHtml(toTitleCase(goal.name))}</div>
             <div style="font-size:11px;color:var(--text3);">${goal.date ? `Target: ${goal.date}${days !== null ? ` · ${days} days left` : ''}` : 'No deadline'}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
@@ -14570,7 +14570,10 @@ create trigger trg_user_state_updated_at
       </span>`
         ).join(' ');
         remSlot.innerHTML = `
-      <div style="padding:10px;display:flex;flex-direction:column;gap:14px;">
+      <!-- T34.22 — Removed the inner padding:10px; the parent .card already
+           provides padding. Stripping it makes this card's content align with
+           every other Profile card. -->
+      <div style="display:flex;flex-direction:column;gap:14px;">
         <!-- T34.9 — Set expectations clearly: reminders only fire while the
              app is open. iOS Safari does NOT allow PWA push notifications;
              Android Chrome supports them when not added to Home Screen. -->
@@ -14601,7 +14604,7 @@ create trigger trg_user_state_updated_at
           </div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm" onclick="testReminderNotification()" style="font-size:11px;">Test Notification</button>
+          <button class="btn btn-sm" onclick="testReminderNotification()">Test Notification</button>
         </div>
       </div>`;
       }
