@@ -127,20 +127,26 @@
       height: 76px;
       box-sizing: border-box;
     }
-    /* T34.25 — Tabs inside the topbar: consistent pill size, content-sized,
-         and allowed to wrap onto 2 lines so long labels like "Log Session"
-         don't get cut off when 4 of them are crammed beside the title. */
+    /* T34.26 — Tabs inside the topbar: share available width equally with
+       a cap (max-width: 78px) so long labels like "Log Session" wrap onto
+       2 lines while short labels (Library, History, Programs) stay on one
+       line. min-width prevents Progress's 2 tabs from collapsing too narrow;
+       max-width prevents them from ballooning. All tabs share the same
+       min-height so the row stays visually uniform whether 1 or 2 lines. */
     .topbar .tab-row .tab-btn {
-      flex: 0 0 auto;
-      padding: 4px 10px;
+      flex: 1 1 0;
+      min-width: 56px;
+      max-width: 78px;
+      padding: 4px 6px;
       font-size: 11px;
       line-height: 1.15;
       white-space: normal;
       text-align: center;
-      min-height: 36px;
+      min-height: 40px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      word-break: break-word;
     }
 
     .topbar-title {
@@ -1349,16 +1355,23 @@
       background: linear-gradient(135deg, #0d1827, #0f1a2e);
       border: 1px solid rgba(79, 142, 255, 0.3);
       border-radius: 12px;
-      padding: 16px 18px;
+      padding: 18px 20px 20px;
       position: relative;
-      overflow: hidden;
+      /* T34.26 — overflow:visible so the systemMessage italic line (rendered
+         below the description) doesn't get clipped. The ::after blur on the
+         card is still contained by border-radius rendering. */
+      overflow: visible;
       flex-shrink: 0;
-      /* T34.25 — guarantee minimum height so the card has visual presence
-         even when the content area is empty or still loading. Prevents the
-         "header-only collapsed card" state on desktop and mobile alike. */
-      min-height: 130px;
-      display: flex;
-      flex-direction: column;
+      /* T34.26 — bumped floor from 130 → 220 to comfortably fit a typical
+         AI quest: header + title + 3-line description + systemMessage. The
+         card still grows beyond this for longer descriptions. */
+      min-height: 220px;
+      height: auto;
+    }
+    /* When ai-card is a grid child on desktop, allow it to size to its
+       content rather than getting squeezed by row sizing. */
+    #quests-scroll > .ai-card {
+      align-self: start;
     }
 
     .ai-card::after {
