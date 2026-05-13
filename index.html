@@ -122,11 +122,18 @@
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
-      /* T34.23 — fixed min-height so every page's topbar matches regardless of
-         whether the page uses a subtitle (Quests) or a tab row (Progress,
-         Workouts, Fuel). 56px fits the tallest variant cleanly. */
-      min-height: 56px;
+      /* T34.24 — fixed height (not min-height) so every page's topbar is
+         identical regardless of content (subtitle, tabs, plain title, etc.). */
+      height: 64px;
       box-sizing: border-box;
+    }
+    /* T34.24 — Tabs inside the topbar shouldn't flex-stretch to fill width
+         — that makes Progress's 2 tabs balloon vs Workouts' 4. Force a
+         consistent pill size by overriding the global .tab-btn flex:1. */
+    .topbar .tab-row .tab-btn {
+      flex: 0 0 auto;
+      padding: 6px 12px;
+      font-size: 11px;
     }
 
     .topbar-title {
@@ -299,12 +306,14 @@
     }
 
     .nav-icon {
-      font-size: 17px;
+      /* T34.24 — bumped 17 → 22 (text) and 20 → 26 (slot height) for a more
+         present bottom-nav. SVG sizing in .nav-icon .icon below scales to match. */
+      font-size: 22px;
       line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      height: 20px;
+      height: 26px;
       filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
     }
 
@@ -313,8 +322,9 @@
     }
 
     .nav-icon .icon {
-      width: 20px;
-      height: 20px;
+      /* T34.24 — bumped 20 → 26 to match the larger slot height above. */
+      width: 26px;
+      height: 26px;
       stroke-width: 2;
     }
 
@@ -14613,12 +14623,24 @@ create trigger trg_user_state_updated_at
       const indicator = document.getElementById('ai-loading-indicator');
       const content = document.getElementById('ai-quest-content');
       if (!indicator || !content) return;
+      // T34.24 — Defensive: if quest is null or missing core fields, show an
+      // explicit error state with a retry button instead of leaving the card
+      // looking half-rendered (header visible, body blank).
+      if (!quest || (!quest.questName && !quest.description)) {
+        indicator.style.display = 'none';
+        content.style.display = 'block';
+        content.innerHTML = `
+          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">Today's challenge didn't load. Tap retry to regenerate.</div>
+          <button class="btn btn-sm" onclick="generateAIQuest({force:true})" style="font-size:11px;">Retry</button>
+        `;
+        return;
+      }
       indicator.style.display = 'none';
       content.style.display = 'block';
       content.innerHTML = `
-      <div style="font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--text);margin-bottom:6px;">${quest.questName} <span style="font-size:13px;color:var(--gold);">+${quest.xpReward} XP</span></div>
-      <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${quest.description}</div>
-      <div style="font-size:12px;color:var(--accent2);font-style:italic;border-left:2px solid var(--accent);padding-left:8px;">"${quest.systemMessage}"</div>
+      <div style="font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--text);margin-bottom:6px;">${quest.questName || 'Daily Challenge'} <span style="font-size:13px;color:var(--gold);">+${quest.xpReward || 0} XP</span></div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${quest.description || ''}</div>
+      <div style="font-size:12px;color:var(--accent2);font-style:italic;border-left:2px solid var(--accent);padding-left:8px;">"${quest.systemMessage || ''}"</div>
       <div id="ai-challenge-btn-slot"></div>
     `;
       renderAIChallengeButton(quest);
