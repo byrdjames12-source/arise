@@ -122,6 +122,11 @@
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
+      /* T34.23 — fixed min-height so every page's topbar matches regardless of
+         whether the page uses a subtitle (Quests) or a tab row (Progress,
+         Workouts, Fuel). 56px fits the tallest variant cleanly. */
+      min-height: 56px;
+      box-sizing: border-box;
     }
 
     .topbar-title {
@@ -2628,31 +2633,22 @@
         grid-column: 1 / -1;
         grid-row: 1;
       }
-      /* Row 2 — AI Quest banner spans full width */
-      #quests-scroll > #ai-quest-card {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        margin: 0;
-      }
-      /* Banner styling — wider, more dramatic */
-      #quests-scroll > #ai-quest-card .ai-card-content {
-        padding: 18px 24px;
-      }
-      /* Hide the redundant "AI-POWERED CHALLENGE" label on desktop — banner is self-evident */
-      #quests-scroll > [data-desktop-hide="ai-label"] { display: none; }
+      /* T34.23 — AI Quest no longer spans the full top. Stacks in the left
+         column under daily quests, matching the mobile flow. */
       /* Hide the legacy identity column — the hunter banner replaces it */
       #quests-scroll > .home-identity { display: none !important; }
       /* Trends panel: right column */
       #quests-scroll > .home-trends {
         grid-column: 2;
-        grid-row: 3 / span 99;
+        grid-row: 2 / span 99;
         align-self: start;
         display: flex;
         flex-direction: column;
         gap: 14px;
       }
-      /* Left column: streak, quests, training log default into col 1 */
+      /* Left column: AI quest, streak, quests, training log all flow in col 1 */
       #quests-scroll > .card:not(.home-identity-card):not(.quests-hunter-banner),
+      #quests-scroll > #ai-quest-card,
       #quests-scroll > .penalty-bar,
       #quests-scroll > .section-label,
       #quests-scroll > #quest-list-container,
@@ -3885,13 +3881,12 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="utensils"></span>Fuel Log</div>
           <div class="topbar-right">
+            <!-- T34.23 — stripped per-button padding/font overrides so Fuel
+                 tabs match the size of tabs on every other screen. -->
             <div class="tab-row" style="gap:4px;">
-              <button class="tab-btn active" id="nut-tab-daily" onclick="switchNutTab('daily')"
-                style="padding:4px 10px;font-size:11px;">Daily</button>
-              <button class="tab-btn" id="nut-tab-weekly" onclick="switchNutTab('weekly')"
-                style="padding:4px 10px;font-size:11px;">Weekly</button>
-              <button class="tab-btn" id="nut-tab-prep" onclick="switchNutTab('prep')"
-                style="padding:4px 10px;font-size:11px;">Meal Prep</button>
+              <button class="tab-btn active" id="nut-tab-daily" onclick="switchNutTab('daily')">Daily</button>
+              <button class="tab-btn" id="nut-tab-weekly" onclick="switchNutTab('weekly')">Weekly</button>
+              <button class="tab-btn" id="nut-tab-prep" onclick="switchNutTab('prep')">Meal Prep</button>
             </div>
           </div>
         </div>
