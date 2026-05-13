@@ -1357,16 +1357,13 @@
       border-radius: 12px;
       padding: 18px 20px 20px;
       position: relative;
-      /* T34.26 — overflow:visible so the systemMessage italic line (rendered
-         below the description) doesn't get clipped. The ::after blur on the
-         card is still contained by border-radius rendering. */
-      overflow: visible;
+      /* T34.27 — overflow:hidden restored to contain the ::after blur glow
+         (which was leaking past the card border in T34.26). The card still
+         grows naturally with content because min-height is a floor, not a
+         ceiling — bigger content pushes the card taller without clipping. */
+      overflow: hidden;
       flex-shrink: 0;
-      /* T34.26 — bumped floor from 130 → 220 to comfortably fit a typical
-         AI quest: header + title + 3-line description + systemMessage. The
-         card still grows beyond this for longer descriptions. */
       min-height: 220px;
-      height: auto;
     }
     /* When ai-card is a grid child on desktop, allow it to size to its
        content rather than getting squeezed by row sizing. */
@@ -3823,7 +3820,7 @@
               <button class="tab-btn active" id="work-tab-log" onclick="switchWorkoutTab('log')">Log Session</button>
               <button class="tab-btn" id="work-tab-lib" onclick="switchWorkoutTab('lib')">Library</button>
               <button class="tab-btn" id="work-tab-hist" onclick="switchWorkoutTab('hist')">History</button>
-              <button class="tab-btn" id="work-tab-prog" onclick="switchWorkoutTab('prog')">Programs</button>
+              <button class="tab-btn" id="work-tab-prog" onclick="switchWorkoutTab('prog')">Plans</button>
             </div>
           </div>
         </div>
