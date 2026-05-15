@@ -21,6 +21,30 @@
   <!-- T34.3 — PWA manifest. Tells iOS/Android how to render the app when
        installed to the home screen (standalone, no browser chrome). -->
   <link rel="manifest" href="manifest.json">
+  <!-- T35.2 — Apply saved theme BEFORE first paint so users don't see a
+       dark-mode flash before light kicks in. Reads localStorage synchronously;
+       Supabase-stored theme syncs later but localStorage is the source of
+       truth for this boot path. Values: dark | light | system.
+       The system mode follows prefers-color-scheme. Default: dark.
+       The id attribute on the script tag distinguishes it from the main
+       app code block so existing test scaffolding can ignore this one. -->
+  <script id="theme-boot">
+    (function applyBootTheme() {
+      try {
+        var pref = localStorage.getItem('arise.theme') || 'dark';
+        var resolved = pref;
+        if (pref === 'system') {
+          resolved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+            ? 'light' : 'dark';
+        }
+        if (resolved === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', '#f4f6fb');
+        }
+      } catch (e) { /* localStorage may be blocked in private mode — fall back to dark */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
     href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
@@ -54,6 +78,41 @@
       --rank-b: #8b5cf6;
       --rank-a: #f59e0b;
       --rank-s: #ef4444;
+    }
+
+    /* T35.1 — Light theme palette. Applied by setting data-theme="light" on
+       <html>. Designed to keep the ARISE brand recognizable: deeper cobalt
+       accent (#2563eb) for contrast on white, slightly darkened status colors
+       so gold/red/green stay legible on light backgrounds. Rank colors keep
+       their hue identity so an S-rank still reads as red, etc. */
+    [data-theme="light"] {
+      --bg: #f4f6fb;
+      --bg2: #ffffff;
+      --bg3: #ffffff;
+      --bg4: #eef2f9;
+      --border: rgba(15, 30, 60, 0.10);
+      --border2: rgba(15, 30, 60, 0.18);
+      --accent: #2563eb;
+      --accent2: #1d4ed8;
+      --accent-glow: rgba(37, 99, 235, 0.14);
+      --gold: #b8860b;
+      --gold2: #d4a017;
+      --purple: #7c3aed;
+      --purple2: #8b5cf6;
+      --green: #059669;
+      --green2: #10b981;
+      --red: #dc2626;
+      --red2: #ef4444;
+      --amber: #d97706;
+      --text: #0f172a;
+      --text2: #475569;
+      --text3: #94a3b8;
+      --rank-e: #4b5563;
+      --rank-d: #059669;
+      --rank-c: #2563eb;
+      --rank-b: #7c3aed;
+      --rank-a: #d97706;
+      --rank-s: #dc2626;
     }
 
     * {
@@ -238,8 +297,12 @@
     }
 
     .btn-primary:hover {
-      background: #3a7aee;
+      background: var(--accent2);
     }
+    /* T35.4 — In light mode, --accent2 (#1d4ed8) is darker than --accent
+       (#2563eb), giving the correct "darken on hover" feel. In dark mode the
+       inherited #3a7aee semantic still works since --accent2 (#7eb3ff) is
+       lighter, matching the original hover behavior. */
 
     .btn-gold {
       background: var(--gold);
@@ -4178,6 +4241,10 @@
               </div>
             </div>
           </div>
+          <!-- T35.3 — Appearance: theme toggle. Rendered by renderThemeCard()
+               in renderProfile(). Segmented control for Dark / Light / System. -->
+          <div class="section-label" style="margin-top:4px;">APPEARANCE</div>
+          <div class="card" id="theme-settings"></div>
           <div class="section-label" style="margin-top:4px;">REMINDER ALERTS</div>
           <div class="card" id="reminder-settings"></div>
           <!-- Cloud Account — sign in/out + status. Hidden when Supabase isn't configured. -->
@@ -4602,7 +4669,7 @@
           </span>
         </label>
         <div id="rpe-help-popover"
-          style="display:none;position:absolute;right:0;top:30px;z-index:50;width:260px;background:#0a0c10;border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-size:11px;color:var(--text2);line-height:1.5;">
+          style="display:none;position:absolute;right:0;top:30px;z-index:50;width:260px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-size:11px;color:var(--text2);line-height:1.5;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <strong style="font-size:12px;color:var(--text);">RPE — Rate of Perceived Exertion</strong>
             <button type="button" onclick="toggleRpeHelp(event)"
@@ -5480,6 +5547,14 @@ create trigger trg_user_state_updated_at
       state.settings = state.settings || {};
       state.settings.lastCloudSync = new Date().toISOString();
       _lastPullAt = state.settings.lastCloudSync;
+      // T35.2 — Cross-device theme sync: if cloud has a theme preference,
+      // mirror it to localStorage and apply live so this device matches.
+      try {
+        if (state.settings.theme && typeof applyTheme === 'function') {
+          localStorage.setItem(THEME_KEY, state.settings.theme);
+          applyTheme(state.settings.theme);
+        }
+      } catch (e) {}
       save();
       // Push the merged result back so cloud reflects the union
       await cloudPush();
@@ -8296,6 +8371,86 @@ create trigger trg_user_state_updated_at
         if (!isEdge && minor.test(lower)) return lower;
         return lower.charAt(0).toUpperCase() + lower.slice(1);
       });
+    }
+
+    // T35.2 — Theme runtime helpers. Boot-time apply is done inline in <head>
+    // (synchronous, runs before first paint). These helpers handle the live
+    // toggle from the Profile settings, plus the "system" mode that follows
+    // OS-level prefers-color-scheme changes.
+    const THEME_KEY = 'arise.theme';
+    function getThemePref() {
+      try { return localStorage.getItem(THEME_KEY) || 'dark'; }
+      catch (e) { return 'dark'; }
+    }
+    function resolveTheme(pref) {
+      if (pref === 'system') {
+        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+          ? 'light' : 'dark';
+      }
+      return pref;
+    }
+    function applyTheme(pref) {
+      const resolved = resolveTheme(pref);
+      if (resolved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      // Update iOS status-bar tint so the chrome matches the theme.
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', resolved === 'light' ? '#f4f6fb' : '#0a0c10');
+    }
+    function setThemePref(pref) {
+      if (!['dark', 'light', 'system'].includes(pref)) pref = 'dark';
+      try { localStorage.setItem(THEME_KEY, pref); } catch (e) {}
+      applyTheme(pref);
+      // Persist to local + cloud. save() writes localStorage AND debounces
+      // a cloud push via cloudSyncOnLocalSave(). State is the canonical
+      // cross-device store; the THEME_KEY localStorage entry is just the
+      // boot-fast cache so we can apply theme before paint.
+      try {
+        if (typeof state !== 'undefined' && state) {
+          state.settings = state.settings || {};
+          state.settings.theme = pref;
+          if (typeof save === 'function') save();
+        }
+      } catch (e) {}
+    }
+    // When the user picks "system", listen for OS-level theme changes so we
+    // flip live. matchMedia.addEventListener is supported on iOS 14+, Chrome 76+.
+    try {
+      const mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+      if (mql && mql.addEventListener) {
+        mql.addEventListener('change', () => {
+          if (getThemePref() === 'system') applyTheme('system');
+        });
+      }
+    } catch (e) {}
+    // T35.3 — Renders the theme picker card on the Profile screen. Reads the
+    // current preference and highlights the active segment. Buttons call
+    // setThemePref() which applies + persists + cloud-syncs.
+    function renderThemeCard() {
+      const slot = document.getElementById('theme-settings');
+      if (!slot) return;
+      const pref = getThemePref();
+      const seg = (val, label, desc) => {
+        const active = pref === val;
+        return `<button class="theme-seg ${active ? 'on' : ''}" onclick="setThemePref('${val}');renderThemeCard();"
+                  style="flex:1;padding:10px 12px;background:${active ? 'var(--accent)' : 'var(--bg2)'};color:${active ? '#fff' : 'var(--text)'};border:1px solid ${active ? 'var(--accent)' : 'var(--border)'};border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;display:flex;flex-direction:column;gap:2px;align-items:center;">
+                  <span>${label}</span>
+                  <span style="font-size:10px;font-weight:400;opacity:0.8;">${desc}</span>
+                </button>`;
+      };
+      slot.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:10px;color:var(--text3);line-height:1.5;">Choose how ARISE looks. System follows your device's setting and changes automatically.</div>
+          <div style="display:flex;gap:8px;">
+            ${seg('dark', 'Dark', 'Classic')}
+            ${seg('light', 'Light', 'Bright surfaces')}
+            ${seg('system', 'System', 'Match device')}
+          </div>
+        </div>
+      `;
     }
 
     // T33.4 — Position the glossary tooltip in viewport coordinates so it
@@ -13372,7 +13527,7 @@ create trigger trg_user_state_updated_at
       if (!pop) {
         pop = document.createElement('div');
         pop.id = 'concept-help-popover';
-        pop.style.cssText = 'position:absolute;display:none;z-index:200;width:260px;max-width:calc(100vw - 24px);background:#0a0c10;border:1px solid var(--accent2);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-size:11px;color:var(--text2);line-height:1.5;';
+        pop.style.cssText = 'position:absolute;display:none;z-index:200;width:260px;max-width:calc(100vw - 24px);background:var(--bg);border:1px solid var(--accent2);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-size:11px;color:var(--text2);line-height:1.5;';
         document.body.appendChild(pop);
         // Click-outside to dismiss
         document.addEventListener('click', function (ev) {
@@ -14578,6 +14733,10 @@ create trigger trg_user_state_updated_at
         const aiCta = document.getElementById('ai-coach-cta-wrapper');
         if (aiCta) aiCta.style.display = aiCoachConfigured() ? 'block' : 'none';
       } catch (e) { }
+      // T35.3 — Appearance / theme toggle card. Segmented Dark / Light /
+       // System. Live-applies via setThemePref() which also persists to local
+       // + cloud. "System" follows OS prefers-color-scheme and updates live.
+      try { renderThemeCard(); } catch (e) { console.warn('theme card render failed', e); }
       // Reminder alerts panel — meal times list + water interval. Shows the current
       // notification permission so the user knows whether toggles will use the OS
       // channel or fall back to in-app toast.
