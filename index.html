@@ -2569,6 +2569,14 @@
         max-width: 64px;
         max-height: 64px;
       }
+      /* T36.4 — Logo is designed in white-on-dark. In light mode this leaves
+         the wordmark invisible. invert(1) flips white → black, hue-rotate
+         compensates for color shift on any accent strokes inside the SVG.
+         This is a STOPGAP — when a proper dark-text SVG is provided, swap
+         in a <picture> source that loads the alternate asset for light. */
+      [data-theme="light"] .sidebar-brand-logo {
+        filter: invert(1) hue-rotate(180deg);
+      }
       .sidebar-nav { display: flex; flex-direction: column; padding: 0 8px; gap: 4px; }
       .sidebar-nav-btn {
         display: flex;
@@ -3189,6 +3197,11 @@
           <div class="aria-intro-text">
             <div class="aria-intro-line" id="aria-intro-line" aria-live="polite"><span class="aria-intro-cursor"></span></div>
             <div class="aria-intro-controls">
+              <!-- T36.6 — Voice toggle. Defaults on so slow readers hear ARIA;
+                   tap to mute mid-intro if it's not wanted. Preference
+                   persists across sessions via localStorage. The label is
+                   re-rendered by toggleAriaVoice() to reflect state. -->
+              <button id="aria-voice-toggle" class="btn btn-sm" onclick="toggleAriaVoice()" aria-pressed="true" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">🔊 Voice on</button>
               <button id="aria-intro-skip" class="btn btn-sm" onclick="skipAriaIntro()" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">Skip Intro</button>
             </div>
           </div>
@@ -4268,17 +4281,22 @@
             <button class="btn btn-sm btn-with-icon" onclick="startTutorial()"><span class="icon-title-slot"
                 data-icon="sparkles"></span>Replay Tour</button>
           </div>
-          <!-- T34.9 — Contact & feedback. A direct mailto so confused or stuck
-               users have a place to land. Pre-fills a subject line. -->
+          <!-- T34.9 / T36.5 — Contact & feedback. Primary path is the in-app
+               form (writes to Supabase support_messages table). Mailto stays
+               as a secondary fallback for users not signed in or who prefer it. -->
           <div class="section-label" style="margin-top:4px;">SUPPORT & FEEDBACK</div>
           <div class="card">
             <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
-              Found a bug, have an idea, or stuck on something? Drop us a line — usually answered within 24 hours.
+              Found a bug, have an idea, or stuck on something? Send a note — usually answered within 24 hours.
             </div>
-            <a href="mailto:support.arisefitness@gmail.com?subject=ARISE%20Fitness%20Feedback" class="btn btn-sm btn-with-icon" style="text-decoration:none;display:inline-flex;align-items:center;">
-              <span class="icon-title-slot" data-icon="mail"></span>Email Support
-            </a>
-            <div style="font-size:10px;color:var(--text3);margin-top:8px;">support.arisefitness@gmail.com</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-with-icon" onclick="openSupportModal()">
+                <span class="icon-title-slot" data-icon="mail"></span>Contact Support
+              </button>
+              <a href="mailto:support.arisefitness@gmail.com?subject=ARISE%20Fitness%20Feedback" class="btn btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;font-size:11px;color:var(--text3);">
+                or email directly
+              </a>
+            </div>
           </div>
           <div class="section-label" style="margin-top:4px;">BACKUP & EXPORT</div>
           <div class="card">
@@ -4743,6 +4761,37 @@
       </div>
     </div>
   </div>
+  <!-- T36.5 — In-app support form. Inserts into Supabase support_messages
+       table when user is signed in; falls back to mailto handoff otherwise. -->
+  <div class="modal-overlay" id="modal-support">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="mail"></span>Contact Support</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5;">Tell us what's going on — bug, idea, or something you can't figure out. Usually answered within 24 hours.</p>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Topic</label>
+        <select id="support-topic">
+          <option value="bug">Bug — something broken</option>
+          <option value="idea">Idea — feature request</option>
+          <option value="question">Question — need help</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Message</label>
+        <textarea id="support-message" rows="6" placeholder="What's happening? The more detail, the faster we can help." style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Your email (so we can reply)</label>
+        <input type="email" id="support-email" placeholder="you@example.com" style="width:100%;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:13px;">
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;">Pre-filled if you're signed in.</div>
+      </div>
+      <div id="support-status" style="font-size:11px;color:var(--text3);margin-bottom:10px;min-height:14px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-full" onclick="closeModal('modal-support')">Cancel</button>
+        <button class="btn btn-primary btn-full" id="support-submit-btn" onclick="submitSupportMessage()"><span class="icon-title-slot" data-icon="send"></span>Send</button>
+      </div>
+    </div>
+  </div>
   <!-- Sample Goals library — curated, browsable goals organized by level/category. -->
   <div class="modal-overlay" id="modal-sample-goals">
     <div class="modal" style="max-width:560px;">
@@ -4974,6 +5023,8 @@
       // T34.19 — envelope icon for the support email button. Standard
       // Lucide-style mail glyph: rounded rectangle + diagonal flap line.
       mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+      // T36.5 — paper-plane "send" icon for the Contact Support submit button.
+      send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
       swords: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="M14.5 6.5 16 8l-1.5 1.5"/><path d="m5 14 2 2"/>',
       barchart: '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
       target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
@@ -5585,6 +5636,130 @@ create trigger trg_user_state_updated_at
         cloudPush();
       }
     }
+
+    // T36.5 — Inject a small "?" help button into every screen's topbar so
+    // support is always one tap away. Done at boot rather than as 6 markup
+    // edits (each screen has its own .topbar). Idempotent — won't double-add
+    // if called multiple times.
+    function injectHelpButtons() {
+      try {
+        document.querySelectorAll('.topbar').forEach(bar => {
+          if (bar.querySelector('.topbar-help-btn')) return; // already injected
+          let rightSlot = bar.querySelector('.topbar-right');
+          // Some topbars don't have a .topbar-right container — create one.
+          if (!rightSlot) {
+            rightSlot = document.createElement('div');
+            rightSlot.className = 'topbar-right';
+            rightSlot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto;';
+            bar.appendChild(rightSlot);
+          }
+          const btn = document.createElement('button');
+          btn.className = 'topbar-help-btn';
+          btn.setAttribute('aria-label', 'Contact support');
+          btn.setAttribute('title', 'Contact support');
+          btn.onclick = openSupportModal;
+          btn.style.cssText = 'width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0;';
+          btn.textContent = '?';
+          rightSlot.appendChild(btn);
+        });
+      } catch (e) { console.warn('injectHelpButtons failed:', e); }
+    }
+
+    // ===== SUPPORT MESSAGES (T36.5) =====
+    // Lets users send a support note without leaving the app. Writes to a
+    // Supabase table `support_messages`. Anyone (signed-in or anon) can
+    // INSERT — admin reads in the Supabase dashboard.
+    //
+    // ONE-TIME SETUP — run this SQL in your Supabase project's SQL editor:
+    /*
+      create table if not exists public.support_messages (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid references auth.users(id) on delete set null,
+        email text,
+        topic text not null,
+        message text not null,
+        app_version text,
+        created_at timestamptz not null default now()
+      );
+      alter table public.support_messages enable row level security;
+      -- Anyone can insert (anon + authenticated). Reads restricted to
+      -- service_role only — manage messages from the Supabase dashboard.
+      create policy "support insert any"
+        on public.support_messages for insert
+        with check (true);
+    */
+    const SUPPORT_TABLE = 'support_messages';
+    function openSupportModal() {
+      const emailEl = document.getElementById('support-email');
+      const msgEl = document.getElementById('support-message');
+      const topicEl = document.getElementById('support-topic');
+      const statusEl = document.getElementById('support-status');
+      // Pre-fill email from signed-in user or onboarding profile
+      try {
+        const fromAuth = _cloudUser && _cloudUser.email;
+        const fromProf = state && state.profile && state.profile.email;
+        if (emailEl && !emailEl.value) emailEl.value = fromAuth || fromProf || '';
+      } catch (e) {}
+      if (statusEl) statusEl.textContent = '';
+      if (msgEl && !msgEl.value) msgEl.value = '';
+      if (topicEl && !topicEl.value) topicEl.value = 'bug';
+      const m = document.getElementById('modal-support');
+      if (m) m.classList.add('open');
+    }
+    async function submitSupportMessage() {
+      const topicEl = document.getElementById('support-topic');
+      const msgEl = document.getElementById('support-message');
+      const emailEl = document.getElementById('support-email');
+      const statusEl = document.getElementById('support-status');
+      const btn = document.getElementById('support-submit-btn');
+      const topic = (topicEl && topicEl.value) || 'other';
+      const message = (msgEl && msgEl.value || '').trim();
+      const email = (emailEl && emailEl.value || '').trim();
+      if (!message) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Please write a message before sending.'; }
+        return;
+      }
+      if (!email) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Please add your email so we can reply.'; }
+        return;
+      }
+      // Soft-validate the email shape (allow some imperfection — server validates too)
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'That email doesn\'t look right — double-check?'; }
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+      if (statusEl) { statusEl.style.color = 'var(--text3)'; statusEl.textContent = 'Sending…'; }
+      try {
+        if (!_supabaseClient) {
+          // Supabase not configured → fall back to mailto so user isn't stuck
+          const subject = encodeURIComponent('ARISE — ' + topic);
+          const body = encodeURIComponent(message + '\n\n— ' + email);
+          window.location.href = `mailto:support.arisefitness@gmail.com?subject=${subject}&body=${body}`;
+          if (statusEl) statusEl.textContent = 'Opening your email app — Supabase not configured.';
+          return;
+        }
+        const payload = {
+          user_id: _cloudUser ? _cloudUser.id : null,
+          email,
+          topic,
+          message,
+          app_version: (typeof CURRENT_SCHEMA_VERSION !== 'undefined') ? ('schema-' + CURRENT_SCHEMA_VERSION) : null,
+        };
+        const { error } = await _supabaseClient.from(SUPPORT_TABLE).insert(payload);
+        if (error) throw error;
+        if (statusEl) { statusEl.style.color = 'var(--green2)'; statusEl.textContent = 'Sent! We\'ll get back to you within 24 hours.'; }
+        if (msgEl) msgEl.value = '';
+        // Auto-close after a moment so the user sees the confirmation
+        setTimeout(() => { try { closeModal('modal-support'); } catch (e) {} }, 1500);
+      } catch (err) {
+        console.error('[support] submit failed:', err);
+        if (statusEl) { statusEl.style.color = 'var(--red2)'; statusEl.textContent = 'Couldn\'t send — ' + (err.message || 'try the email link instead'); }
+      } finally {
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      }
+    }
+
     // ===== AUTH MODAL HANDLERS =====
     let _authTab = 'signin';
     function openCloudAuthModal() {
@@ -6316,21 +6491,41 @@ create trigger trg_user_state_updated_at
       try { renderCoachMessages(); } catch (e) { }
       // Send the entire history as context so Claude has continuity
       const chatHistory = state.aiCoach.messages.map(m => ({ role: m.role, content: m.content }));
-      const resp = await fetch(ANTHROPIC_PROXY_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-          'apikey': SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          messages: chatHistory,
-          userContext: buildCoachUserContext(),
-        }),
-      });
-      const data = await resp.json();
+      let resp;
+      try {
+        resp = await fetch(ANTHROPIC_PROXY_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            messages: chatHistory,
+            userContext: buildCoachUserContext(),
+          }),
+        });
+      } catch (netErr) {
+        // T36.3 — Network-layer failure (DNS, CORS, offline). Surface it
+        // explicitly so the user sees something actionable instead of the
+        // generic "Coach request failed."
+        console.error('[ARIA] network error:', netErr);
+        throw new Error('Network error — check your connection. (' + (netErr.message || 'fetch failed') + ')');
+      }
+      // T36.3 — Read body as text first so we can include it in error
+      // messages even when the response isn't valid JSON (e.g. Edge Function
+      // returned an HTML 500 page).
+      const rawBody = await resp.text();
+      let data;
+      try { data = JSON.parse(rawBody); }
+      catch (parseErr) {
+        console.error('[ARIA] proxy returned non-JSON (status', resp.status + '):', rawBody.slice(0, 500));
+        throw new Error('Coach proxy returned ' + resp.status + ' — non-JSON response. Check the Supabase Edge Function logs.');
+      }
       if (!resp.ok || !data.reply) {
-        throw new Error(data.error || 'Coach request failed');
+        const detail = data.error || (rawBody ? rawBody.slice(0, 200) : 'no detail');
+        console.error('[ARIA] proxy error (status', resp.status + '):', data);
+        throw new Error('Coach error (' + resp.status + '): ' + detail);
       }
       state.aiCoach.messages.push({ role: 'assistant', content: data.reply, ts: Date.now() });
       save();
@@ -6688,6 +6883,58 @@ create trigger trg_user_state_updated_at
     ];
     let _ariaIntroTimers = [];
     let _ariaIntroAborted = false;
+
+    // T36.6 — ARIA voice for the intro. Uses Web Speech API (no API key, ships
+    // today). The user can mute it via the toggle in the intro UI; preference
+    // persists across sessions. Falls back silently on browsers without
+    // speechSynthesis. Voice selection prefers a clear feminine voice when
+    // available; the browser picks a sensible default otherwise.
+    const ARIA_VOICE_KEY = 'arise.ariaVoice';
+    function ariaVoiceEnabled() {
+      try { return localStorage.getItem(ARIA_VOICE_KEY) !== 'off'; } catch (e) { return true; }
+    }
+    function setAriaVoice(on) {
+      try { localStorage.setItem(ARIA_VOICE_KEY, on ? 'on' : 'off'); } catch (e) {}
+      if (!on) try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+    }
+    function _pickAriaVoice() {
+      try {
+        if (!window.speechSynthesis) return null;
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || !voices.length) return null;
+        // Prefer English voices that include a feminine-sounding name; fall
+        // back to the system default English voice, then any English voice.
+        const en = voices.filter(v => /^en[-_]/.test(v.lang || ''));
+        const pool = en.length ? en : voices;
+        const feminine = pool.find(v => /samantha|victoria|female|google.*female|microsoft.*aria|microsoft.*zira/i.test(v.name));
+        if (feminine) return feminine;
+        const usDefault = pool.find(v => v.default && /en-us/i.test(v.lang));
+        if (usDefault) return usDefault;
+        return pool[0];
+      } catch (e) { return null; }
+    }
+    function _ariaSpeak(text) {
+      if (!ariaVoiceEnabled()) return;
+      try {
+        if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
+        window.speechSynthesis.cancel(); // cut off any in-flight line
+        const u = new SpeechSynthesisUtterance(text);
+        const v = _pickAriaVoice();
+        if (v) u.voice = v;
+        u.rate = 0.95;    // slightly slower than default for clarity
+        u.pitch = 1.0;
+        u.volume = 0.9;
+        window.speechSynthesis.speak(u);
+      } catch (e) { /* speech unsupported — silently no-op */ }
+    }
+    // Voice list loads asynchronously on some browsers — kick it once on init
+    // so _pickAriaVoice() returns a populated list by the time we need it.
+    try {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.getVoices();
+        window.speechSynthesis.addEventListener && window.speechSynthesis.addEventListener('voiceschanged', () => {});
+      }
+    } catch (e) {}
     function _ariaTimeout(fn, ms) {
       const id = setTimeout(() => { if (!_ariaIntroAborted) fn(); }, ms);
       _ariaIntroTimers.push(id);
@@ -6746,6 +6993,11 @@ create trigger trg_user_state_updated_at
           return;
         }
         const line = ARIA_INTRO_LINES[i];
+        // T36.6 — Speak the line in parallel with the typewriter. The two
+        // tracks (audio + text) finish around the same time on a typical
+        // line length; the typewriter's hold/clear logic still gates the
+        // next line transition, so we don't need to await speech completion.
+        _ariaSpeak(line);
         _ariaTypeLine(line, charDelay, () => {
           // Hold completed line, then clear it before starting next
           _ariaTimeout(() => {
@@ -6803,6 +7055,18 @@ create trigger trg_user_state_updated_at
       _ariaSetLine('');
       // T31.6 — force pure black on every parent so no color seams show through
       try { document.body.classList.add('intro-mode'); } catch (e) {}
+      // T36.6 — Sync voice toggle button to saved preference. The button is
+      // already in the DOM (rendered in the intro markup); we just update its
+      // visual state to match what's stored before the intro starts speaking.
+      try {
+        const btn = document.getElementById('aria-voice-toggle');
+        if (btn) {
+          const on = ariaVoiceEnabled();
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          btn.textContent = on ? '🔊 Voice on' : '🔇 Voice off';
+          btn.style.opacity = on ? '1' : '0.65';
+        }
+      } catch (e) {}
       _ariaPlayIntro();
     }
     // T34.9 — Landing splash → ARIA intro transition. Called by the "Get
@@ -6827,10 +7091,26 @@ create trigger trg_user_state_updated_at
       _ariaIntroAborted = true;
       _ariaIntroTimers.forEach(t => clearTimeout(t));
       _ariaIntroTimers = [];
+      // T36.6 — cut off the spoken line if the user skips
+      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
       finishAriaIntro();
+    }
+    // T36.6 — Toggle ARIA voice from the intro UI. Updates the button's
+    // visual state immediately so the user can see the change.
+    function toggleAriaVoice() {
+      const next = !ariaVoiceEnabled();
+      setAriaVoice(next);
+      const btn = document.getElementById('aria-voice-toggle');
+      if (btn) {
+        btn.setAttribute('aria-pressed', next ? 'true' : 'false');
+        btn.textContent = next ? '🔊 Voice on' : '🔇 Voice off';
+        btn.style.opacity = next ? '1' : '0.65';
+      }
     }
     function finishAriaIntro() {
       try { localStorage.setItem('arise_intro_seen', '1'); } catch (e) {}
+      // T36.6 — make sure no residual speech keeps playing past the intro
+      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
       const intro = document.getElementById('ob-intro');
       const ob0 = document.getElementById('ob0');
       if (intro) intro.classList.remove('active');
@@ -8521,6 +8801,8 @@ create trigger trg_user_state_updated_at
     })();
     function initApp() {
       hydrateIcons();
+      // T36.5 — Inject the global "?" help button into every topbar.
+      try { injectHelpButtons(); } catch (e) { }
       applyBeginnerModeClass();
       applyPlainModeLabels();
       // T23.7 — Pair section-labels with their content cards on the Profile page
@@ -9700,6 +9982,52 @@ create trigger trg_user_state_updated_at
     // backgrounded for a few seconds (browsers can throttle setInterval).
     let _restTimer = null; // { startedAt, duration, paused, remaining, intervalId }
     const REST_TIMER_DEFAULTS = { short: 60, medium: 90, long: 180 };
+    // T36.6 — Shared AudioContext for the timer ding. iOS Safari only
+    // allows AudioContext to start playing from a user-gesture chain;
+    // creating it lazily inside the timer-complete callback often fails.
+    // We init/resume it on startRestTimer() (which is itself called from a
+    // tap) so the context is "primed" before zero hits.
+    let _audioCtx = null;
+    function _ensureAudioCtx() {
+      try {
+        if (_audioCtx) {
+          if (_audioCtx.state === 'suspended' && _audioCtx.resume) _audioCtx.resume();
+          return _audioCtx;
+        }
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        _audioCtx = new Ctx();
+        return _audioCtx;
+      } catch (e) { return null; }
+    }
+    function _playTimerDing() {
+      try {
+        const ctx = _ensureAudioCtx();
+        if (!ctx) return;
+        // 3-tone descending pattern with envelope — more attention-grabbing
+        // than the original single 880Hz blip. Each tone is ~200ms.
+        const now = ctx.currentTime;
+        const tones = [
+          { freq: 988, start: 0.00, dur: 0.18 },  // B5
+          { freq: 784, start: 0.22, dur: 0.18 },  // G5
+          { freq: 1175, start: 0.50, dur: 0.32 }, // D6 (longer "ding")
+        ];
+        tones.forEach(t => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = t.freq;
+          o.connect(g);
+          g.connect(ctx.destination);
+          // Attack–decay envelope so each tone has a softer "ding" feel
+          g.gain.setValueAtTime(0, now + t.start);
+          g.gain.linearRampToValueAtTime(0.25, now + t.start + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t.start + t.dur);
+          o.start(now + t.start);
+          o.stop(now + t.start + t.dur + 0.02);
+        });
+      } catch (e) { /* audio unsupported — silent fallback */ }
+    }
     function fmtRestSec(n) {
       n = Math.max(0, Math.round(n));
       const m = Math.floor(n / 60);
@@ -9708,6 +10036,9 @@ create trigger trg_user_state_updated_at
     }
     function startRestTimer(seconds) {
       const dur = parseInt(seconds, 10) || 90;
+      // T36.6 — Prime the AudioContext on this user gesture so the
+      // ding can actually play on iOS Safari when the timer hits zero.
+      _ensureAudioCtx();
       // If a timer is already running, just reset it to the new duration
       if (_restTimer && _restTimer.intervalId) clearInterval(_restTimer.intervalId);
       _restTimer = {
@@ -9753,19 +10084,9 @@ create trigger trg_user_state_updated_at
       // Vibrate (mobile) + show notification + audible beep where allowed
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]); } catch (e) {}
       try { showNotif('Rest complete — next set!', 'var(--green2)'); } catch (e) {}
-      try {
-        // Tiny synthesized beep using the WebAudio API. Falls back silently if unavailable.
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (Ctx) {
-          const ctx = new Ctx();
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.connect(g); g.connect(ctx.destination);
-          o.frequency.value = 880; g.gain.value = 0.15;
-          o.start(); o.stop(ctx.currentTime + 0.18);
-          setTimeout(() => ctx.close && ctx.close(), 400);
-        }
-      } catch (e) {}
+      // T36.6 — 3-tone descending ding via shared AudioContext (primed on
+      // start). More attention-grabbing than the original single blip.
+      _playTimerDing();
       // Auto-hide widget 4 seconds after completion
       setTimeout(() => {
         if (_restTimer && _restTimer.remaining <= 0) cancelRestTimer();
@@ -14499,7 +14820,7 @@ create trigger trg_user_state_updated_at
         equipEl.innerHTML = `
           <div style="font-size:11px;color:var(--text3);margin-bottom:8px;line-height:1.5;">Tag what you have access to. The "Find substitute" button filters alternatives to fit your gym, and ARIA will respect this when she builds plans. Leave all unchecked to see every option.</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;">
-            ${options.map(o => `<span class="diet-chip ${have.has(o.id) ? 'on' : ''}" onclick="toggleEquipment(${JSON.stringify(o.id)})" style="cursor:pointer;">${escapeHtml(o.label)}</span>`).join('')}
+            ${options.map(o => `<span class="diet-chip ${have.has(o.id) ? 'on' : ''}" onclick="toggleEquipment(${JSON.stringify(o.id).replace(/"/g, '&quot;')})" style="cursor:pointer;">${escapeHtml(o.label)}</span>`).join('')}
           </div>
         `;
       }
@@ -14922,9 +15243,21 @@ create trigger trg_user_state_updated_at
     function renderAIChallengeButton(questOverride) {
       const slot = document.getElementById('ai-challenge-btn-slot');
       if (!slot) return;
-      // Source of truth for the original challenge data: if we're rendering for the first
-      // time after generation, the caller passes it in. After accept, we pull from state.
-      const data = questOverride || (state.aiActiveChallenge && state.aiActiveChallenge.original);
+      // T36.2 — Source of truth for what gets wired to Accept Quest:
+      //   1. Explicit override from the caller (renderAIQuestCard passes today's quest in)
+      //   2. Today's cached quest (state.aiTodayQuest.quest) — covers re-renders from
+      //      cloud sync / other surfaces that don't pass an override.
+      //   3. Previously-accepted challenge original — only as a last-resort fallback,
+      //      and only for the same date so we never wire yesterday's data.
+      // Prior bug: a re-render with no override fell straight through to (3), which
+      // for a brand-new day would point at YESTERDAY's accepted challenge — clicking
+      // Accept added the wrong quest to today's list.
+      const today = todayStr();
+      const todaysCached = (state.aiTodayQuest && state.aiTodayQuest.date === today)
+        ? state.aiTodayQuest.quest : null;
+      const sameDayActive = (state.aiActiveChallenge && state.aiActiveChallenge.date === today)
+        ? state.aiActiveChallenge.original : null;
+      const data = questOverride || todaysCached || sameDayActive;
       if (!data) return;
       const status = getAIChallengeStatus();
       if (status === 'completed') {
