@@ -6397,7 +6397,14 @@ create trigger trg_user_state_updated_at
     // Plans returned by Claude are wrapped in <plan>...</plan> JSON tags. parseCoachPlan
     // extracts and validates them; applyCoachPlan stamps the split + goals into state
     // after user confirmation.
-    const ANTHROPIC_PROXY_URL = 'https://xdgnqdobgmngohtgdodm.supabase.co/functions/v1/anthropic-chat'; // user fills in — Edge Function URL
+    // T36.7 — Edge Function was deployed under the name
+    // `anthropic-chat-edge-function-ts` (Supabase auto-appended the file
+    // extension during dashboard create). Previous value was just
+    // `anthropic-chat`, which 404'd ("Requested function was not found") and
+    // surfaced in the chat UI as "Network error — failed to fetch". The
+    // browser sees a 404 on a CORS-restricted endpoint as an opaque network
+    // failure rather than a clean HTTP error.
+    const ANTHROPIC_PROXY_URL = 'https://xdgnqdobgmngohtgdodm.supabase.co/functions/v1/anthropic-chat-edge-function-ts'; // user fills in — Edge Function URL
 
     function aiCoachConfigured() {
       return ANTHROPIC_PROXY_URL && !ANTHROPIC_PROXY_URL.includes('YOUR_') && !ANTHROPIC_PROXY_URL.includes('<your-');
