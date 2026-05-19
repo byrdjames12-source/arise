@@ -176,7 +176,11 @@
     .topbar {
       background: var(--bg2);
       border-bottom: 1px solid var(--border);
-      padding: 12px 16px;
+      /* T37.2 — Trimmed horizontal padding from 16px → 10px to give subtabs
+         more breathing room on phones (Workouts has 4 tabs + title + ? icon
+         and was clipping). The 12px vertical pad is preserved so vertical
+         rhythm doesn't shift. */
+      padding: 12px 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -191,12 +195,14 @@
        2 lines while short labels (Library, History, Programs) stay on one
        line. min-width prevents Progress's 2 tabs from collapsing too narrow;
        max-width prevents them from ballooning. All tabs share the same
-       min-height so the row stays visually uniform whether 1 or 2 lines. */
+       min-height so the row stays visually uniform whether 1 or 2 lines.
+       T37.2 — min-width 56 → 48 and padding 4px 6px → 3px 4px to fit four
+       tabs alongside the Workouts title + ? help button on narrow phones. */
     .topbar .tab-row .tab-btn {
       flex: 1 1 0;
-      min-width: 56px;
+      min-width: 48px;
       max-width: 78px;
-      padding: 4px 6px;
+      padding: 3px 4px;
       font-size: 11px;
       line-height: 1.15;
       white-space: normal;
@@ -215,12 +221,23 @@
       letter-spacing: 2px;
       color: var(--accent2);
       text-transform: uppercase;
+      /* T37.2 — Keep title on a single line even when the topbar is tight
+         (4 subtabs + ? help icon). Icon stays inline next to the word.
+         flex-shrink: 0 prevents the tab-row from squeezing the title into
+         a 2-line wrap. */
+      white-space: nowrap;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
     }
 
     .topbar-right {
       display: flex;
       align-items: center;
       gap: 10px;
+      /* T37.2 — Allow the tab row to shrink as needed instead of pushing
+         the title into a wrap. */
+      min-width: 0;
     }
 
     .rank-pill {
@@ -3891,11 +3908,14 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Workouts</div>
           <div class="topbar-right">
-            <!-- T32.2 — Order: Tracker → Library → History → Programs. -->
+            <!-- T37.2/T37.4 — Order: Log → History → Library → Plans. Library
+                 and History swapped so the more frequently used History sits
+                 next to Log. Tab label trimmed: "Log Session" → "Log" to keep
+                 single-line on phone. -->
             <div class="tab-row" style="gap:4px;">
-              <button class="tab-btn active" id="work-tab-log" onclick="switchWorkoutTab('log')">Log Session</button>
-              <button class="tab-btn" id="work-tab-lib" onclick="switchWorkoutTab('lib')">Library</button>
+              <button class="tab-btn active" id="work-tab-log" onclick="switchWorkoutTab('log')">Log</button>
               <button class="tab-btn" id="work-tab-hist" onclick="switchWorkoutTab('hist')">History</button>
+              <button class="tab-btn" id="work-tab-lib" onclick="switchWorkoutTab('lib')">Library</button>
               <button class="tab-btn" id="work-tab-prog" onclick="switchWorkoutTab('prog')">Plans</button>
             </div>
           </div>
@@ -10011,27 +10031,43 @@ create trigger trg_user_state_updated_at
       try {
         const ctx = _ensureAudioCtx();
         if (!ctx) return;
-        // 3-tone descending pattern with envelope — more attention-grabbing
-        // than the original single 880Hz blip. Each tone is ~200ms.
+        // T37.5 — Two-octave pattern that's hard to miss even over music.
+        // Each tone uses a sine + square mix routed through a gain node:
+        //   - sine for warmth, square for the cutting edge that punches
+        //     through whatever audio is also playing on the device.
+        //   - peak gain 0.8 (was 0.25) — much louder, still capped well
+        //     below distortion on most devices.
+        //   - 4 tones spread over 1.2s — the final two are a double-ding
+        //     repeat so even if the user catches the tail end they know
+        //     the timer fired.
         const now = ctx.currentTime;
+        const master = ctx.createGain();
+        master.gain.value = 0.8;
+        master.connect(ctx.destination);
         const tones = [
-          { freq: 988, start: 0.00, dur: 0.18 },  // B5
-          { freq: 784, start: 0.22, dur: 0.18 },  // G5
-          { freq: 1175, start: 0.50, dur: 0.32 }, // D6 (longer "ding")
+          { freq: 988,  start: 0.00, dur: 0.22 }, // B5
+          { freq: 784,  start: 0.25, dur: 0.22 }, // G5
+          { freq: 1175, start: 0.55, dur: 0.30 }, // D6 — primary ding
+          { freq: 1175, start: 0.95, dur: 0.30 }, // D6 — repeat
         ];
         tones.forEach(t => {
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.type = 'sine';
-          o.frequency.value = t.freq;
-          o.connect(g);
-          g.connect(ctx.destination);
-          // Attack–decay envelope so each tone has a softer "ding" feel
-          g.gain.setValueAtTime(0, now + t.start);
-          g.gain.linearRampToValueAtTime(0.25, now + t.start + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.001, now + t.start + t.dur);
-          o.start(now + t.start);
-          o.stop(now + t.start + t.dur + 0.02);
+          // Pair a sine oscillator (warm tone) with a quieter square wave
+          // (cuts through music). Mix them at the gain stage.
+          ['sine', 'square'].forEach((shape, idx) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = shape;
+            o.frequency.value = t.freq;
+            // Square wave is harsh — keep it at 35% of sine's amplitude
+            const peak = idx === 0 ? 0.55 : 0.20;
+            o.connect(g);
+            g.connect(master);
+            g.gain.setValueAtTime(0, now + t.start);
+            g.gain.linearRampToValueAtTime(peak, now + t.start + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, now + t.start + t.dur);
+            o.start(now + t.start);
+            o.stop(now + t.start + t.dur + 0.02);
+          });
         });
       } catch (e) { /* audio unsupported — silent fallback */ }
     }
@@ -13561,6 +13597,16 @@ create trigger trg_user_state_updated_at
       save(); closeModal('modal-add-meal'); renderDailyNutrition();
       if (typeof renderSavedRecipes === 'function') renderSavedRecipes();
       if (typeof renderRecipeSuggestions === 'function') renderRecipeSuggestions();
+      // T37.3 — Clear the form so the next "Add meal" opens fresh. Previously
+      // the modal kept the last entry's values, which led to accidental
+      // duplicates when users tapped Log It twice or didn't notice stale data.
+      ['add-meal-name','add-meal-cals','add-meal-prot','add-meal-carbs','add-meal-fat',
+       'add-meal-fiber','add-meal-sodium','add-meal-alcohol','add-meal-caffeine',
+       'add-meal-ingredients','add-meal-micros-data'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      const recipeCheckbox = document.getElementById('add-meal-save-recipe');
+      if (recipeCheckbox) recipeCheckbox.checked = false;
       showNotif('Meal logged!');
     }
     // Detect whether today's logged macros meet the daily targets (within tolerance)
@@ -13752,6 +13798,18 @@ create trigger trg_user_state_updated_at
       renderTrainingLog();
       renderExerciseProgression();
       renderStats();
+      // T37.3 — Clear the log-exercise modal so the next "+ Log" opens fresh
+      // instead of carrying over the previous session's name/sets/notes.
+      const nameEl = document.getElementById('log-ex-name'); if (nameEl) nameEl.value = '';
+      const notesEl = document.getElementById('log-ex-notes'); if (notesEl) notesEl.value = '';
+      const setsWrap = document.getElementById('log-ex-sets');
+      if (setsWrap) {
+        setsWrap.innerHTML = '';
+        // Add a single blank set row so the user sees a fresh template next time
+        try { addSetRow(); } catch (e) {}
+      }
+      const suggestEl = document.getElementById('log-ex-suggest');
+      if (suggestEl) suggestEl.innerHTML = '';
       showNotif(`Session logged · +${xp} XP`);
     }
     // Delete one session entry. Confirmed via native prompt to keep chrome light.
@@ -14528,8 +14586,14 @@ create trigger trg_user_state_updated_at
       });
       const summaries = [...groups.entries()].map(([_, sessions]) => {
         sessions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        const last = sessions[sessions.length - 1];
-        const prior = sessions.length > 1 ? sessions[sessions.length - 2] : null;
+        // T37.1 — Prefer sessions with weighted sets when picking "last".
+        // Otherwise a placeholder quest entry (weight=0) can win a same-date
+        // tie against a real Tracker entry and incorrectly tag the exercise
+        // as BW even though weight was logged.
+        const weightedSessions = sessions.filter(s => (s.sets || []).some(x => (x.weight || 0) > 0));
+        const pool = weightedSessions.length ? weightedSessions : sessions;
+        const last = pool[pool.length - 1];
+        const prior = pool.length > 1 ? pool[pool.length - 2] : null;
         const sets = last.sets || [];
         // Last session "best" set — highest weight (for weighted) OR highest reps (for BW)
         const lastTopWeight = sets.reduce((m, x) => (x.weight || 0) > (m?.weight || 0) ? x : m, null);
@@ -14648,8 +14712,15 @@ create trigger trg_user_state_updated_at
       });
       const summaries = [...groups.entries()].map(([_, sessions]) => {
         sessions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        const last = sessions[sessions.length - 1];
-        const prior = sessions.length > 1 ? sessions[sessions.length - 2] : null;
+        // T37.1 — Prefer sessions with actual weighted sets when picking
+        // "last" / "prior". parseQuestExercises stamps placeholder entries
+        // with weight=0 when the user completes strength quests, and those
+        // could win a same-date tie against a real Tracker entry — making
+        // the exercise show "BW" even though the user logged weight.
+        const weightedSessions = sessions.filter(s => (s.sets || []).some(x => (x.weight || 0) > 0));
+        const pool = weightedSessions.length ? weightedSessions : sessions;
+        const last = pool[pool.length - 1];
+        const prior = pool.length > 1 ? pool[pool.length - 2] : null;
         const topOf = s => (s.sets || []).reduce((m, x) => (x.weight || 0) > (m?.weight || 0) ? x : m, null);
         const lastTop = topOf(last);
         const priorTop = prior ? topOf(prior) : null;
