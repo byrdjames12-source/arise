@@ -2586,14 +2586,10 @@
         max-width: 64px;
         max-height: 64px;
       }
-      /* T36.4 — Logo is designed in white-on-dark. In light mode this leaves
-         the wordmark invisible. invert(1) flips white → black, hue-rotate
-         compensates for color shift on any accent strokes inside the SVG.
-         This is a STOPGAP — when a proper dark-text SVG is provided, swap
-         in a <picture> source that loads the alternate asset for light. */
-      [data-theme="light"] .sidebar-brand-logo {
-        filter: invert(1) hue-rotate(180deg);
-      }
+      /* T39.1 — Proper light-mode SVG assets now ship alongside the dark
+         versions. The CSS filter stopgap was removed; logo swap happens via
+         the data-light-src attribute on each <img>, applied by
+         applyThemeLogos() whenever the theme changes. */
       .sidebar-nav { display: flex; flex-direction: column; padding: 0 8px; gap: 4px; }
       .sidebar-nav-btn {
         display: flex;
@@ -3124,7 +3120,7 @@
        1.5s auto-fade or on tap. The image is referenced by relative path so it
        loads from the same folder as the HTML (works on GitHub Pages). -->
   <div id="splash-screen" onclick="dismissSplash()">
-    <img src="arise-logo-stacked.svg" alt="ARISE" onerror="this.src='arise-logo.png';this.onerror=()=>this.style.display='none';">
+    <img src="arise-logo-stacked.svg" data-light-src="arise-logo-stacked-light.svg" alt="ARISE" onerror="this.src='arise-logo.png';this.onerror=()=>this.style.display='none';">
   </div>
   <div id="notif" class="notif"></div>
   <div id="app" class="app">
@@ -3137,7 +3133,7 @@
            users skip this entirely. -->
       <div id="ob-landing" class="ob-screen" style="background:var(--bg);align-items:center;justify-content:center;padding:24px;">
         <div style="max-width:480px;width:100%;text-align:center;display:flex;flex-direction:column;gap:24px;">
-          <img src="arise-logo-mark.svg" alt="ARISE" style="width:96px;height:96px;margin:0 auto;filter:drop-shadow(0 0 24px rgba(127,119,221,0.55));" onerror="this.src='arise-logo.png';this.onerror=()=>this.style.display='none';">
+          <img src="arise-logo-mark.svg" data-light-src="arise-logo-mark-light.svg" alt="ARISE" style="width:96px;height:96px;margin:0 auto;filter:drop-shadow(0 0 24px rgba(127,119,221,0.55));" onerror="this.src='arise-logo.png';this.onerror=()=>this.style.display='none';">
           <div>
             <div style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:3px;font-size:32px;color:var(--text);margin-bottom:6px;">ARISE</div>
             <div style="font-family:'Rajdhani',sans-serif;letter-spacing:2px;font-size:13px;color:var(--accent2);">FITNESS SYSTEM</div>
@@ -3618,7 +3614,7 @@
         <!-- T24.2 — inline horizontal logo SVG (already includes the ARISE text)
              with a fallback chain: SVG → PNG → gradient mark+text if both fail. -->
         <div class="sidebar-brand">
-          <img class="sidebar-brand-logo" src="arise-logo-inline.svg" alt="ARISE"
+          <img class="sidebar-brand-logo" src="arise-logo-inline.svg" data-light-src="arise-logo-inline-light.svg" alt="ARISE"
                onerror="this.onerror=null;this.src='arise-logo.png';this.classList.add('sidebar-brand-logo-fallback');">
         </div>
         <nav class="sidebar-nav">
@@ -6790,6 +6786,25 @@ create trigger trg_user_state_updated_at
           if (!state.settings) state.settings = {};
           if (typeof state.settings.mealPrepEnabled !== 'boolean') state.settings.mealPrepEnabled = true;
           if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
+          // T38.2 — One-time cleanup: remove quest-sourced placeholder entries
+          // that have either empty sets or all-zero weights/reps. These were
+          // created automatically when the user completed strength quests
+          // and caused redundant data + the BW-display bug on Progression.
+          // Any quest entry with actual data (non-zero weight or reps) is
+          // preserved — this only prunes the placeholders.
+          else {
+            const before = state.workoutLog.length;
+            state.workoutLog = state.workoutLog.filter(e => {
+              if (e.source !== 'quest') return true; // not from quest auto-log
+              const sets = e.sets || [];
+              if (sets.length === 0 && !e.cardio) return false; // empty placeholder
+              const hasData = sets.some(s => (s.weight || 0) > 0 || (s.reps || 0) > 0);
+              return hasData; // keep only quest entries that have actual numbers
+            });
+            if (state.workoutLog.length !== before) {
+              console.log(`[T38.2] Pruned ${before - state.workoutLog.length} empty quest-sourced log entries`);
+            }
+          }
           if (!Array.isArray(state.blocklist)) state.blocklist = [];
           // T12.1 cleanup: pre-fix saves may have hundreds of duplicate blocklist entries.
           // Dedup on load so the user's existing state heals itself the moment they open the app.
@@ -6911,18 +6926,37 @@ create trigger trg_user_state_updated_at
     let _ariaIntroTimers = [];
     let _ariaIntroAborted = false;
 
-    // T36.6 — ARIA voice for the intro. Uses Web Speech API (no API key, ships
-    // today). The user can mute it via the toggle in the intro UI; preference
-    // persists across sessions. Falls back silently on browsers without
-    // speechSynthesis. Voice selection prefers a clear feminine voice when
-    // available; the browser picks a sensible default otherwise.
+    // T36.6 / T40.1 — ARIA voice for the intro. Primary path is pre-recorded
+    // ElevenLabs MP3s (aria-1.mp3 … aria-N.mp3) for the cinematic feel; lines
+    // without a corresponding file fall back to the browser's Web Speech API
+    // so the intro still has audio. The user can mute via the toggle in the
+    // intro UI; preference persists across sessions. Falls back silently on
+    // browsers without either capability.
     const ARIA_VOICE_KEY = 'arise.ariaVoice';
+    // T40.1 — Map intro line index → MP3 filename. Null/missing = use TTS.
+    // Add more entries as additional ElevenLabs files ship.
+    const ARIA_VOICE_FILES = [
+      'aria-1.mp3', // "I'm ARIA."
+      'aria-2.mp3', // "Most people guess their way through this. We don't."
+      'aria-3.mp3', // "I track, you train, we adjust when it matters."
+      'aria-4.mp3', // "The ones who stick around get stronger."
+      'aria-5.mp3', // "Let's begin." — drop the file in to enable; until then,
+                    // the .play() error path triggers Web Speech automatically.
+    ];
+    // Shared <audio> element for ARIA playback. Created/unlocked on the
+    // user's intro-starting gesture (iOS Safari requires audio elements to
+    // be touched inside a gesture chain before they can play later via JS).
+    let _ariaAudio = null;
     function ariaVoiceEnabled() {
       try { return localStorage.getItem(ARIA_VOICE_KEY) !== 'off'; } catch (e) { return true; }
     }
     function setAriaVoice(on) {
       try { localStorage.setItem(ARIA_VOICE_KEY, on ? 'on' : 'off'); } catch (e) {}
-      if (!on) try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+      // T40.1 — Mute now stops both the MP3 path and the Web Speech path.
+      if (!on) {
+        try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+        try { if (_ariaAudio) { _ariaAudio.pause(); _ariaAudio.currentTime = 0; } } catch (e) {}
+      }
     }
     function _pickAriaVoice() {
       try {
@@ -6940,8 +6974,35 @@ create trigger trg_user_state_updated_at
         return pool[0];
       } catch (e) { return null; }
     }
-    function _ariaSpeak(text) {
+    function _ariaSpeak(text, lineIndex) {
       if (!ariaVoiceEnabled()) return;
+      // T40.1 — Try MP3 first. The shared _ariaAudio element was created
+      // and unlocked inside the user's gesture during startAriaIntro, so
+      // assigning a new src + play() here should succeed on iOS Safari.
+      // On failure (file missing, network error, codec issue) we fall back
+      // to Web Speech so the user always hears *something* if voice is on.
+      const file = (typeof lineIndex === 'number') ? ARIA_VOICE_FILES[lineIndex] : null;
+      if (file && _ariaAudio) {
+        try {
+          _ariaAudio.pause();
+          _ariaAudio.currentTime = 0;
+          _ariaAudio.src = file;
+          const p = _ariaAudio.play();
+          if (p && typeof p.then === 'function') {
+            p.catch(err => {
+              console.warn('[ARIA] MP3 play failed, falling back to TTS:', err && err.message);
+              _ariaSpeakWebTTS(text);
+            });
+          }
+          return;
+        } catch (e) {
+          console.warn('[ARIA] MP3 error, falling back to TTS:', e && e.message);
+        }
+      }
+      // No MP3 for this line — use Web Speech
+      _ariaSpeakWebTTS(text);
+    }
+    function _ariaSpeakWebTTS(text) {
       try {
         if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
         window.speechSynthesis.cancel(); // cut off any in-flight line
@@ -6953,6 +7014,11 @@ create trigger trg_user_state_updated_at
         u.volume = 0.9;
         window.speechSynthesis.speak(u);
       } catch (e) { /* speech unsupported — silently no-op */ }
+    }
+    // T40.1 — Stop both audio paths. Called from skip/finish/voice-mute.
+    function _ariaStopSpeech() {
+      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+      try { if (_ariaAudio) { _ariaAudio.pause(); _ariaAudio.currentTime = 0; } } catch (e) {}
     }
     // Voice list loads asynchronously on some browsers — kick it once on init
     // so _pickAriaVoice() returns a populated list by the time we need it.
@@ -7020,11 +7086,12 @@ create trigger trg_user_state_updated_at
           return;
         }
         const line = ARIA_INTRO_LINES[i];
-        // T36.6 — Speak the line in parallel with the typewriter. The two
-        // tracks (audio + text) finish around the same time on a typical
-        // line length; the typewriter's hold/clear logic still gates the
-        // next line transition, so we don't need to await speech completion.
-        _ariaSpeak(line);
+        // T36.6 / T40.1 — Speak the line in parallel with the typewriter.
+        // Pass the line index so _ariaSpeak knows which MP3 to play (or
+        // when to fall back to Web Speech if no file exists for that line).
+        // The typewriter's hold/clear logic still gates the next line
+        // transition, so we don't need to await speech completion.
+        _ariaSpeak(line, i);
         _ariaTypeLine(line, charDelay, () => {
           // Hold completed line, then clear it before starting next
           _ariaTimeout(() => {
@@ -7082,6 +7149,34 @@ create trigger trg_user_state_updated_at
       _ariaSetLine('');
       // T31.6 — force pure black on every parent so no color seams show through
       try { document.body.classList.add('intro-mode'); } catch (e) {}
+      // T40.1 — Create + unlock the shared audio element inside the user
+      // gesture chain (startAriaIntro is called synchronously from the
+      // "Get Started" tap). iOS Safari blocks JS-triggered audio playback
+      // unless the element has been "touched" during a gesture. The
+      // play/pause dance below satisfies the gating; subsequent .play()
+      // calls from setTimeout callbacks then work. Also preload all the
+      // MP3s so playback starts instantly when each line begins.
+      try {
+        if (!_ariaAudio) {
+          _ariaAudio = new Audio();
+          _ariaAudio.preload = 'auto';
+          _ariaAudio.volume = 0.95;
+        }
+        // Unlock trick: play a silent first frame, then immediately pause.
+        // Safari counts this as a user-initiated play and lifts the gate.
+        if (ariaVoiceEnabled() && ARIA_VOICE_FILES[0]) {
+          _ariaAudio.src = ARIA_VOICE_FILES[0];
+          const p = _ariaAudio.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => _ariaAudio.pause()).catch(() => {});
+          }
+        }
+        // Warm the browser cache for the other MP3s
+        ARIA_VOICE_FILES.slice(1).forEach(f => {
+          if (!f) return;
+          const a = new Audio(); a.preload = 'auto'; a.src = f;
+        });
+      } catch (e) { console.warn('[ARIA] audio unlock failed:', e && e.message); }
       // T36.6 — Sync voice toggle button to saved preference. The button is
       // already in the DOM (rendered in the intro markup); we just update its
       // visual state to match what's stored before the intro starts speaking.
@@ -7118,8 +7213,8 @@ create trigger trg_user_state_updated_at
       _ariaIntroAborted = true;
       _ariaIntroTimers.forEach(t => clearTimeout(t));
       _ariaIntroTimers = [];
-      // T36.6 — cut off the spoken line if the user skips
-      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+      // T36.6 / T40.1 — cut off both the MP3 and Web Speech paths
+      _ariaStopSpeech();
       finishAriaIntro();
     }
     // T36.6 — Toggle ARIA voice from the intro UI. Updates the button's
@@ -7136,8 +7231,8 @@ create trigger trg_user_state_updated_at
     }
     function finishAriaIntro() {
       try { localStorage.setItem('arise_intro_seen', '1'); } catch (e) {}
-      // T36.6 — make sure no residual speech keeps playing past the intro
-      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+      // T36.6 / T40.1 — make sure no residual audio keeps playing past the intro
+      _ariaStopSpeech();
       const intro = document.getElementById('ob-intro');
       const ob0 = document.getElementById('ob0');
       if (intro) intro.classList.remove('active');
@@ -8706,6 +8801,22 @@ create trigger trg_user_state_updated_at
       // Update iOS status-bar tint so the chrome matches the theme.
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute('content', resolved === 'light' ? '#f4f6fb' : '#0a0c10');
+      // T39.1 — Swap logo SVG src to the light variant. Each logo <img>
+      // carries a data-light-src attribute and a data-dark-src cache; on
+      // first run we capture the original src so we can flip back.
+      applyThemeLogos(resolved);
+    }
+    // T39.1 — Walk every <img> with a data-light-src and swap its src based
+    // on resolved theme. The original (dark) src is cached in data-dark-src
+    // on first call so we can flip back. Safe to call repeatedly.
+    function applyThemeLogos(resolved) {
+      try {
+        document.querySelectorAll('img[data-light-src]').forEach(img => {
+          if (!img.dataset.darkSrc) img.dataset.darkSrc = img.getAttribute('src');
+          const want = resolved === 'light' ? img.dataset.lightSrc : img.dataset.darkSrc;
+          if (want && img.getAttribute('src') !== want) img.setAttribute('src', want);
+        });
+      } catch (e) { /* DOM may not be ready on the very first applyTheme call */ }
     }
     function setThemePref(pref) {
       if (!['dark', 'light', 'system'].includes(pref)) pref = 'dark';
@@ -8830,6 +8941,11 @@ create trigger trg_user_state_updated_at
       hydrateIcons();
       // T36.5 — Inject the global "?" help button into every topbar.
       try { injectHelpButtons(); } catch (e) { }
+      // T39.1 — Boot-time applyBootTheme runs before the body exists so it
+      // can't swap logo srcs. Now that DOM is ready, sync the logos to the
+      // active theme. Subsequent toggles already call applyThemeLogos via
+      // applyTheme, so this just covers the initial-load case.
+      try { applyThemeLogos(resolveTheme(getThemePref())); } catch (e) { }
       applyBeginnerModeClass();
       applyPlainModeLabels();
       // T23.7 — Pair section-labels with their content cards on the Profile page
@@ -11722,10 +11838,15 @@ create trigger trg_user_state_updated_at
       const coinAward = Math.max(10, Math.round(q.xp / 5));
       state.coins = (state.coins || 0) + coinAward;
       showXP(xpAward, el);
-      // Auto-log exercise quests into the training log (strength + cardio types)
-      const logged = logQuestToTrainingLog(q);
-      const logSuffix = logged > 0 ? ` · ${logged} exercise${logged === 1 ? '' : 's'} logged` : '';
-      showNotif(`Quest complete! +${xpAward} XP · +${coinAward} coins${xpAward > q.xp ? ' (2× bonus!)' : ''}${logSuffix}`);
+      // T38.2 — Quest completion no longer auto-logs placeholder entries to
+      // workoutLog. The Tracker is the source of truth for "what I actually
+      // did" — quests serve as a challenge guide / checklist. The old
+      // behavior pushed empty-set entries (weight=0) that caused two
+      // problems: (1) duplicated data once the user also logged via Tracker,
+      // (2) made exercises appear as BW in Progression because the
+      // placeholder won the same-date sort tie. The render-layer T37.1 fix
+      // is still in place as a safety net for any legacy data.
+      showNotif(`Quest complete! +${xpAward} XP · +${coinAward} coins${xpAward > q.xp ? ' (2× bonus!)' : ''}`);
       // Level-up & rank-up bonuses
       checkLevelUp();
       // Check if all done
@@ -11742,9 +11863,10 @@ create trigger trg_user_state_updated_at
       renderQuests();
       renderStats();
       renderProfile();
-      // Refresh training log + progression so auto-logged quest entries show up immediately
-      if (typeof renderTrainingLog === 'function') renderTrainingLog();
-      if (typeof renderExerciseProgression === 'function') renderExerciseProgression();
+      // T38.2 — Removed the post-completion renderTrainingLog/renderExerciseProgression
+      // calls since quest completion no longer touches workoutLog. The Tracker
+      // path stays in charge of updating those panes when actual session data
+      // is saved.
     }
     function renderStreakRow() {
       const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -12749,11 +12871,14 @@ create trigger trg_user_state_updated_at
       </div>
       <datalist id="tracker-cardio-list">${CARDIO_POOL.map(x => `<option value="${x}">`).join('')}</datalist>
       <div style="display:flex;gap:8px;margin-top:14px;">
-        <button class="btn btn-full" onclick="renderTrackerSheet()" style="font-size:12px;">Refresh</button>
+        <!-- T38.1 — Renamed from "Refresh" (which was a no-op visual re-render)
+             to "Clear Sheet" (calls resetTrackerSheet with a confirm dialog).
+             Now the button actually does what its label promises. -->
+        <button class="btn btn-full" onclick="resetTrackerSheet()" style="font-size:12px;">Clear Sheet</button>
         <button class="btn btn-primary btn-full" onclick="commitTrackerToLog()" style="font-size:12px;">${iconSvg('check', 14)} Save Session to Log</button>
       </div>
       <div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:center;">
-        Edits autosave. Tap <strong>Save Session</strong> to push filled rows to your workout log so they appear in Exercise Progression.
+        Edits autosave. Tap <strong>Save Session</strong> to push filled rows to your workout log; the sheet clears after a successful save.
       </div>
     </div>
   `;
@@ -12854,12 +12979,24 @@ create trigger trg_user_state_updated_at
         });
         logged++;
       }
+      // T38.1 — Clear the tracker sheet for this date so the user gets a
+      // fresh slate next session. Data is already preserved in workoutLog
+      // (and accessible via History/Progress), so this isn't destructive —
+      // it just stops the same data from sitting around in the input form
+      // the next time the user opens the Tracker. Only clears if at least
+      // one row was logged; otherwise leave the sheet alone so a partial
+      // entry isn't wiped by an accidental tap.
+      if (logged > 0) {
+        delete state.trackerSheets[date];
+      }
       save();
       if (logged === 0) {
         showNotif('Fill in at least one set first', 'var(--amber)');
       } else {
-        showNotif(`${logged} exercise${logged === 1 ? '' : 's'} saved to log`);
+        showNotif(`${logged} exercise${logged === 1 ? '' : 's'} saved · tracker cleared`);
       }
+      // T38.1 — Re-render the now-blank tracker so the cleared state shows.
+      if (typeof renderTrackerSheet === 'function') renderTrackerSheet();
       if (typeof renderTrainingLog === 'function') renderTrainingLog();
       if (typeof renderExerciseProgression === 'function') renderExerciseProgression();
     }
