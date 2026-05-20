@@ -6943,20 +6943,25 @@ create trigger trg_user_state_updated_at
       'aria-5.mp3', // "Let's begin." — drop the file in to enable; until then,
                     // the .play() error path triggers Web Speech automatically.
     ];
-    // Shared <audio> element for ARIA playback. Created/unlocked on the
-    // user's intro-starting gesture (iOS Safari requires audio elements to
-    // be touched inside a gesture chain before they can play later via JS).
-    let _ariaAudio = null;
+    // T40.2 — One Audio element per line. Created and individually unlocked
+    // during the user gesture in startAriaIntro. Per-line elements (vs. a
+    // single shared one that gets its src reassigned) avoid two bugs:
+    //   1. Desktop Chrome sometimes refuses to re-play after src reassignment
+    //      if the element was play+paused during the unlock trick — caused
+    //      audio to be silent on desktop while phone worked.
+    //   2. Reassigning src mid-flight in Safari can race with the previous
+    //      play() promise and leave the element in a frozen state.
+    // Each element also exposes its own "ended" event so the typewriter can
+    // gate the next-line advance on audio completion (see _ariaSpeak).
+    let _ariaAudios = []; // indexed parallel to ARIA_VOICE_FILES
     function ariaVoiceEnabled() {
       try { return localStorage.getItem(ARIA_VOICE_KEY) !== 'off'; } catch (e) { return true; }
     }
     function setAriaVoice(on) {
       try { localStorage.setItem(ARIA_VOICE_KEY, on ? 'on' : 'off'); } catch (e) {}
-      // T40.1 — Mute now stops both the MP3 path and the Web Speech path.
-      if (!on) {
-        try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
-        try { if (_ariaAudio) { _ariaAudio.pause(); _ariaAudio.currentTime = 0; } } catch (e) {}
-      }
+      // T40.1 / T40.2 — Mute stops both MP3 (any of the per-line elements)
+      // and Web Speech.
+      if (!on) _ariaStopSpeech();
     }
     function _pickAriaVoice() {
       try {
@@ -6974,33 +6979,45 @@ create trigger trg_user_state_updated_at
         return pool[0];
       } catch (e) { return null; }
     }
+    // T40.2 — Returns a Promise that resolves when this line's audio finishes
+    // (or when it fails and falls back to TTS, or when no MP3 is available).
+    // playNext awaits this so the next line doesn't start until the voice
+    // has finished — fixes the "text outpaces audio" mismatch.
     function _ariaSpeak(text, lineIndex) {
-      if (!ariaVoiceEnabled()) return;
-      // T40.1 — Try MP3 first. The shared _ariaAudio element was created
-      // and unlocked inside the user's gesture during startAriaIntro, so
-      // assigning a new src + play() here should succeed on iOS Safari.
-      // On failure (file missing, network error, codec issue) we fall back
-      // to Web Speech so the user always hears *something* if voice is on.
-      const file = (typeof lineIndex === 'number') ? ARIA_VOICE_FILES[lineIndex] : null;
-      if (file && _ariaAudio) {
+      if (!ariaVoiceEnabled()) return Promise.resolve();
+      const audio = (typeof lineIndex === 'number') ? _ariaAudios[lineIndex] : null;
+      if (audio) {
         try {
-          _ariaAudio.pause();
-          _ariaAudio.currentTime = 0;
-          _ariaAudio.src = file;
-          const p = _ariaAudio.play();
-          if (p && typeof p.then === 'function') {
-            p.catch(err => {
-              console.warn('[ARIA] MP3 play failed, falling back to TTS:', err && err.message);
-              _ariaSpeakWebTTS(text);
+          audio.currentTime = 0;
+          const playPromise = audio.play();
+          if (playPromise && typeof playPromise.then === 'function') {
+            return new Promise(resolve => {
+              let settled = false;
+              const done = () => { if (settled) return; settled = true; resolve(); };
+              // Resolve when this audio's natural ended event fires
+              audio.addEventListener('ended', done, { once: true });
+              // Safety: if ended never fires (e.g. decoding stalls, tab
+              // backgrounded), use the audio's duration + 1s buffer as a
+              // hard cap. Falls back to 8s if duration isn't known.
+              const cap = (audio.duration && isFinite(audio.duration))
+                ? (audio.duration - audio.currentTime + 1) * 1000 : 8000;
+              setTimeout(done, cap);
+              // If the play() promise rejects, fall back to TTS for this
+              // line and resolve immediately (TTS doesn't gate the gate).
+              playPromise.catch(err => {
+                console.warn('[ARIA] MP3 play failed for line', lineIndex, '— falling back to TTS:', err && err.message);
+                _ariaSpeakWebTTS(text);
+                done();
+              });
             });
           }
-          return;
         } catch (e) {
           console.warn('[ARIA] MP3 error, falling back to TTS:', e && e.message);
         }
       }
-      // No MP3 for this line — use Web Speech
+      // No MP3 element for this line (or audio failed at creation) — use TTS
       _ariaSpeakWebTTS(text);
+      return Promise.resolve();
     }
     function _ariaSpeakWebTTS(text) {
       try {
@@ -7015,10 +7032,14 @@ create trigger trg_user_state_updated_at
         window.speechSynthesis.speak(u);
       } catch (e) { /* speech unsupported — silently no-op */ }
     }
-    // T40.1 — Stop both audio paths. Called from skip/finish/voice-mute.
+    // T40.1 / T40.2 — Stop both audio paths. Called from skip/finish/voice-mute.
     function _ariaStopSpeech() {
       try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
-      try { if (_ariaAudio) { _ariaAudio.pause(); _ariaAudio.currentTime = 0; } } catch (e) {}
+      try {
+        (_ariaAudios || []).forEach(a => {
+          if (a) { try { a.pause(); a.currentTime = 0; } catch (e) {} }
+        });
+      } catch (e) {}
     }
     // Voice list loads asynchronously on some browsers — kick it once on init
     // so _pickAriaVoice() returns a populated list by the time we need it.
@@ -7069,8 +7090,13 @@ create trigger trg_user_state_updated_at
       } catch (e) {}
     }
     function _ariaPlayIntro() {
-      const charDelay = 30; // ms per character — feels brisk but readable
-      const holdMs = 1300;  // ms to hold a complete line before clearing
+      // T40.2 — Pacing tuned to match voiced delivery. The typewriter still
+      // races ahead of the audio on long lines, but the audio.ended gate
+      // (see playNext) holds the line until the voice catches up. holdMs
+      // is now just the BREATHING PAUSE after the audio ends — set to 600
+      // (was 1300) so we don't add unnecessary silence between lines.
+      const charDelay = 45; // ms/char — slightly more deliberate than 30
+      const holdMs = 600;   // ms post-audio breathing pause before next line
       const clearMs = 200;  // small pause after clearing before next line types
       let i = 0;
       const playNext = () => {
@@ -7086,41 +7112,40 @@ create trigger trg_user_state_updated_at
           return;
         }
         const line = ARIA_INTRO_LINES[i];
-        // T36.6 / T40.1 — Speak the line in parallel with the typewriter.
-        // Pass the line index so _ariaSpeak knows which MP3 to play (or
-        // when to fall back to Web Speech if no file exists for that line).
-        // The typewriter's hold/clear logic still gates the next line
-        // transition, so we don't need to await speech completion.
-        _ariaSpeak(line, i);
+        // T36.6 / T40.2 — Speak the line in parallel with the typewriter.
+        // _ariaSpeak returns a Promise that resolves when this line's audio
+        // ends (or when it falls back to TTS / has no MP3). We gate the
+        // next-line transition on the audio finishing so the voice always
+        // gets to deliver the full sentence, regardless of how fast the
+        // text typed. minHoldMs gives a brief breathing pause AFTER the
+        // audio ends (or after the typewriter, whichever is longer).
+        const audioP = _ariaSpeak(line, i);
         _ariaTypeLine(line, charDelay, () => {
-          // Hold completed line, then clear it before starting next
-          _ariaTimeout(() => {
-            if (i < ARIA_INTRO_LINES.length - 1) {
-              _ariaSetLine('');
-              _ariaTimeout(() => { i++; playNext(); }, clearMs);
-            } else {
-              // T34.13 / T34.16 — Last line: don't erase. Settle the orb,
-              // then fade-to-black, swap to ob0, fade back in. Whole
-              // transition is ~1500ms — faster than the original 2.4s but
-              // still cinematic thanks to the crossfade.
-              i++;
-              _ariaTimeout(() => {
-                _ariaSettleOrb();
-                const fade = document.getElementById('aria-intro-fade');
-                // Step 1: fade-to-black over 600ms
-                if (fade) fade.style.opacity = '1';
-                // Step 2: at ~600ms (mid-fade), swap screens behind the curtain
+          // Wait for audio to finish (no-op when audio is short or absent)
+          // then enforce a brief visual hold so the line doesn't snap away.
+          audioP.then(() => {
+            if (_ariaIntroAborted) return;
+            _ariaTimeout(() => {
+              if (_ariaIntroAborted) return;
+              if (i < ARIA_INTRO_LINES.length - 1) {
+                _ariaSetLine('');
+                _ariaTimeout(() => { i++; playNext(); }, clearMs);
+              } else {
+                // T34.13 / T34.16 — Last line: don't erase. Settle the orb,
+                // fade-to-black, swap to ob0, fade back in.
+                i++;
                 _ariaTimeout(() => {
-                  finishAriaIntro();
-                  // Step 3: fade the black overlay back out over 600ms,
-                  // revealing the path picker underneath
+                  _ariaSettleOrb();
+                  const fade = document.getElementById('aria-intro-fade');
+                  if (fade) fade.style.opacity = '1';
                   _ariaTimeout(() => {
-                    if (fade) fade.style.opacity = '0';
-                  }, 50);
-                }, 600);
-              }, 300);
-            }
-          }, holdMs);
+                    finishAriaIntro();
+                    _ariaTimeout(() => { if (fade) fade.style.opacity = '0'; }, 50);
+                  }, 600);
+                }, 300);
+              }
+            }, holdMs);
+          });
         });
       };
       // Initial pause before typing starts so the orb gets a moment to be felt
@@ -7149,34 +7174,37 @@ create trigger trg_user_state_updated_at
       _ariaSetLine('');
       // T31.6 — force pure black on every parent so no color seams show through
       try { document.body.classList.add('intro-mode'); } catch (e) {}
-      // T40.1 — Create + unlock the shared audio element inside the user
-      // gesture chain (startAriaIntro is called synchronously from the
-      // "Get Started" tap). iOS Safari blocks JS-triggered audio playback
-      // unless the element has been "touched" during a gesture. The
-      // play/pause dance below satisfies the gating; subsequent .play()
-      // calls from setTimeout callbacks then work. Also preload all the
-      // MP3s so playback starts instantly when each line begins.
+      // T40.2 — Create one Audio element per intro line and individually
+      // unlock each during the user gesture chain. Per-line elements avoid
+      // the desktop-Chrome bug where reusing one element with src
+      // reassignment after an unlock play+pause silently refused to play.
+      // Each element is preloaded so playback starts instantly when its
+      // line begins, and each gets its own "ended" event listener that
+      // gates the typewriter advance (in _ariaSpeak).
       try {
-        if (!_ariaAudio) {
-          _ariaAudio = new Audio();
-          _ariaAudio.preload = 'auto';
-          _ariaAudio.volume = 0.95;
-        }
-        // Unlock trick: play a silent first frame, then immediately pause.
-        // Safari counts this as a user-initiated play and lifts the gate.
-        if (ariaVoiceEnabled() && ARIA_VOICE_FILES[0]) {
-          _ariaAudio.src = ARIA_VOICE_FILES[0];
-          const p = _ariaAudio.play();
-          if (p && typeof p.then === 'function') {
-            p.then(() => _ariaAudio.pause()).catch(() => {});
+        _ariaAudios = ARIA_VOICE_FILES.map((file, idx) => {
+          if (!file) return null;
+          const a = new Audio(file);
+          a.preload = 'auto';
+          a.volume = 0.95;
+          // Unlock trick — only the first element needs to actually play+
+          // pause to lift Safari's autoplay gate for THIS user gesture.
+          // The others just need to exist + be loading; iOS extends the
+          // gate to all media elements once one has played.
+          if (idx === 0 && ariaVoiceEnabled()) {
+            const p = a.play();
+            if (p && typeof p.then === 'function') {
+              p.then(() => { a.pause(); a.currentTime = 0; }).catch(err => {
+                // Common on desktop Chrome before user-engagement quota is met.
+                // We swallow this — the play() inside _ariaSpeak will retry
+                // with the user gesture still considered fresh.
+                console.warn('[ARIA] audio unlock blocked on first element:', err && err.message);
+              });
+            }
           }
-        }
-        // Warm the browser cache for the other MP3s
-        ARIA_VOICE_FILES.slice(1).forEach(f => {
-          if (!f) return;
-          const a = new Audio(); a.preload = 'auto'; a.src = f;
+          return a;
         });
-      } catch (e) { console.warn('[ARIA] audio unlock failed:', e && e.message); }
+      } catch (e) { console.warn('[ARIA] audio init failed:', e && e.message); }
       // T36.6 — Sync voice toggle button to saved preference. The button is
       // already in the DOM (rendered in the intro markup); we just update its
       // visual state to match what's stored before the intro starts speaking.
