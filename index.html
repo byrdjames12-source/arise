@@ -6979,14 +6979,41 @@ create trigger trg_user_state_updated_at
         return pool[0];
       } catch (e) { return null; }
     }
-    // T40.2 — Returns a Promise that resolves when this line's audio finishes
-    // (or when it fails and falls back to TTS, or when no MP3 is available).
-    // playNext awaits this so the next line doesn't start until the voice
-    // has finished — fixes the "text outpaces audio" mismatch.
+    // T40.3 — Resolve once the audio has enough data buffered to play through
+    // without stalling. readyState 4 = HAVE_ENOUGH_DATA. If we time out
+    // waiting, play anyway with whatever's buffered (better than freezing
+    // the intro). Cap is 2s — most ElevenLabs MP3s under 300 KB load
+    // comfortably within that on any reasonable connection.
+    function _ariaWaitForBuffered(audio) {
+      if (!audio) return Promise.resolve();
+      if (audio.readyState >= 4) return Promise.resolve();
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = () => { if (settled) return; settled = true; resolve(); };
+        audio.addEventListener('canplaythrough', finish, { once: true });
+        // Fallback — don't block the intro forever if the network is slow
+        setTimeout(finish, 2000);
+      });
+    }
+    // T40.2 / T40.3 — Returns a Promise that resolves when this line's audio
+    // finishes (or falls back to TTS, or there's no MP3 mapped). playNext
+    // awaits this so the next line doesn't start until the voice catches
+    // up — fixes the "text outpaces audio" mismatch. Now also waits for
+    // the clip to be fully buffered before play() so the audio can't stall
+    // and fire 'ended' early (was the root cause of lines 2/3 cutoff).
     function _ariaSpeak(text, lineIndex) {
       if (!ariaVoiceEnabled()) return Promise.resolve();
       const audio = (typeof lineIndex === 'number') ? _ariaAudios[lineIndex] : null;
-      if (audio) {
+      if (!audio) {
+        // No MP3 element for this line — TTS fallback
+        _ariaSpeakWebTTS(text);
+        return Promise.resolve();
+      }
+      // Wait until the clip is fully buffered, THEN play. This gate is
+      // why lines 2 and 3 used to cut off — they were still streaming
+      // when their turn came up; the buffer ran out mid-sentence and
+      // 'ended' fired prematurely.
+      return _ariaWaitForBuffered(audio).then(() => {
         try {
           audio.currentTime = 0;
           const playPromise = audio.play();
@@ -6994,16 +7021,14 @@ create trigger trg_user_state_updated_at
             return new Promise(resolve => {
               let settled = false;
               const done = () => { if (settled) return; settled = true; resolve(); };
-              // Resolve when this audio's natural ended event fires
               audio.addEventListener('ended', done, { once: true });
-              // Safety: if ended never fires (e.g. decoding stalls, tab
-              // backgrounded), use the audio's duration + 1s buffer as a
-              // hard cap. Falls back to 8s if duration isn't known.
+              // Safety hard-cap based on actual duration (now that the
+              // clip is fully buffered, audio.duration is reliable). +1s
+              // buffer. Falls back to 12s if duration is still unknown
+              // (rare; bumped from 8s for extra safety on long lines).
               const cap = (audio.duration && isFinite(audio.duration))
-                ? (audio.duration - audio.currentTime + 1) * 1000 : 8000;
+                ? (audio.duration - audio.currentTime + 1) * 1000 : 12000;
               setTimeout(done, cap);
-              // If the play() promise rejects, fall back to TTS for this
-              // line and resolve immediately (TTS doesn't gate the gate).
               playPromise.catch(err => {
                 console.warn('[ARIA] MP3 play failed for line', lineIndex, '— falling back to TTS:', err && err.message);
                 _ariaSpeakWebTTS(text);
@@ -7013,11 +7038,9 @@ create trigger trg_user_state_updated_at
           }
         } catch (e) {
           console.warn('[ARIA] MP3 error, falling back to TTS:', e && e.message);
+          _ariaSpeakWebTTS(text);
         }
-      }
-      // No MP3 element for this line (or audio failed at creation) — use TTS
-      _ariaSpeakWebTTS(text);
-      return Promise.resolve();
+      });
     }
     function _ariaSpeakWebTTS(text) {
       try {
@@ -7174,19 +7197,25 @@ create trigger trg_user_state_updated_at
       _ariaSetLine('');
       // T31.6 — force pure black on every parent so no color seams show through
       try { document.body.classList.add('intro-mode'); } catch (e) {}
-      // T40.2 — Create one Audio element per intro line and individually
-      // unlock each during the user gesture chain. Per-line elements avoid
-      // the desktop-Chrome bug where reusing one element with src
-      // reassignment after an unlock play+pause silently refused to play.
-      // Each element is preloaded so playback starts instantly when its
-      // line begins, and each gets its own "ended" event listener that
-      // gates the typewriter advance (in _ariaSpeak).
+      // T40.2 / T40.3 — Create one Audio element per intro line and
+      // individually unlock each during the user gesture chain. Per-line
+      // elements avoid the desktop-Chrome bug where reusing one element
+      // with src reassignment after an unlock play+pause silently refused
+      // to play. Each element is preloaded; the .load() call below is the
+      // explicit "commit to downloading now" signal (preload='auto' alone
+      // is a hint that Chrome can ignore under memory pressure or when the
+      // page is busy). The buffer-then-play gate inside _ariaSpeak then
+      // waits for each clip to be fully buffered before its turn so the
+      // audio can't run out mid-sentence (caused lines 2–3 to cut off
+      // on slower connections).
       try {
         _ariaAudios = ARIA_VOICE_FILES.map((file, idx) => {
           if (!file) return null;
           const a = new Audio(file);
           a.preload = 'auto';
           a.volume = 0.95;
+          // T40.3 — force the browser to actually start downloading
+          try { a.load(); } catch (e) {}
           // Unlock trick — only the first element needs to actually play+
           // pause to lift Safari's autoplay gate for THIS user gesture.
           // The others just need to exist + be loading; iOS extends the
