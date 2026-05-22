@@ -3134,6 +3134,17 @@
       color: #0a0c10;
     }
     .tutorial-btn-primary:hover { background: linear-gradient(135deg, #ffe28a 0%, #ffb822 100%); }
+    /* T42.5 — Light theme: the tour tooltip + opt-in banner shipped with a
+       dark navy fill that clashed against the light theme. Swap to the same
+       white-to-pale gradient the app's cards use; their text and borders
+       already run on theme variables, so they stay legible. */
+    [data-theme="light"] .tutorial-tooltip,
+    [data-theme="light"] .tutorial-optin {
+      background: linear-gradient(135deg, #ffffff 0%, #eef2fb 100%);
+    }
+    [data-theme="light"] .tutorial-tooltip {
+      box-shadow: 0 12px 32px rgba(15, 30, 60, 0.18), 0 0 24px rgba(244, 182, 63, 0.22);
+    }
     /* Opt-in prompt — a small floating banner that appears on the Quests
        screen on first launch. Dismissible. Sits above bottom nav but
        below the FAB (FAB is at z-index 80; this is 70). */
@@ -4114,7 +4125,7 @@
           <!-- Today's meals -->
           <div class="section-label">TODAY'S MEALS</div>
           <div id="today-meals-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-          <button class="btn btn-full" onclick="openAddMealModal('extra')" style="border-style:dashed;margin-top:4px;">+
+          <button class="btn btn-full" id="log-food-btn" onclick="openAddMealModal('extra')" style="border-style:dashed;margin-top:4px;">+
             Log additional food</button>
           <button class="btn btn-full btn-with-icon" onclick="openAddMealModal('swap')"
             style="border-style:dashed;"><span class="icon-title-slot" data-icon="swap"
@@ -8593,6 +8604,14 @@ create trigger trg_user_state_updated_at
         beforeShow: () => { try { switchTab('progress'); switchProgressTab('goals'); } catch(e){} },
       },
       {
+        id: 'ct-goaldetail',
+        selectorFn: () => document.querySelector('#prog-pane-goals .goal-card') || document.getElementById('prog-tab-goals'),
+        title: 'Inside a Goal',
+        body: 'Open any goal to see its milestones — smaller checkpoints on the way to the target. ARISE tracks progress toward each milestone and fills the bar as you log work, so a big goal always stays broken into doable steps.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('progress'); switchProgressTab('goals'); } catch(e){} },
+      },
+      {
         id: 'ct-workouts',
         selectorFn: () => _getNavButton('workouts'),
         title: 'Workouts',
@@ -8623,6 +8642,22 @@ create trigger trg_user_state_updated_at
         body: 'Track calories, macros, and water. Log meals by hand, reuse saved recipes and meal preps, or scan a barcode and the numbers fill themselves in.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('nutrition'); } catch(e){} },
+      },
+      {
+        id: 'ct-logmeals',
+        selectorFn: () => document.getElementById('log-food-btn'),
+        title: 'Logging a Meal',
+        body: 'Tap here to log food. In the Add Food window you can search the built-in food library by name, or hit the barcode icon to scan a packaged item and let the macros fill in automatically — or just hand-enter the numbers yourself.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('nutrition'); switchNutTab('daily'); } catch(e){} },
+      },
+      {
+        id: 'ct-mealprep',
+        selectorFn: () => document.getElementById('nut-tab-prep'),
+        title: 'Meal Prep',
+        body: 'The Meal Prep tab is your reusable kitchen. Save meals you eat often, set which days they belong to, and log them in one tap instead of re-entering the macros every single time.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('nutrition'); switchNutTab('prep'); } catch(e){} },
       },
       {
         id: 'ct-profile',
