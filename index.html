@@ -868,6 +868,38 @@
       z-index: 1;
     }
 
+    /* T42.1 — Equippable card frames. equipItem() / applyEquippedFrame() add
+       the .framed class plus --frame-border / --frame-glow custom properties
+       to .hunter-card and the home identity card. Animated frames also get a
+       .frame-anim-* class. Frame definitions live in FRAME_STYLES (JS). */
+    .hunter-card.framed,
+    .home-identity-card.framed {
+      border: 2px solid var(--frame-border, var(--accent));
+      box-shadow: var(--frame-glow, none);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .frame-anim-aurora  { animation: frameAurora 7s ease-in-out infinite; }
+    .frame-anim-ember   { animation: frameEmber 2.6s ease-in-out infinite; }
+    .frame-anim-circuit { animation: frameCircuit 3s ease-in-out infinite; }
+    .frame-anim-monarch { animation: frameMonarch 3.6s ease-in-out infinite; }
+    @keyframes frameAurora {
+      0%, 100% { border-color: #5ad1c8; box-shadow: 0 0 20px rgba(90, 209, 200, 0.5), inset 0 0 22px rgba(124, 119, 221, 0.08); }
+      33%      { border-color: #7c77dd; box-shadow: 0 0 22px rgba(124, 119, 221, 0.55), inset 0 0 22px rgba(90, 209, 200, 0.08); }
+      66%      { border-color: #63c878; box-shadow: 0 0 22px rgba(99, 200, 120, 0.5), inset 0 0 22px rgba(124, 119, 221, 0.08); }
+    }
+    @keyframes frameEmber {
+      0%, 100% { box-shadow: 0 0 13px rgba(255, 107, 53, 0.4); }
+      50%      { box-shadow: 0 0 28px rgba(255, 107, 53, 0.72); }
+    }
+    @keyframes frameCircuit {
+      0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.4), inset 0 0 18px rgba(34, 211, 238, 0.06); }
+      50%      { box-shadow: 0 0 27px rgba(34, 211, 238, 0.8), inset 0 0 18px rgba(34, 211, 238, 0.13); }
+    }
+    @keyframes frameMonarch {
+      0%, 100% { box-shadow: 0 0 16px rgba(244, 182, 63, 0.45), inset 0 0 24px rgba(244, 182, 63, 0.1); }
+      50%      { box-shadow: 0 0 31px rgba(244, 182, 63, 0.8), inset 0 0 24px rgba(244, 182, 63, 0.17); }
+    }
+
     .hunter-name {
       font-family: 'Rajdhani', sans-serif;
       font-size: 24px;
@@ -2029,9 +2061,13 @@
       border-color: var(--green);
     }
 
+    /* T42.1 — Stronger equipped state so it's unmistakable which item is on:
+       gold border + tinted fill + a soft gold glow. */
     .shop-item.equipped {
       border-color: var(--gold);
-      background: linear-gradient(135deg, rgba(240, 165, 0, 0.06), transparent);
+      border-width: 2px;
+      background: linear-gradient(135deg, rgba(240, 165, 0, 0.14), transparent);
+      box-shadow: 0 0 14px rgba(240, 165, 0, 0.3);
     }
 
     .shop-item:hover:not(.owned):not(.equipped) {
@@ -2076,6 +2112,8 @@
     .shop-item-tag.equipped {
       background: var(--gold);
       color: #000;
+      font-size: 10px;
+      padding: 3px 8px;
     }
 
     .shop-item-tag.owned {
@@ -4329,10 +4367,16 @@
           <!-- T33.2 — Tour & tips section — lets the user replay the Hunter Orientation tour anytime. -->
           <div class="section-label" style="margin-top:4px;">TOUR & TIPS</div>
           <div class="card">
-            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Replay the 60-second
-              Hunter Orientation tour — a quick highlight of the quest list, navigation, programs, and ARIA.</div>
-            <button class="btn btn-sm btn-with-icon" onclick="startTutorial()"><span class="icon-title-slot"
-                data-icon="sparkles"></span>Replay Tour</button>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Two guided tours. The
+              quick <strong>Hunter Orientation</strong> highlights the five tabs and ARIA. The
+              <strong>Full Tour</strong> goes deeper — a ~15-stop walkthrough of every system: quests, the workout
+              tracker, nutrition, progress, the shop, and more.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-with-icon" onclick="startTutorial()"><span class="icon-title-slot"
+                  data-icon="sparkles"></span>Replay Tour</button>
+              <button class="btn btn-sm btn-with-icon" onclick="startComprehensiveTour()"><span class="icon-title-slot"
+                  data-icon="swords"></span>Full Tour</button>
+            </div>
           </div>
           <!-- T34.9 / T36.5 — Contact & feedback. Primary path is the in-app
                form (writes to Supabase support_messages table). Mailto stays
@@ -8480,6 +8524,134 @@ create trigger trg_user_state_updated_at
         beforeShow: () => { try { switchTab('quests'); } catch(e){} },
       },
     ];
+    // T42.3 — Comprehensive tour. The quick tour above just names the five
+    // tabs; this one walks every major system in depth (~15 stops). Same
+    // engine — startTutorial(steps) swaps which array is active.
+    const COMPREHENSIVE_TOUR_STEPS = [
+      {
+        id: 'ct-welcome',
+        selectorFn: null,
+        title: 'The Full Tour',
+        body: 'A deeper walkthrough of ARISE — every major system, in order. It takes about two minutes. Tap Next to begin, or Skip anytime.',
+        placement: 'center',
+        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+      },
+      {
+        id: 'ct-quests',
+        selectorFn: () => _getNavButton('quests'),
+        title: 'Quests — Your Home Base',
+        body: 'Every day starts here. Daily quests, your streak, XP, and hunter rank. Completing quests is how you earn XP and climb the E → S ranks.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+      },
+      {
+        id: 'ct-aiquest',
+        selectorFn: () => document.getElementById('ai-quest-card'),
+        title: 'ARIA\'s Daily Challenge',
+        body: 'Each day ARIA generates one challenge tuned to your training split and goals. Tap Accept to add it to your quest list for bonus XP.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+      },
+      {
+        id: 'ct-aria',
+        selectorFn: () => document.getElementById('fab-coach'),
+        title: 'Meet ARIA',
+        body: 'Your AI coach is one tap away from any screen. Ask for form tips, a plan tweak, macro math, or training advice — ARIA reads your profile and recent training for context. When the orb glows gold, a reply is waiting.',
+        placement: 'left',
+        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+      },
+      {
+        id: 'ct-progress',
+        selectorFn: () => _getNavButton('progress'),
+        title: 'Progress',
+        body: 'The numbers behind your work — body stats, weight and body-fat trends, weekly training volume, and your goals.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('progress'); } catch(e){} },
+      },
+      {
+        id: 'ct-rank',
+        selectorFn: () => document.getElementById('rank-badge'),
+        title: 'Hunter Rank & XP',
+        body: 'Your rank climbs from E to S as you bank XP, and the bar shows how close the next rank is. Card frames you equip in the Shop appear right here on this card.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('progress'); switchProgressTab('stats'); } catch(e){} },
+      },
+      {
+        id: 'ct-stats',
+        selectorFn: () => document.getElementById('body-stats-grid'),
+        title: 'Body Stats & Trends',
+        body: 'Log weight, body fat, and measurements over time. ARISE charts the trend so you can see whether the plan is working — open this for your 4-week review.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('progress'); switchProgressTab('stats'); } catch(e){} },
+      },
+      {
+        id: 'ct-goals',
+        selectorFn: () => document.getElementById('prog-tab-goals'),
+        title: 'Goals',
+        body: 'Set targets — a goal weight, a lift number, a habit — and ARISE tracks feasibility and progress. ARIA can draft a full goal set for you, too.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('progress'); switchProgressTab('goals'); } catch(e){} },
+      },
+      {
+        id: 'ct-workouts',
+        selectorFn: () => _getNavButton('workouts'),
+        title: 'Workouts',
+        body: 'Everything training: log sessions, review your history, and build or browse multi-week programs.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('workouts'); } catch(e){} },
+      },
+      {
+        id: 'ct-tracker',
+        selectorFn: () => document.getElementById('work-tab-log'),
+        title: 'The Workout Tracker',
+        body: 'Log each exercise set by set — weight, reps, and effort (RPE). A built-in rest timer counts down between sets and chimes when you\'re ready for the next one.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('workouts'); switchWorkoutTab('log'); } catch(e){} },
+      },
+      {
+        id: 'ct-plans',
+        selectorFn: () => document.getElementById('work-tab-prog'),
+        title: 'Plans & Library',
+        body: 'Run a structured multi-week program, or browse the exercise library for substitutions, equipment-aware picks, and demo videos.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('workouts'); switchWorkoutTab('prog'); } catch(e){} },
+      },
+      {
+        id: 'ct-fuel',
+        selectorFn: () => _getNavButton('nutrition'),
+        title: 'Fuel',
+        body: 'Track calories, macros, and water. Log meals by hand, reuse saved recipes and meal preps, or scan a barcode and the numbers fill themselves in.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('nutrition'); } catch(e){} },
+      },
+      {
+        id: 'ct-profile',
+        selectorFn: () => _getNavButton('profile'),
+        title: 'Profile',
+        body: 'Your hunter identity and every setting — biometrics, training setup, reminders, recovery mode, theme, and cloud sync to keep your devices in step.',
+        placement: 'auto',
+        beforeShow: () => { try { switchTab('profile'); } catch(e){} },
+      },
+      {
+        id: 'ct-shop',
+        selectorFn: null,
+        title: 'The Shop',
+        body: 'Spend the coins you earn from quests on card frames that customize your hunter card, plus consumable buffs like 2× XP and Streak Shields. Titles are earned by hitting milestones.',
+        placement: 'center',
+        beforeShow: () => { try { switchTab('shop'); } catch(e){} },
+      },
+      {
+        id: 'ct-done',
+        selectorFn: null,
+        title: 'That\'s the Full Picture',
+        body: 'You\'ve seen every system. Replay either tour anytime from Profile → Tour & Tips. Now go put in the work, Hunter.',
+        placement: 'center',
+        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+      },
+    ];
+    // Which step array the tutorial engine is currently running. startTutorial()
+    // swaps this so the same machinery drives both the quick and full tours.
+    let _activeTourSteps = TUTORIAL_STEPS;
     let _tutorialIdx = 0;
     let _tutorialActive = false;
     let _tutorialResizeBound = false;
@@ -8507,7 +8679,10 @@ create trigger trg_user_state_updated_at
       if (optin) optin.classList.remove('active');
       startTutorial();
     }
-    function startTutorial() {
+    // T42.3 — startTutorial now takes an optional steps array. No argument
+    // (the Replay Tour button, the opt-in banner) → the quick TUTORIAL_STEPS.
+    function startTutorial(steps) {
+      _activeTourSteps = Array.isArray(steps) ? steps : TUTORIAL_STEPS;
       _tutorialIdx = 0;
       _tutorialActive = true;
       const bd = document.getElementById('tutorial-backdrop');
@@ -8520,8 +8695,10 @@ create trigger trg_user_state_updated_at
       }
       _tutorialShowStep(0);
     }
+    // T42.3 — Run the in-depth ~15-stop tour through the same engine.
+    function startComprehensiveTour() { startTutorial(COMPREHENSIVE_TOUR_STEPS); }
     function tutorialNext() {
-      if (_tutorialIdx >= TUTORIAL_STEPS.length - 1) { tutorialEnd(); return; }
+      if (_tutorialIdx >= _activeTourSteps.length - 1) { tutorialEnd(); return; }
       _tutorialShowStep(_tutorialIdx + 1);
     }
     // T34.12 — Step backward. No-op on step 0 (the Back button is hidden there).
@@ -8540,7 +8717,7 @@ create trigger trg_user_state_updated_at
     }
     function _tutorialShowStep(idx) {
       _tutorialIdx = idx;
-      const step = TUTORIAL_STEPS[idx];
+      const step = _activeTourSteps[idx];
       if (!step) { tutorialEnd(); return; }
       // Run any "switch screen first" hook before measuring the target.
       if (typeof step.beforeShow === 'function') {
@@ -8556,9 +8733,9 @@ create trigger trg_user_state_updated_at
       const backBtn = document.getElementById('tutorial-tt-back');
       if (title) title.textContent = step.title;
       if (body) body.textContent = step.body;
-      if (counter) counter.textContent = `Step ${idx + 1} of ${TUTORIAL_STEPS.length}`;
-      if (nextBtn) nextBtn.textContent = (idx === TUTORIAL_STEPS.length - 1) ? 'Done' : 'Next';
-      if (skipBtn) skipBtn.style.display = (idx === TUTORIAL_STEPS.length - 1) ? 'none' : '';
+      if (counter) counter.textContent = `Step ${idx + 1} of ${_activeTourSteps.length}`;
+      if (nextBtn) nextBtn.textContent = (idx === _activeTourSteps.length - 1) ? 'Done' : 'Next';
+      if (skipBtn) skipBtn.style.display = (idx === _activeTourSteps.length - 1) ? 'none' : '';
       // T34.12 — Back button only makes sense from step 1 onward
       if (backBtn) backBtn.style.display = (idx > 0) ? '' : 'none';
       // Wait two animation frames — first for the screen-switch to apply,
@@ -8676,7 +8853,7 @@ create trigger trg_user_state_updated_at
     }
     function _tutorialReposition() {
       if (!_tutorialActive) return;
-      const step = TUTORIAL_STEPS[_tutorialIdx];
+      const step = _activeTourSteps[_tutorialIdx];
       if (step) _tutorialPositionForStep(step);
     }
 
@@ -9187,6 +9364,8 @@ create trigger trg_user_state_updated_at
       // T41.2 — Reflect any unread ARIA reply on the FAB orb at boot (e.g. a
       // reply arrived after the user had closed the chat in a prior session).
       try { updateCoachOrb(); } catch (e) { }
+      // T42.1 — Paint the equipped card frame onto the hunter card at boot.
+      try { applyEquippedFrame(); } catch (e) { }
     }
     // ===== COACH TIPS — beginner-mode learning content =====
     // Curated, rotating tips that help beginners build training literacy. Cycled by the
@@ -16978,6 +17157,13 @@ create trigger trg_user_state_updated_at
       // T29.3 — additional frames for variety
       frame_aurora: { id: 'frame_aurora', kind: 'frame', name: 'Aurora Frame', icon: 'sparkles', desc: 'A shifting gradient inspired by the northern lights.', price: 500 },
       frame_emberforge: { id: 'frame_emberforge', kind: 'frame', name: 'Emberforge Frame', icon: 'flame', desc: 'Forged in fire — for those who train relentlessly.', price: 600 },
+      // T42.2 — six more frames spanning price tiers and styles
+      frame_verdant: { id: 'frame_verdant', kind: 'frame', name: 'Verdant Frame', icon: 'leaf', desc: 'A calm forest-green border for the steady and consistent.', price: 350 },
+      frame_frost: { id: 'frame_frost', kind: 'frame', name: 'Frostbite Frame', icon: 'snowflake', desc: 'An icy blue glow for hunters who keep their cool.', price: 400 },
+      frame_crimson: { id: 'frame_crimson', kind: 'frame', name: 'Crimson Frame', icon: 'swords', desc: 'A blood-red border that radiates intensity.', price: 450 },
+      frame_amethyst: { id: 'frame_amethyst', kind: 'frame', name: 'Amethyst Frame', icon: 'sparkles', desc: 'A regal violet glow with a mystic edge.', price: 550 },
+      frame_circuit: { id: 'frame_circuit', kind: 'frame', name: 'Circuit Frame', icon: 'zap', desc: 'A pulsing neon-cyan border for the data-driven.', price: 700 },
+      frame_monarch: { id: 'frame_monarch', kind: 'frame', name: 'Monarch Frame', icon: 'crown', desc: 'The shimmering gold-and-shadow crown of an S-rank hunter.', price: 1000 },
       // Buffs (functional, consumable)
       buff_2xp: { id: 'buff_2xp', kind: 'buff', name: '2× XP Token', icon: 'zap', desc: 'Doubles XP on your next completed quest.', price: 150, consumable: true },
       buff_shield: { id: 'buff_shield', kind: 'buff', name: 'Streak Shield', icon: 'shield', desc: 'Protects your streak from one missed day.', price: 300, consumable: true },
@@ -16990,6 +17176,42 @@ create trigger trg_user_state_updated_at
       buff_quest_reroll: { id: 'buff_quest_reroll', kind: 'buff', name: 'Quest Reroll', icon: 'refresh', desc: 'Regenerate today\'s quest list — useful when the prescribed work conflicts with reality.', price: 75, consumable: true },
       buff_streak_double: { id: 'buff_streak_double', kind: 'buff', name: 'Streak Multiplier', icon: 'flame', desc: 'Next 7 days count double toward streak titles. Stack with 2× XP for a big push.', price: 500, consumable: true },
     };
+    // T42.1 — Visual definitions for each card frame. applyEquippedFrame()
+    // reads this to set the --frame-border / --frame-glow custom properties on
+    // the hunter card; `anim` (when present) names a .frame-anim-* CSS class
+    // whose keyframes drive an animated glow instead of a static one.
+    const FRAME_STYLES = {
+      frame_gold:       { border: '#f4b63f', glow: '0 0 18px rgba(244,182,63,0.5), inset 0 0 22px rgba(244,182,63,0.08)' },
+      frame_obsidian:   { border: '#4a4a5e', glow: '0 0 0 1px rgba(120,120,150,0.5), 0 6px 22px rgba(0,0,0,0.55)' },
+      frame_aurora:     { border: '#5ad1c8', glow: '', anim: 'aurora' },
+      frame_emberforge: { border: '#ff6b35', glow: '0 0 13px rgba(255,107,53,0.4)', anim: 'ember' },
+      frame_verdant:    { border: '#3fae6b', glow: '0 0 18px rgba(63,174,107,0.5)' },
+      frame_frost:      { border: '#5ec8e8', glow: '0 0 18px rgba(94,200,232,0.55), inset 0 0 22px rgba(94,200,232,0.1)' },
+      frame_crimson:    { border: '#e0354b', glow: '0 0 20px rgba(224,53,75,0.55)' },
+      frame_amethyst:   { border: '#a855f7', glow: '0 0 20px rgba(168,85,247,0.55)' },
+      frame_circuit:    { border: '#22d3ee', glow: '0 0 12px rgba(34,211,238,0.4)', anim: 'circuit' },
+      frame_monarch:    { border: '#f4b63f', glow: '0 0 16px rgba(244,182,63,0.45)', anim: 'monarch' },
+    };
+    // Apply the user's equipped frame to the hunter card + home identity card.
+    // These elements are static in the DOM, so calling this once at boot and
+    // again whenever the frame changes is enough — re-renders of their inner
+    // content don't drop the class. 'default' (or unknown) → no frame.
+    function applyEquippedFrame() {
+      const fid = (state.equipped && state.equipped.frame) || 'default';
+      const fs = FRAME_STYLES[fid];
+      const animClasses = ['frame-anim-aurora', 'frame-anim-ember', 'frame-anim-circuit', 'frame-anim-monarch'];
+      document.querySelectorAll('.hunter-card, .home-identity-card').forEach(el => {
+        el.classList.remove('framed', ...animClasses);
+        el.style.removeProperty('--frame-border');
+        el.style.removeProperty('--frame-glow');
+        if (fs) {
+          el.classList.add('framed');
+          el.style.setProperty('--frame-border', fs.border);
+          if (fs.glow) el.style.setProperty('--frame-glow', fs.glow);
+          if (fs.anim) el.classList.add('frame-anim-' + fs.anim);
+        }
+      });
+    }
     // Earned titles — not purchased, awarded by hitting a condition.
     // `progress` returns { current, target } for a progress bar; `check` is a boolean.
     const TITLE_CATALOG = {
@@ -17277,7 +17499,7 @@ create trigger trg_user_state_updated_at
           : false;
         const cls = equipped ? 'shop-item equipped' : owned ? 'shop-item owned' : 'shop-item';
         const priceNode = equipped
-          ? `<span class="shop-item-tag equipped">EQUIPPED</span>`
+          ? `<div style="display:flex;flex-direction:column;gap:6px;width:100%;align-items:flex-start;"><span class="shop-item-tag equipped">✓ EQUIPPED</span><button class="btn btn-sm" onclick="unequipFrame()">Unequip</button></div>`
           : owned && kind !== 'buff'
             ? `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`
             : owned && kind === 'buff'
@@ -17357,7 +17579,9 @@ create trigger trg_user_state_updated_at
         <div class="shop-item-icon">${iconSvg(it.icon, 28)}</div>
         <div class="shop-item-name">${it.name}</div>
         <div class="shop-item-desc">${it.desc}</div>
-        ${equipped ? '<span class="shop-item-tag equipped">EQUIPPED</span>' : `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`}
+        ${equipped
+          ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;"><span class="shop-item-tag equipped">✓ EQUIPPED</span><button class="btn btn-sm" onclick="${it.kind === 'frame' ? 'unequipFrame()' : 'unequipTitle()'}">Unequip</button></div>`
+          : `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`}
       </div>`;
       }).join('')}</div>`}
     <div class="section-label" style="margin-top:10px;">BUFFS</div>
@@ -17408,6 +17632,20 @@ create trigger trg_user_state_updated_at
       renderShop();
       renderProfile();
       renderStats();
+      // T42.1 — Paint the frame onto the hunter card so the change is visible.
+      try { applyEquippedFrame(); } catch (e) {}
+    }
+    // T42.1 — Remove the equipped frame, reverting the hunter card to its
+    // default accent border. Mirrors unequipTitle().
+    function unequipFrame() {
+      state.equipped = state.equipped || {};
+      state.equipped.frame = 'default';
+      showNotif('Frame unequipped', 'var(--text2)');
+      save();
+      try { applyEquippedFrame(); } catch (e) {}
+      renderShop();
+      try { renderProfile(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
     }
     function useBuff(id) {
       if ((state.inventory.buffs[id] || 0) <= 0) return;
