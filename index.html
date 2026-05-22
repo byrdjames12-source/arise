@@ -5455,6 +5455,65 @@
           result.inventory.buffs[b] = max(li.buffs?.[b], ri.buffs?.[b]);
         });
       }
+      // ----- todayWater: a DAILY counter, merged date-aware -----
+      // T41.7 — todayWater previously rode the global last-write-wins path, so
+      // a force-pull from a device that hadn't logged water yet wiped the
+      // count. Fix: same calendar day on both sides → take the max (you never
+      // lose water you logged); different days → the device on the newer date
+      // holds the live count and the other is yesterday's stale value.
+      {
+        const lwd = local.todayWaterDate || '';
+        const rwd = remote.todayWaterDate || '';
+        if (lwd === rwd) {
+          result.todayWater = max(local.todayWater, remote.todayWater);
+          result.todayWaterDate = lwd || result.todayWaterDate || '';
+        } else if (rwd > lwd) {
+          result.todayWater = parseFloat(remote.todayWater) || 0;
+          result.todayWaterDate = rwd;
+        } else {
+          result.todayWater = parseFloat(local.todayWater) || 0;
+          result.todayWaterDate = lwd;
+        }
+      }
+      // ----- settings.injuries: merge by the block's own updatedAt stamp -----
+      // T41.7 — The global lastSync timestamp can't arbitrate settings: it's
+      // bumped on every save, so the device you're actively using always wins
+      // — which silently reverted an injury removed on the other device. Each
+      // injury edit now stamps settings.injuries.updatedAt; we pick whichever
+      // side was edited more recently. Neither side stamped (pre-update data)
+      // → keep the last-write-wins winner's copy, so there's no regression.
+      {
+        const li = (local.settings && local.settings.injuries) || null;
+        const ri = (remote.settings && remote.settings.injuries) || null;
+        if (li || ri) {
+          const lt = (li && li.updatedAt) ? new Date(li.updatedAt).getTime() : 0;
+          const rt = (ri && ri.updatedAt) ? new Date(ri.updatedAt).getTime() : 0;
+          let chosen;
+          if (lt === 0 && rt === 0) chosen = (result.settings && result.settings.injuries) || li || ri;
+          else chosen = (lt >= rt) ? li : ri;
+          if (chosen) {
+            result.settings = result.settings || {};
+            result.settings.injuries = JSON.parse(JSON.stringify(chosen));
+          }
+        }
+      }
+      // ----- profile.recoveryRegions: merge by recoveryRegionsUpdatedAt -----
+      // T41.7 — Same problem as injuries: recovery regions live inside profile
+      // (last-write-wins), so a region removed on one device came back from the
+      // other. Each add/remove/clear stamps profile.recoveryRegionsUpdatedAt;
+      // the more recently edited side wins. Unstamped on both → keep winner's.
+      {
+        const lProf = local.profile || {};
+        const rProf = remote.profile || {};
+        const lru = lProf.recoveryRegionsUpdatedAt ? new Date(lProf.recoveryRegionsUpdatedAt).getTime() : 0;
+        const rru = rProf.recoveryRegionsUpdatedAt ? new Date(rProf.recoveryRegionsUpdatedAt).getTime() : 0;
+        if (lru || rru) {
+          result.profile = result.profile || {};
+          const winnerProf = (rru > lru) ? rProf : lProf;
+          result.profile.recoveryRegions = JSON.parse(JSON.stringify(winnerProf.recoveryRegions || []));
+          result.profile.recoveryRegionsUpdatedAt = winnerProf.recoveryRegionsUpdatedAt;
+        }
+      }
       return result;
     }
     // ===== CLOUD SYNC — Supabase integration =====
@@ -9888,6 +9947,8 @@ create trigger trg_user_state_updated_at
         startedAt: todayStr(),
         expiresAt: _recoveryExpiresAt(days0),
       });
+      // T41.7 — Stamp so cross-device merge respects this edit (see mergeStates).
+      state.profile.recoveryRegionsUpdatedAt = new Date().toISOString();
       save();
       renderRecoveryRegionList();
       try { renderProfile(); } catch (e) {}
@@ -9896,6 +9957,8 @@ create trigger trg_user_state_updated_at
     function removeRecoveryRegion(regionKey) {
       state.profile = state.profile || {};
       state.profile.recoveryRegions = (state.profile.recoveryRegions || []).filter(r => r.region !== regionKey);
+      // T41.7 — Stamp so the removal isn't reverted by the other device's sync.
+      state.profile.recoveryRegionsUpdatedAt = new Date().toISOString();
       save();
       renderRecoveryRegionList();
       try { renderProfile(); } catch (e) {}
@@ -9904,6 +9967,8 @@ create trigger trg_user_state_updated_at
     function clearAllRecoveryRegions() {
       state.profile = state.profile || {};
       state.profile.recoveryRegions = [];
+      // T41.7 — Stamp so this clear isn't reverted by the other device's sync.
+      state.profile.recoveryRegionsUpdatedAt = new Date().toISOString();
       save();
       renderRecoveryRegionList();
       try { renderProfile(); } catch (e) {}
@@ -10021,6 +10086,9 @@ create trigger trg_user_state_updated_at
       if (idx >= 0) arr.splice(idx, 1);
       else arr.push(area);
       state.settings.injuries.active = arr.length > 0;
+      // T41.7 — Stamp the edit so cross-device merge can tell which device
+      // changed injuries last (the global lastSync can't — see mergeStates).
+      state.settings.injuries.updatedAt = new Date().toISOString();
       // Force quest regen so today's quests reflect the new state
       state.questsDate = null;
       state.questsWorkoutType = null;
@@ -10033,7 +10101,8 @@ create trigger trg_user_state_updated_at
 
     function clearInjuries() {
       state.settings = state.settings || {};
-      state.settings.injuries = { active: false, areas: [] };
+      // T41.7 — updatedAt stamp lets cross-device merge respect this clear.
+      state.settings.injuries = { active: false, areas: [], updatedAt: new Date().toISOString() };
       state.questsDate = null;
       state.questsWorkoutType = null;
       state.quests = [];
