@@ -8597,7 +8597,11 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-goals',
-        selectorFn: () => document.getElementById('prog-tab-goals'),
+        // T43.2 — Layout-aware: the subtab buttons are hidden on desktop (all
+        // panes show side-by-side), so target the pane there instead.
+        selectorFn: () => (window.innerWidth >= 1024)
+          ? document.getElementById('prog-pane-goals')
+          : document.getElementById('prog-tab-goals'),
         title: 'Goals',
         body: 'Set targets — a goal weight, a lift number, a habit — and ARISE tracks feasibility and progress. ARIA can draft a full goal set for you, too.',
         placement: 'auto',
@@ -8605,7 +8609,10 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-goaldetail',
-        selectorFn: () => document.querySelector('#prog-pane-goals .goal-card') || document.getElementById('prog-tab-goals'),
+        selectorFn: () => document.querySelector('#prog-pane-goals .goal-card')
+          || ((window.innerWidth >= 1024)
+            ? document.getElementById('prog-pane-goals')
+            : document.getElementById('prog-tab-goals')),
         title: 'Inside a Goal',
         body: 'Open any goal to see its milestones — smaller checkpoints on the way to the target. ARISE tracks progress toward each milestone and fills the bar as you log work, so a big goal always stays broken into doable steps.',
         placement: 'auto',
@@ -8621,7 +8628,9 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-tracker',
-        selectorFn: () => document.getElementById('work-tab-log'),
+        selectorFn: () => (window.innerWidth >= 1024)
+          ? document.getElementById('work-pane-log')
+          : document.getElementById('work-tab-log'),
         title: 'The Workout Tracker',
         body: 'Log each exercise set by set — weight, reps, and effort (RPE). A built-in rest timer counts down between sets and chimes when you\'re ready for the next one.',
         placement: 'auto',
@@ -8629,11 +8638,15 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-plans',
-        selectorFn: () => document.getElementById('work-tab-prog'),
+        selectorFn: () => (window.innerWidth >= 1024)
+          ? document.getElementById('work-pane-prog')
+          : document.getElementById('work-tab-prog'),
         title: 'Plans & Library',
         body: 'Run a structured multi-week program, or browse the exercise library for substitutions, equipment-aware picks, and demo videos.',
         placement: 'auto',
-        beforeShow: () => { try { switchTab('workouts'); switchWorkoutTab('prog'); } catch(e){} },
+        // T43.2 — On desktop the Plans pane can be collapsed to a thin rail;
+        // un-collapse it so the tour has something real to highlight.
+        beforeShow: () => { try { switchTab('workouts'); switchWorkoutTab('prog'); const p = document.getElementById('work-pane-prog'); if (p) p.classList.remove('pane-collapsed'); } catch(e){} },
       },
       {
         id: 'ct-fuel',
@@ -8653,7 +8666,9 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-mealprep',
-        selectorFn: () => document.getElementById('nut-tab-prep'),
+        selectorFn: () => (window.innerWidth >= 1024)
+          ? document.getElementById('nut-prep')
+          : document.getElementById('nut-tab-prep'),
         title: 'Meal Prep',
         body: 'The Meal Prep tab is your reusable kitchen. Save meals you eat often, set which days they belong to, and log them in one tap instead of re-entering the macros every single time.',
         placement: 'auto',
@@ -8749,6 +8764,9 @@ create trigger trg_user_state_updated_at
         const el = document.getElementById(id);
         if (el) el.classList.remove('active', 'center');
       });
+      // T43.2 — The comprehensive tour may have force-expanded the Plans pane
+      // on desktop; restore the user's saved collapse preferences.
+      try { applyWorkoutPanesCollapsed(); } catch (e) { }
     }
     function _tutorialShowStep(idx) {
       _tutorialIdx = idx;
@@ -12003,7 +12021,10 @@ create trigger trg_user_state_updated_at
         <div class="xp-tag" style="${q.done ? 'color:var(--green2)' : ''}">+${q.xp}</div>
       </div>
     `;
-        div.onclick = (e) => { if (!q.done) toggleQuest(q.id, e.currentTarget); };
+        // T43.1 — Done quests are tappable too, so an accidental completion
+        // can be undone (toggleQuest routes a done quest to uncompleteQuest).
+        div.onclick = (e) => { toggleQuest(q.id, e.currentTarget); };
+        div.title = q.done ? 'Tap to mark as not done' : 'Tap to mark complete';
         container.appendChild(div);
       });
       // T17.3 — refresh the AI Challenge button so it reflects the current quest state
@@ -12263,7 +12284,10 @@ create trigger trg_user_state_updated_at
     }
     function toggleQuest(id, el) {
       const q = state.quests.find(q => q.id === id);
-      if (!q || q.done) return;
+      if (!q) return;
+      // T43.1 — Tapping an already-completed quest now UN-completes it. New
+      // users were tapping quests done by accident with no way to undo.
+      if (q.done) { uncompleteQuest(q); return; }
       q.done = true;
       // Stats: total quests ever completed (for Relentless title)
       if (!state.stats) state.stats = { totalQuestsCompleted: 0, anyFullDayCompleted: false, macroStreak: 0, lastMacroHitDate: null };
@@ -12275,6 +12299,10 @@ create trigger trg_user_state_updated_at
       // Coins: 10-25 per quest based on XP
       const coinAward = Math.max(10, Math.round(q.xp / 5));
       state.coins = (state.coins || 0) + coinAward;
+      // T43.1 — Record exactly what this quest awarded so an un-complete can
+      // reverse it precisely (XP may be doubled by a 2× buff).
+      q.xpAwarded = xpAward;
+      q.coinAwarded = coinAward;
       showXP(xpAward, el);
       // T38.2 — Quest completion no longer auto-logs placeholder entries to
       // workoutLog. The Tracker is the source of truth for "what I actually
@@ -12287,8 +12315,11 @@ create trigger trg_user_state_updated_at
       showNotif(`Quest complete! +${xpAward} XP · +${coinAward} coins${xpAward > q.xp ? ' (2× bonus!)' : ''}`);
       // Level-up & rank-up bonuses
       checkLevelUp();
-      // Check if all done
-      if (state.quests.every(q => q.done)) {
+      // Check if all done. T43.1 — guarded by a per-day flag so the board-clear
+      // bonus is granted once per day (never re-granted when a quest is
+      // un-completed then re-completed) and can be cleanly reversed.
+      if (state.quests.every(q => q.done) && state.allCompleteBonusDate !== todayStr()) {
+        state.allCompleteBonusDate = todayStr();
         state.streak++;
         state.coins += 50; // bonus for clearing the board
         // Stats: first-ever full-day clear (for First Light title)
@@ -12305,6 +12336,44 @@ create trigger trg_user_state_updated_at
       // calls since quest completion no longer touches workoutLog. The Tracker
       // path stays in charge of updating those panes when actual session data
       // is saved.
+    }
+    // T43.1 — Undo an accidental quest completion. Reverses the XP, coins, and
+    // completion-count this quest awarded (the exact amounts were stored on the
+    // quest at completion time), refunds a consumed 2× buff, and reverses the
+    // board-clear bonus if it is still in effect for today. Level and earned
+    // titles are deliberately treated as high-water marks — not rolled back.
+    function uncompleteQuest(q) {
+      if (!q || !q.done) return;
+      if (!confirm('Mark this quest as not done?\n\nThe XP and coins it awarded will be removed.')) return;
+      // Reverse the board-clear bonus if it was granted today and is still in
+      // effect (all quests currently done — checked before we un-mark this one).
+      if (state.quests.every(x => x.done) && state.allCompleteBonusDate === todayStr()) {
+        state.allCompleteBonusDate = null;
+        state.streak = Math.max(0, (state.streak || 0) - 1);
+        state.coins = Math.max(0, (state.coins || 0) - 50);
+      }
+      q.done = false;
+      const xpBack = (typeof q.xpAwarded === 'number') ? q.xpAwarded : (q.xp || 0);
+      const coinBack = (typeof q.coinAwarded === 'number') ? q.coinAwarded : Math.max(10, Math.round((q.xp || 0) / 5));
+      // Refund a 2× buff charge if this completion had consumed one (the award
+      // came out doubled), so the buff isn't wasted on an undone quest.
+      if (xpBack > (q.xp || 0)) {
+        state.activeBuffs = state.activeBuffs || [];
+        state.activeBuffs.push({ id: 'buff_2xp', charges: 1 });
+      }
+      state.xp = Math.max(0, (state.xp || 0) - xpBack);
+      state.rank = getRank(state.xp);
+      state.coins = Math.max(0, (state.coins || 0) - coinBack);
+      if (state.stats) {
+        state.stats.totalQuestsCompleted = Math.max(0, (state.stats.totalQuestsCompleted || 0) - 1);
+      }
+      delete q.xpAwarded;
+      delete q.coinAwarded;
+      showNotif(`Quest unmarked — −${xpBack} XP · −${coinBack} coins`, 'var(--text2)');
+      save();
+      renderQuests();
+      renderStats();
+      renderProfile();
     }
     function renderStreakRow() {
       const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
