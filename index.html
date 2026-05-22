@@ -64,8 +64,13 @@
       --gold2: #ffd166;
       --purple: #8b5cf6;
       --purple2: #a78bfa;
-      --green: #10b981;
-      --green2: #34d399;
+      /* T41.6 — Single soft-sage green shared by both themes. Previously the
+         green switched between #10b981/#34d399 (dark) and #059669/#10b981
+         (light); the bright variants read as "neon" on white. One calm sage
+         palette keeps green consistent everywhere. green2 is a deeper sibling
+         so it stays legible as text on light backgrounds. */
+      --green: #7cce97;
+      --green2: #4caf78;
       --red: #ef4444;
       --red2: #f87171;
       --amber: #f59e0b;
@@ -99,8 +104,10 @@
       --gold2: #d4a017;
       --purple: #7c3aed;
       --purple2: #8b5cf6;
-      --green: #059669;
-      --green2: #10b981;
+      /* T41.6 — Same soft-sage green as the dark theme (see note above) so it
+         no longer switches between themes or looks neon on white. */
+      --green: #7cce97;
+      --green2: #4caf78;
       --red: #dc2626;
       --red2: #ef4444;
       --amber: #d97706;
@@ -2541,6 +2548,36 @@
        chat with the Coach before they have a profile). JS toggles
        body.app-ready when onboarding finishes. */
     body:not(.app-ready) .fab-coach { display: none; }
+
+    /* T41.3 — Light theme: ARIA's orb shipped with a dark navy fill that
+       looked heavy against the bright page. Swap to a clean white→pale
+       gradient; the blue border + icon still read clearly against it. */
+    [data-theme="light"] .fab-coach {
+      background: linear-gradient(135deg, #ffffff 0%, #eef1f8 100%);
+    }
+    /* T41.5 — Light theme: the Hunter card (Progress page) and the AI quest
+       card (Quests page) shipped with hardcoded dark-navy fills that clashed
+       with the bright theme. Swap to a clean white→pale gradient; their
+       accent borders + glows still give them a distinct, branded look, and
+       their inner text already uses theme variables so it stays legible. */
+    [data-theme="light"] .hunter-card,
+    [data-theme="light"] .ai-card {
+      background: linear-gradient(135deg, #ffffff 0%, #eef2fb 100%);
+    }
+    /* T41.2 — Unread ARIA message: the orb glows gold so the user knows a
+       coach reply is waiting. Gold border + icon, plus a slower, wider gold
+       pulse (with a steady inner glow) that overrides the default purple. */
+    .fab-coach.has-unread,
+    .fab-coach.has-unread:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      animation: fab-coach-pulse-gold 1.9s ease-out infinite;
+    }
+    @keyframes fab-coach-pulse-gold {
+      0%   { box-shadow: 0 0 0 0 rgba(244, 182, 63, 0.7), 0 0 20px 3px rgba(244, 182, 63, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4); }
+      70%  { box-shadow: 0 0 0 16px rgba(244, 182, 63, 0), 0 0 20px 3px rgba(244, 182, 63, 0.32), 0 4px 12px rgba(0, 0, 0, 0.4); }
+      100% { box-shadow: 0 0 0 0 rgba(244, 182, 63, 0), 0 0 20px 3px rgba(244, 182, 63, 0.32), 0 4px 12px rgba(0, 0, 0, 0.4); }
+    }
 
     @media (min-width: 1024px) {
       .app {
@@ -6021,8 +6058,8 @@ create trigger trg_user_state_updated_at
           Chat with ARIA, your AI fitness coach. Tell her your goals, schedule, equipment, and experience — she'll build a personalized split + goals you can apply with one click.
           ${userMsgCount > 0 ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;">Existing conversation: ${userMsgCount} message${userMsgCount === 1 ? '' : 's'} sent.</div>` : ''}
         </div>
-        <button class="btn btn-primary btn-full btn-with-icon" onclick="openAICoachModal()" style="background:linear-gradient(135deg, var(--gold), var(--accent));border-color:var(--gold);color:#0a0c10;font-weight:600;">
-          <span class="icon-title-slot" data-icon="sparkles" style="color:#0a0c10;"></span>${userMsgCount > 0 ? 'Continue chat' : 'Start chat'}
+        <button class="btn btn-full btn-with-icon" onclick="openAICoachModal()" style="background:linear-gradient(135deg, rgba(244,182,63,0.18), rgba(79,142,255,0.18));border:1px solid var(--gold);color:var(--text);font-weight:600;">
+          <span class="icon-title-slot" data-icon="sparkles" style="color:var(--gold);"></span>${userMsgCount > 0 ? 'Continue chat' : 'Start chat'}
         </button>
         <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.5;">
           Powered by Claude. Conversation syncs across your devices via cloud sync. Reset any time from inside the chat.
@@ -6555,6 +6592,36 @@ create trigger trg_user_state_updated_at
       return data.reply;
     }
 
+    // T41.2 — ARIA unread tracking. The FAB orb glows gold when a coach reply
+    // is waiting that the user hasn't seen yet — e.g. they closed the chat
+    // before the reply landed. state.aiCoach.seenCount is a watermark equal to
+    // the number of messages the user has already viewed.
+    function ariaUnreadCount() {
+      const ac = state.aiCoach;
+      if (!ac || !Array.isArray(ac.messages)) return 0;
+      const seen = (typeof ac.seenCount === 'number') ? ac.seenCount : ac.messages.length;
+      let n = 0;
+      for (let i = seen; i < ac.messages.length; i++) {
+        if (ac.messages[i] && ac.messages[i].role === 'assistant') n++;
+      }
+      return n;
+    }
+    function updateCoachOrb() {
+      const fab = document.getElementById('fab-coach');
+      if (!fab) return;
+      const unread = ariaUnreadCount() > 0;
+      fab.classList.toggle('has-unread', unread);
+      fab.title = unread ? 'ARIA has a new message' : 'Ask ARIA';
+    }
+    // Mark the whole conversation as seen and clear the gold glow. Called when
+    // the user opens the chat (or has it open when a reply arrives).
+    function markAriaRead() {
+      state.aiCoach = state.aiCoach || { messages: [] };
+      state.aiCoach.seenCount = (state.aiCoach.messages || []).length;
+      save();
+      updateCoachOrb();
+    }
+
     // Parse a coach reply that contains <plan>...</plan> JSON. Returns the plan object
     // or null if no plan is present (i.e., the coach is still gathering info).
     function parseCoachPlan(replyText) {
@@ -6649,6 +6716,9 @@ create trigger trg_user_state_updated_at
         save();
       }
       openModal('modal-ai-coach');
+      // T41.2 — Opening the chat means the user is now reading it: clear the
+      // unread watermark + the gold orb glow.
+      markAriaRead();
       setTimeout(() => {
         renderCoachMessages();
         const inp = document.getElementById('coach-input');
@@ -6756,6 +6826,15 @@ create trigger trg_user_state_updated_at
       try {
         await sendCoachMessage(text);
         renderCoachMessages();
+        // T41.2 — If the chat is still open the user is seeing the reply, so
+        // mark it read. If they closed the modal mid-request, leave it unread
+        // so the FAB orb glows gold and pulls them back.
+        if (document.getElementById('modal-ai-coach') &&
+            document.getElementById('modal-ai-coach').classList.contains('open')) {
+          markAriaRead();
+        } else {
+          updateCoachOrb();
+        }
       } catch (err) {
         showNotif('Coach error: ' + (err.message || 'unknown'), 'var(--red2)');
         // Pop the user message back into the input so they can retry without retyping
@@ -6892,6 +6971,15 @@ create trigger trg_user_state_updated_at
             if (!state.avatar.outfitStyle) state.avatar.outfitStyle = 'casual';
             if (!state.avatar.accessories || typeof state.avatar.accessories !== 'object') state.avatar.accessories = { glasses: 'none', accent: 'none' };
             if (!state.avatar.module) state.avatar.module = 'fitness';
+          }
+          // T41.2 — ARIA unread-message watermark. seenCount = how many coach
+          // messages the user has already seen; an assistant reply that lands
+          // past this watermark lights the FAB orb gold. Existing users have
+          // read their whole history, so default the watermark to the current
+          // message count (nothing unread on first load after this update).
+          if (state.aiCoach && Array.isArray(state.aiCoach.messages)
+              && typeof state.aiCoach.seenCount !== 'number') {
+            state.aiCoach.seenCount = state.aiCoach.messages.length;
           }
         }
       } catch (e) { }
@@ -9037,6 +9125,9 @@ create trigger trg_user_state_updated_at
       // T34.1 — Render recovery banner if any regions are active, and run
       // an auto-expiry check (getActiveRecoveryRegions filters expired entries).
       try { renderRecoveryBanner(); } catch (e) { console.warn('recovery banner', e); }
+      // T41.2 — Reflect any unread ARIA reply on the FAB orb at boot (e.g. a
+      // reply arrived after the user had closed the chat in a prior session).
+      try { updateCoachOrb(); } catch (e) { }
     }
     // ===== COACH TIPS — beginner-mode learning content =====
     // Curated, rotating tips that help beginners build training literacy. Cycled by the
@@ -10008,6 +10099,13 @@ create trigger trg_user_state_updated_at
         else if (tab === 'shop') renderShop();
         else if (tab === 'profile') renderProfile();
       } catch (e) { console.warn('Render error for tab', tab, e); }
+      // T41.1 — Always open a freshly-switched page scrolled to the top
+      // rather than restoring wherever the user last left off. Resets every
+      // .scroll pane in the screen (including hidden subtab panes) so subtab
+      // switches within the page start clean too.
+      if (target) {
+        target.querySelectorAll('.scroll').forEach(el => { el.scrollTop = 0; });
+      }
     }
 
     // ===== SUBTAB CONTROLLERS =====
