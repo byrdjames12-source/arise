@@ -4651,6 +4651,9 @@
     <div class="modal">
       <div class="modal-title" id="meal-modal-title">+ Log Food</div>
       <input type="hidden" id="meal-modal-type" value="extra">
+      <!-- T44.1 — when set to a logged meal's id, Save updates that entry in
+           place (edit mode) instead of pushing a new one. -->
+      <input type="hidden" id="meal-modal-edit-id" value="">
       <input type="hidden" id="add-meal-micros-data" value="">
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div class="form-group"><label>Food / Meal Name</label><input type="text" id="add-meal-name"
@@ -4736,8 +4739,11 @@
         </label>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-full" onclick="closeModal('modal-add-meal')">Cancel</button>
-          <button class="btn btn-primary btn-full" onclick="saveMealEntry()">Log It</button>
+          <button class="btn btn-primary btn-full" id="meal-modal-save-btn" onclick="saveMealEntry()">Log It</button>
         </div>
+        <!-- T44.1 — Delete button, shown only when editing an existing entry. -->
+        <button class="btn btn-full" id="meal-modal-delete-btn" onclick="deleteMealEntry()"
+          style="display:none;color:var(--red2);border-color:var(--red2);margin-top:2px;">Delete This Entry</button>
       </div>
     </div>
   </div>
@@ -5152,6 +5158,7 @@
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
       check: '<polyline points="20 6 9 17 4 12"/>',
       close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+      edit: '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
       coin: '<circle cx="12" cy="12" r="10"/><path d="M12 6v12"/><path d="M15 9.5C15 8.1 13.7 7 12 7s-3 1.1-3 2.5 1.3 2.5 3 2.5 3 1.1 3 2.5-1.3 2.5-3 2.5-3-1.1-3-2.5"/>',
       shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
       user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
@@ -7017,6 +7024,11 @@ create trigger trg_user_state_updated_at
               if (seen.has(k)) return false;
               seen.add(k); return true;
             });
+            // T44.1 — Backfill an id on any legacy entry that lacks one so
+            // every logged meal can be opened for editing.
+            state.todayMeals.forEach(x => {
+              if (x && x.id == null) x.id = Date.now() + Math.random();
+            });
           }
           if (Array.isArray(state.mealPrep)) {
             const seen = new Set();
@@ -8194,7 +8206,16 @@ create trigger trg_user_state_updated_at
       document.getElementById('meal-modal-type').value = type;
       // Use innerHTML to render the swap SVG icon properly across mobile browsers
       document.getElementById('meal-modal-title').innerHTML = type === 'swap' ? iconSvg('swap', 16) + ' Substitute Meal' : '+ Log Additional Food';
-      ['add-meal-name', 'add-meal-cals', 'add-meal-prot', 'add-meal-carbs', 'add-meal-fat', 'add-meal-ingredients'].forEach(id => {
+      // T44.1 — Clear edit mode: a fresh open is always an "add", and the
+      // primary button + delete button reset to their add-mode state.
+      const editIdEl = document.getElementById('meal-modal-edit-id');
+      if (editIdEl) editIdEl.value = '';
+      const saveBtn = document.getElementById('meal-modal-save-btn');
+      if (saveBtn) saveBtn.textContent = 'Log It';
+      const delBtn = document.getElementById('meal-modal-delete-btn');
+      if (delBtn) delBtn.style.display = 'none';
+      ['add-meal-name', 'add-meal-cals', 'add-meal-prot', 'add-meal-carbs', 'add-meal-fat', 'add-meal-ingredients',
+       'add-meal-fiber', 'add-meal-sodium', 'add-meal-alcohol', 'add-meal-caffeine'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -8238,6 +8259,50 @@ create trigger trg_user_state_updated_at
         if (hidden) hidden.value = JSON.stringify(recipe.micros);
         renderMealMicroSummary(recipe.micros);
       }
+    }
+    // T44.1 — Open the Add Meal modal in EDIT mode for an already-logged food
+    // entry. Reuses the same modal: openAddMealModal() resets it, then we
+    // prefill every field from the entry and flip the modal into edit mode
+    // (save updates in place; a Delete button appears).
+    function openEditMealModal(id) {
+      const m = (state.todayMeals || []).find(x => String(x.id) === String(id));
+      if (!m) { showNotif('Could not find that entry', 'var(--red2)'); return; }
+      openAddMealModal('extra');
+      document.getElementById('meal-modal-edit-id').value = String(m.id);
+      document.getElementById('meal-modal-title').innerHTML = iconSvg('edit', 16) + ' Edit Food';
+      const setVal = (elid, v) => { const e = document.getElementById(elid); if (e) e.value = (v || v === 0) ? v : ''; };
+      setVal('add-meal-name', m.name);
+      setVal('add-meal-cals', m.cals);
+      setVal('add-meal-prot', m.prot);
+      setVal('add-meal-carbs', m.carbs);
+      setVal('add-meal-fat', m.fat);
+      setVal('add-meal-fiber', m.fiber);
+      setVal('add-meal-sodium', m.sodium);
+      setVal('add-meal-alcohol', m.alcohol);
+      setVal('add-meal-caffeine', m.caffeine);
+      setVal('add-meal-ingredients', Array.isArray(m.ingredients) ? m.ingredients.join(', ') : (m.ingredients || ''));
+      // Carry through the micro profile so editing macros doesn't wipe micros.
+      const hidden = document.getElementById('add-meal-micros-data');
+      if (hidden) hidden.value = m.micros ? JSON.stringify(m.micros) : '';
+      if (m.micros && typeof renderMealMicroSummary === 'function') {
+        try { renderMealMicroSummary(m.micros); } catch (e) {}
+      }
+      const saveBtn = document.getElementById('meal-modal-save-btn');
+      if (saveBtn) saveBtn.textContent = 'Save Changes';
+      const delBtn = document.getElementById('meal-modal-delete-btn');
+      if (delBtn) delBtn.style.display = '';
+    }
+    // T44.1 — Delete the logged meal currently open in the edit modal.
+    function deleteMealEntry() {
+      const editId = (document.getElementById('meal-modal-edit-id') || {}).value || '';
+      if (!editId) return;
+      if (!confirm('Delete this logged food entry?')) return;
+      state.todayMeals = (state.todayMeals || []).filter(x => String(x.id) !== String(editId));
+      if (typeof checkMacroHit === 'function') checkMacroHit();
+      save();
+      closeModal('modal-add-meal');
+      renderDailyNutrition();
+      showNotif('Entry deleted', 'var(--text2)');
     }
     function openMealPrepModal() { openModal('modal-meal-prep'); }
     function openGenerateModal() { openModal('modal-generate'); }
@@ -13930,15 +13995,31 @@ create trigger trg_user_state_updated_at
         if (allMeals.length === 0) {
           mealList.innerHTML = '<div style="text-align:center;padding:20px 14px;color:var(--text3);font-size:13px;line-height:1.5;">No meals logged today yet.<br><span style="font-size:11px;">Tap <strong>+ Add Meal</strong> below to log food. Scan a barcode 📷 or search the library to fill macros instantly.</span></div>';
         } else {
-          mealList.innerHTML = allMeals.map((m, i) => `
-        <div class="meal-entry">
+          mealList.innerHTML = allMeals.map((m, i) => {
+            // T44.1 — Logged meals (not meal-prep templates) are tappable to
+            // edit. Prep rows are managed from the Meal Prep tab instead.
+            const editable = !m.isPrep && m.id != null;
+            const badge = m.isPrep
+              ? '<span style="font-size:10px;color:var(--accent2);padding:1px 6px;background:rgba(79,142,255,0.1);border-radius:4px;">PREP</span>'
+              : m.swap
+                ? '<span style="font-size:10px;color:var(--gold);padding:1px 6px;background:rgba(240,165,0,0.1);border-radius:4px;">SWAP</span>'
+                : '';
+            const tap = editable
+              ? ` onclick="openEditMealModal('${m.id}')" style="cursor:pointer;" title="Tap to edit this entry"`
+              : '';
+            return `
+        <div class="meal-entry"${tap}>
           <div>
-            <div class="meal-entry-name">${m.name || m.type || 'Meal'} ${m.isPrep ? '<span style="font-size:10px;color:var(--accent2);padding:1px 6px;background:rgba(79,142,255,0.1);border-radius:4px;">PREP</span>' : m.swap ? '<span style="font-size:10px;color:var(--gold);padding:1px 6px;background:rgba(240,165,0,0.1);border-radius:4px;">SWAP</span>' : ''}</div>
+            <div class="meal-entry-name">${m.name || m.type || 'Meal'} ${badge}</div>
             <div class="meal-entry-macros">P:${m.prot || 0}g · C:${m.carbs || 0}g · F:${m.fat || 0}g${m.portion ? ' · ' + m.portion : ''}</div>
           </div>
-          <div class="meal-entry-cal">${m.cals || 0}</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="meal-entry-cal">${m.cals || 0}</div>
+            ${editable ? `<span style="color:var(--text3);display:flex;flex-shrink:0;">${iconSvg('edit', 14)}</span>` : ''}
+          </div>
         </div>
-      `).join('');
+      `;
+          }).join('');
         }
       }
       // Water — coerce to number so an imported state with undefined/string doesn't render NaN
@@ -14207,6 +14288,31 @@ create trigger trg_user_state_updated_at
         const raw = (document.getElementById('add-meal-micros-data') || {}).value || '';
         if (raw) micros = JSON.parse(raw);
       } catch (e) { micros = undefined; }
+      // T44.1 — Edit mode: update the existing entry in place instead of
+      // pushing a new one. The entry's id, date, and swap flag are preserved.
+      const editId = (document.getElementById('meal-modal-edit-id') || {}).value || '';
+      if (editId) {
+        const m = (state.todayMeals || []).find(x => String(x.id) === String(editId));
+        if (m) {
+          m.name = name; m.cals = cals; m.prot = prot; m.carbs = carbs; m.fat = fat;
+          m.fiber = fiber || undefined;
+          m.sodium = sodium || undefined;
+          m.alcohol = alcohol || undefined;
+          m.caffeine = caffeine || undefined;
+          m.ingredients = ingredients.length ? ingredients : undefined;
+          m.micros = micros || undefined;
+        }
+        if (typeof checkMacroHit === 'function') checkMacroHit();
+        save(); closeModal('modal-add-meal'); renderDailyNutrition();
+        if (typeof renderSavedRecipes === 'function') renderSavedRecipes();
+        ['add-meal-name', 'add-meal-cals', 'add-meal-prot', 'add-meal-carbs', 'add-meal-fat',
+         'add-meal-fiber', 'add-meal-sodium', 'add-meal-alcohol', 'add-meal-caffeine',
+         'add-meal-ingredients', 'add-meal-micros-data', 'meal-modal-edit-id'].forEach(id => {
+          const el = document.getElementById(id); if (el) el.value = '';
+        });
+        showNotif('Entry updated!');
+        return;
+      }
       state.todayMeals.push({
         // T20.2 — explicit id for cloud-sync dedup. Without it, mergeStates' no-id
         // branch was appending duplicates on every sync (same bug we fixed for blocklist).
