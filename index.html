@@ -1063,6 +1063,27 @@
       color: var(--text3);
     }
 
+    /* T45.1 — When a fast is active, dim the macro card so the fasting card
+       at the top is the clear focus. Numbers stay visible (the user may want
+       to glance at them) but they're visually de-emphasized. */
+    .macros-suppressed {
+      opacity: 0.45;
+      filter: saturate(0.7);
+      position: relative;
+    }
+
+    .macros-suppressed::after {
+      content: 'PAUSED — FASTING';
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 9px;
+      color: var(--gold);
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      pointer-events: none;
+    }
+
     /* MEAL ENTRY */
     .meal-entry {
       background: var(--bg3);
@@ -4106,7 +4127,12 @@
         <div class="nut-panes-wrap">
         <!-- Daily Tab -->
         <div id="nut-daily" class="scroll">
-          <div class="card">
+          <!-- T45.1 — Fasting card. Inactive state shows a "Start Fast" CTA;
+               active state replaces the macro UI with a fasting status panel
+               (elapsed time, type, end-fast button). Macros stay rendered but
+               are visually suppressed via the .macros-suppressed class. -->
+          <div id="fasting-card-slot"></div>
+          <div class="card" id="macros-card-daily">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
               <div>
                 <div class="calorie-display" id="today-cals">0</div>
@@ -4747,6 +4773,57 @@
       </div>
     </div>
   </div>
+  <!-- T45.1 — Start Fast modal -->
+  <div class="modal-overlay" id="modal-start-fast">
+    <div class="modal">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="hourglass"></span>Start a Fast</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5;">
+        While fasting, macro targets are paused, your macro-hit streak is protected, and
+        meal/hydration quests auto-complete. Weight changes during a fast aren't flagged as
+        warnings.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="form-group">
+          <label>Fast type</label>
+          <select id="fast-type" onchange="updateFastTypeDesc()">
+            <option value="water">Water Only — strict</option>
+            <option value="liquid">Liquid Fast — water, juice, broth, tea</option>
+            <option value="daniel">Daniel Fast — fruits, veggies, grains, legumes</option>
+            <option value="intermittent">Intermittent — defined eating window</option>
+            <option value="custom">Custom — your own rules</option>
+          </select>
+          <div id="fast-type-desc" style="font-size:11px;color:var(--text3);margin-top:4px;"></div>
+        </div>
+        <div class="form-group">
+          <label>Planned length</label>
+          <select id="fast-length" onchange="updateFastLengthCustom()">
+            <option value="16">16 hours (16:8 window)</option>
+            <option value="18">18 hours</option>
+            <option value="20">20 hours</option>
+            <option value="24" selected>24 hours (1 day)</option>
+            <option value="36">36 hours</option>
+            <option value="48">48 hours (2 days)</option>
+            <option value="72">72 hours (3 days)</option>
+            <option value="168">7 days</option>
+            <option value="504">21 days (Daniel fast)</option>
+            <option value="960">40 days</option>
+            <option value="custom">Custom hours…</option>
+            <option value="open">Open-ended (I'll end it manually)</option>
+          </select>
+          <input type="number" id="fast-length-custom" placeholder="Hours, e.g. 60"
+            style="display:none;margin-top:6px;" min="1" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <input type="text" id="fast-notes" placeholder="e.g. spiritual fast, prayer focus">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-full" onclick="closeModal('modal-start-fast')">Cancel</button>
+          <button class="btn btn-primary btn-full" onclick="submitStartFast()">Start Fast</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="modal-overlay" id="modal-meal-prep">
     <div class="modal">
       <div class="modal-title"><span class="icon-title-slot" data-icon="salad"></span>Add Meal Prep Item</div>
@@ -4774,10 +4851,15 @@
         </div>
         <div class="form-group"><label>Days this week</label><input type="text" id="prep-days"
             placeholder="e.g. Mon, Tue, Wed, Thu, Fri"></div>
+        <!-- T45.2 — hidden edit-idx so saveMealPrep knows whether to update vs push -->
+        <input type="hidden" id="prep-edit-idx" value="">
         <div style="display:flex;gap:8px;">
           <button class="btn btn-full" onclick="closeModal('modal-meal-prep')">Cancel</button>
-          <button class="btn btn-primary btn-full" onclick="saveMealPrep()">Add to Prep</button>
+          <button class="btn btn-primary btn-full" id="prep-save-btn" onclick="saveMealPrep()">Add to Prep</button>
         </div>
+        <!-- T45.2 — appears in edit mode only; lets the user copy this entry into My Recipes -->
+        <button class="btn btn-full" id="prep-save-as-recipe-btn" onclick="saveCurrentPrepAsRecipe()"
+          style="display:none;border-style:dashed;color:var(--green);">+ Save to My Recipes</button>
       </div>
     </div>
   </div>
@@ -5243,6 +5325,19 @@
       },
       // NEW — lifetime stats used to evaluate earned titles
       stats: { totalQuestsCompleted: 0, anyFullDayCompleted: false, macroStreak: 0, lastMacroHitDate: null },
+      // T45.1 — Fasting feature. `fasting` is the currently active fast (null when not
+      // fasting). Shape: { id, type, startedAt, plannedEndAt|null, notes }
+      //   type: 'water'   (water only)
+      //         'liquid'  (water + juice/broth/tea)
+      //         'daniel'  (fruits, veggies, grains, legumes — common spiritual fast)
+      //         'intermittent' (defined eating window, e.g. 16:8)
+      //         'custom'  (user-defined rules)
+      // While `fasting` is non-null AND today falls inside [startedAt, plannedEndAt or
+      // ongoing], macro targets are suppressed, the macro-hit streak is auto-credited,
+      // and meal/hydration quests auto-complete. `fastingHistory` keeps completed fasts
+      // for future review / streak analytics.
+      fasting: null,
+      fastingHistory: [], // [{ id, type, startedAt, endedAt, notes }]
       activeBuffs: [], // { id, expiresAt, ... }
       // Training log — one entry per exercise per session (multiple per day ok)
       // { id, date, exercise, sets:[{reps,weight,rpe}], notes }
@@ -6983,6 +7078,9 @@ create trigger trg_user_state_updated_at
           if (typeof state.attributePointsPending !== 'number') state.attributePointsPending = 0;
           if (typeof state.level !== 'number') state.level = 1;
           if (!state.stats) state.stats = { totalQuestsCompleted: 0, anyFullDayCompleted: false, macroStreak: 0, lastMacroHitDate: null };
+          // T45.1 — Fasting backfill (added in v2.1, no schema bump needed)
+          if (state.fasting === undefined) state.fasting = null;
+          if (!Array.isArray(state.fastingHistory)) state.fastingHistory = [];
           if (!state.settings) state.settings = {};
           if (typeof state.settings.mealPrepEnabled !== 'boolean') state.settings.mealPrepEnabled = true;
           if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
@@ -8006,6 +8104,144 @@ create trigger trg_user_state_updated_at
       return `${yyyy}-${mm}-${dd}`;
     }
     function dayOfWeek() { return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]; }
+    // ===== FASTING (T45.1) =====
+    // Pure helpers — call into these everywhere instead of poking state.fasting directly.
+    const FAST_TYPE_META = {
+      water:        { label: 'Water Only',          short: 'Water',        icon: 'water',    desc: 'Water only — no calories' },
+      liquid:       { label: 'Liquid Fast',         short: 'Liquid',       icon: 'water',    desc: 'Water + juice, broth, tea' },
+      daniel:       { label: 'Daniel Fast',         short: 'Daniel',       icon: 'leaf',     desc: 'Fruits, veggies, grains, legumes' },
+      intermittent: { label: 'Intermittent Fast',   short: 'Intermittent', icon: 'hourglass', desc: 'Defined eating window (e.g. 16:8)' },
+      custom:       { label: 'Custom Fast',         short: 'Custom',       icon: 'snowflake', desc: 'Your own rules' },
+    };
+    function getFastTypeMeta(type) { return FAST_TYPE_META[type] || FAST_TYPE_META.custom; }
+    // Returns the active fast if one is in progress (not yet ended), else null.
+    // Also handles a fast whose plannedEndAt is in the past — it stays "active" until the
+    // user taps End Fast (so the spiritual length is honored even if they forget to close it).
+    function getActiveFast() {
+      const f = state.fasting;
+      if (!f || !f.startedAt) return null;
+      if (f.endedAt) return null;
+      return f;
+    }
+    // True if today's date string falls within an active fast. Used to suppress macro
+    // alerts, auto-credit the macro streak, and auto-complete meal/hydration quests.
+    function isFastingToday() {
+      const f = getActiveFast();
+      if (!f) return false;
+      const today = todayStr();
+      const startDate = (f.startedAt || '').slice(0, 10);
+      if (!startDate) return false;
+      // Active fast: today must be ≥ startDate. plannedEndAt only acts as a hint —
+      // the fast remains active until explicitly ended.
+      return today >= startDate;
+    }
+    function startFast(type, plannedEndAt, notes) {
+      if (!FAST_TYPE_META[type]) type = 'custom';
+      state.fasting = {
+        id: Date.now() + Math.random(),
+        type,
+        startedAt: new Date().toISOString(),
+        plannedEndAt: plannedEndAt || null,
+        notes: (notes || '').trim() || undefined,
+      };
+      // T45.1 — Credit the macro-hit streak immediately and auto-complete any
+      // already-rendered meal/hydration quests on the board so the user can
+      // clear them without logging food.
+      try { if (typeof checkMacroHit === 'function') checkMacroHit(); } catch (e) {}
+      try {
+        const today = todayStr();
+        (state.quests || []).forEach(q => {
+          if (q.date !== today || q.done) return;
+          if (q.name === 'Hit Macro Targets' || q.name === 'Hydration Goal' || q.name === 'No Added Sugar') {
+            q.done = true;
+            q.autoCompletedByFast = true;
+          }
+        });
+      } catch (e) {}
+      save();
+      try { renderDailyNutrition(); } catch (e) {}
+      try { renderQuests(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
+      showNotif(`Fast started — ${getFastTypeMeta(type).label}`, 'var(--accent)');
+    }
+    function endFast() {
+      const f = getActiveFast();
+      if (!f) return;
+      const dur = msToHumanDuration(Date.now() - new Date(f.startedAt).getTime());
+      const ended = new Date().toISOString();
+      const closed = { ...f, endedAt: ended };
+      state.fastingHistory = state.fastingHistory || [];
+      state.fastingHistory.push(closed);
+      state.fasting = null;
+      save();
+      try { renderDailyNutrition(); } catch (e) {}
+      try { renderQuests(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
+      showNotif(`Fast complete — ${dur}`, 'var(--gold)');
+    }
+    function cancelActiveFast() {
+      if (!getActiveFast()) return;
+      if (!confirm('Cancel this fast?\n\nIt will not be recorded in your fasting history.')) return;
+      state.fasting = null;
+      save();
+      try { renderDailyNutrition(); } catch (e) {}
+      try { renderQuests(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
+      showNotif('Fast cancelled', 'var(--text2)');
+    }
+    function msToHumanDuration(ms) {
+      if (!isFinite(ms) || ms < 0) return '0m';
+      const totalMin = Math.floor(ms / 60000);
+      const days = Math.floor(totalMin / (60 * 24));
+      const hours = Math.floor((totalMin % (60 * 24)) / 60);
+      const mins = totalMin % 60;
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${mins}m`;
+      return `${mins}m`;
+    }
+    function openStartFastModal() {
+      // Reset modal fields each open
+      const t = document.getElementById('fast-type');
+      if (t) t.value = 'water';
+      const len = document.getElementById('fast-length');
+      if (len) len.value = '24';
+      const lenCustom = document.getElementById('fast-length-custom');
+      if (lenCustom) { lenCustom.value = ''; lenCustom.style.display = 'none'; }
+      const notes = document.getElementById('fast-notes');
+      if (notes) notes.value = '';
+      updateFastTypeDesc();
+      openModal('modal-start-fast');
+    }
+    function updateFastTypeDesc() {
+      const t = document.getElementById('fast-type');
+      const d = document.getElementById('fast-type-desc');
+      if (t && d) d.textContent = getFastTypeMeta(t.value).desc;
+    }
+    function updateFastLengthCustom() {
+      const len = document.getElementById('fast-length');
+      const cu = document.getElementById('fast-length-custom');
+      if (!len || !cu) return;
+      cu.style.display = (len.value === 'custom') ? 'block' : 'none';
+    }
+    function submitStartFast() {
+      const type = (document.getElementById('fast-type') || {}).value || 'custom';
+      const lenSel = (document.getElementById('fast-length') || {}).value || '24';
+      let hours = 0;
+      if (lenSel === 'custom') {
+        hours = parseFloat((document.getElementById('fast-length-custom') || {}).value || '0');
+      } else if (lenSel === 'open') {
+        hours = 0; // open-ended — no plannedEnd
+      } else {
+        hours = parseFloat(lenSel);
+      }
+      const notes = (document.getElementById('fast-notes') || {}).value || '';
+      let plannedEndAt = null;
+      if (hours > 0) {
+        plannedEndAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+      }
+      startFast(type, plannedEndAt, notes);
+      closeModal('modal-start-fast');
+    }
     function showNotif(msg, color = 'var(--green)') {
       const n = document.getElementById('notif');
       n.textContent = msg; n.style.borderColor = color; n.style.color = color;
@@ -8304,7 +8540,23 @@ create trigger trg_user_state_updated_at
       renderDailyNutrition();
       showNotif('Entry deleted', 'var(--text2)');
     }
-    function openMealPrepModal() { openModal('modal-meal-prep'); }
+    function openMealPrepModal() {
+      // T45.2 — Reset to add-mode each open: clear edit-idx, reset title/btn copy,
+      // hide the "save as recipe" shortcut, and clear stale form values.
+      const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v != null ? v : ''; };
+      ['prep-name', 'prep-portion', 'prep-cals', 'prep-prot', 'prep-carbs', 'prep-fat'].forEach(id => setV(id, ''));
+      setV('prep-type', 'Breakfast');
+      setV('prep-days', 'Mon, Tue, Wed, Thu, Fri');
+      setV('prep-edit-idx', '');
+      const titleEl = document.querySelector('#modal-meal-prep .modal-title');
+      if (titleEl) titleEl.innerHTML = '<span class="icon-title-slot" data-icon="salad"></span>Add Meal Prep Item';
+      const saveBtn = document.getElementById('prep-save-btn');
+      if (saveBtn) saveBtn.textContent = 'Add to Prep';
+      const saveRecipeBtn = document.getElementById('prep-save-as-recipe-btn');
+      if (saveRecipeBtn) saveRecipeBtn.style.display = 'none';
+      try { hydrateIcons(document.getElementById('modal-meal-prep')); } catch (e) {}
+      openModal('modal-meal-prep');
+    }
     function openGenerateModal() { openModal('modal-generate'); }
     // ===== FOOD LIBRARY PICKER (inside Add Meal modal) =====
     // Toggles the inline picker panel and renders the food list on first open.
@@ -12022,6 +12274,20 @@ create trigger trg_user_state_updated_at
         quests.push({ id: Date.now() + 99, name: 'Hit Macro Targets', desc: `${state.macros.calories} cal · ${state.macros.protein}g protein`, icon: 'salad', type: 'nutrition', xp: 60, done: oldDone.includes('Hit Macro Targets'), date: today });
         // Habit quest
         quests.push({ id: Date.now() + 100, name: 'Hydration Goal', desc: 'Drink 128 oz of water today', icon: 'water', type: 'habit', xp: 40, done: oldDone.includes('Hydration Goal'), date: today });
+        // T45.1 — On fasting days, auto-complete the meal/hydration quests so
+        // the board can still be cleared. The user isn't eating to macro by
+        // choice; the streak and full-day clear shouldn't penalize that.
+        if (typeof isFastingToday === 'function' && isFastingToday()) {
+          quests.forEach(q => {
+            if (q.name === 'Hit Macro Targets' || q.name === 'Hydration Goal' || q.name === 'No Added Sugar') {
+              if (!q.done) {
+                q.done = true;
+                q.autoCompletedByFast = true;
+                q.desc = (q.desc || '') + ' · ✓ auto-completed (fasting)';
+              }
+            }
+          });
+        }
         // Daily challenge — keep the same one across regens within the same day to avoid surprise
         let challenge = (state.quests || []).find(q => q.type === 'challenge' && q.date === today)
           || DAILY_CHALLENGES[Math.floor(Math.random() * DAILY_CHALLENGES.length)];
@@ -13884,6 +14150,77 @@ create trigger trg_user_state_updated_at
       const mpToggle = document.getElementById('mealprep-toggle');
       if (mpToggle) mpToggle.classList.toggle('on', enabled);
     }
+    // T45.1 — Render the fasting card at the top of the Fuel tab. When no fast
+    // is active, shows a compact "Start Fast" CTA. When a fast is active, shows
+    // type, elapsed time, planned end (if any), and End / Cancel buttons. Also
+    // toggles a `.macros-suppressed` class on the macro card so its visual
+    // weight drops during a fast (without removing the numbers entirely — users
+    // may still want to glance at what they would have hit).
+    function renderFastingCard() {
+      const slot = document.getElementById('fasting-card-slot');
+      if (!slot) return;
+      const f = getActiveFast();
+      const macroCard = document.getElementById('macros-card-daily');
+      if (!f) {
+        slot.innerHTML = `
+          <div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px;">
+            <span class="icon-title-slot" data-icon="hourglass" style="color:var(--accent2);font-size:18px;"></span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;">Fasting</div>
+              <div style="font-size:11px;color:var(--text3);">Spiritual, intermittent, or custom — pauses macros & quests.</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="openStartFastModal()" style="flex-shrink:0;">Start Fast</button>
+          </div>`;
+        if (macroCard) macroCard.classList.remove('macros-suppressed');
+        try { hydrateIcons(slot); } catch (e) {}
+        return;
+      }
+      const meta = getFastTypeMeta(f.type);
+      const startedMs = new Date(f.startedAt).getTime();
+      const elapsed = msToHumanDuration(Date.now() - startedMs);
+      let endLine = '';
+      if (f.plannedEndAt) {
+        const endMs = new Date(f.plannedEndAt).getTime();
+        const remain = endMs - Date.now();
+        if (remain > 0) {
+          endLine = `<div style="font-size:11px;color:var(--text3);">${msToHumanDuration(remain)} left · ends ${new Date(endMs).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</div>`;
+        } else {
+          endLine = `<div style="font-size:11px;color:var(--gold);">Planned length reached — tap End Fast when you break.</div>`;
+        }
+      } else {
+        endLine = `<div style="font-size:11px;color:var(--text3);">Open-ended — end manually when you break.</div>`;
+      }
+      const noteLine = f.notes
+        ? `<div style="font-size:11px;color:var(--text2);margin-top:4px;font-style:italic;">"${escapeHtml(f.notes)}"</div>`
+        : '';
+      slot.innerHTML = `
+        <div class="card fasting-active-card" style="padding:12px;border:1px solid var(--accent2);background:linear-gradient(135deg, rgba(79,142,255,0.08), rgba(244,182,63,0.08));">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+              <span class="icon-title-slot" data-icon="hourglass" style="color:var(--gold);font-size:18px;"></span>
+              <div style="min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:var(--gold);">FASTING — ${meta.label}</div>
+                <div style="font-size:11px;color:var(--text3);">${meta.desc}</div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;line-height:1;">${elapsed}</div>
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">elapsed</div>
+            </div>
+          </div>
+          ${endLine}
+          ${noteLine}
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <button class="btn btn-sm btn-primary" onclick="endFast()" style="flex:1;">End Fast</button>
+            <button class="btn btn-sm" onclick="cancelActiveFast()" style="flex:1;color:var(--red2);border-color:var(--red2);">Cancel</button>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.5;">
+            Macro targets paused · meal & hydration quests auto-complete · streak protected.
+          </div>
+        </div>`;
+      if (macroCard) macroCard.classList.add('macros-suppressed');
+      try { hydrateIcons(slot); } catch (e) {}
+    }
     function renderDailyNutrition() {
       // T21.4 — Defensive: corrupted/imported state may have these as undefined.
       // Without these guards, an error here aborts the whole render — including the
@@ -13891,6 +14228,8 @@ create trigger trg_user_state_updated_at
       // nothing happens" even though logWater() ran fine.
       if (!Array.isArray(state.todayMeals)) state.todayMeals = [];
       if (!Array.isArray(state.mealPrep)) state.mealPrep = [];
+      // T45.1 — Render the fasting card before the macro UI so it shows up at the top.
+      try { renderFastingCard(); } catch (e) {}
       // T25.5 — roll over water counter to 0 if it's a new local day
       try { ensureTodayWaterFresh(); } catch (e) {}
       const meals = state.todayMeals.filter(m => m && m.date === todayStr());
@@ -14177,19 +14516,115 @@ create trigger trg_user_state_updated_at
         list.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px;">No meal prep entered yet.</div>';
         return;
       }
-      list.innerHTML = state.mealPrep.map((m, i) => `
+      // T45.2 — Each meal prep entry now exposes Edit (open in modal),
+      // Save to Recipes (push to savedRecipes if not already there), and
+      // Remove. Lets users save a prep recipe they forgot to save before
+      // adding it to the week.
+      const savedNames = new Set((state.savedRecipes || []).map(r => (r.label || '').toLowerCase()));
+      list.innerHTML = state.mealPrep.map((m, i) => {
+        const alreadySaved = savedNames.has((m.name || '').toLowerCase());
+        const saveBtn = alreadySaved
+          ? `<button disabled title="Already in My Recipes" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:default;">✓ Saved</button>`
+          : `<button onclick="saveMealPrepAsRecipe(${i})" title="Save this meal as a reusable recipe in My Recipes" style="background:none;border:none;color:var(--green);font-size:11px;cursor:pointer;">Save to Recipes</button>`;
+        return `
     <div class="meal-entry">
-      <div>
-        <div class="meal-entry-name">${m.name} <span style="font-size:10px;color:var(--text3);">${m.type || ''}</span></div>
-        <div class="meal-entry-macros">P:${m.prot || 0}g · C:${m.carbs || 0}g · F:${m.fat || 0}g · ${m.days || '—'}</div>
-        <div style="font-size:11px;color:var(--text3);">${m.portion || ''}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="meal-entry-name">${escapeHtml(m.name || 'Meal')} <span style="font-size:10px;color:var(--text3);">${escapeHtml(m.type || '')}</span></div>
+        <div class="meal-entry-macros">P:${m.prot || 0}g · C:${m.carbs || 0}g · F:${m.fat || 0}g · ${escapeHtml(m.days || '—')}</div>
+        <div style="font-size:11px;color:var(--text3);">${escapeHtml(m.portion || '')}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
         <div class="meal-entry-cal">${m.cals || 0}</div>
-        <button onclick="removeMealPrep(${i})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">Remove</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+          <button onclick="openEditMealPrepModal(${i})" title="Edit this meal prep" style="background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;">Edit</button>
+          ${saveBtn}
+          <button onclick="removeMealPrep(${i})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">Remove</button>
+        </div>
       </div>
     </div>
-  `).join('');
+  `;
+      }).join('');
+    }
+    // T45.2 — Save a meal prep entry to My Recipes so it can be re-used
+    // without re-entering. Skips if the label already exists. Ingredients
+    // aren't stored on prep entries today, so the recipe starts empty;
+    // the user can edit it via the prep modal first if they want richer data.
+    function saveMealPrepAsRecipe(idx) {
+      const mp = state.mealPrep[idx];
+      if (!mp) return;
+      state.savedRecipes = state.savedRecipes || [];
+      if (state.savedRecipes.some(r => (r.label || '').toLowerCase() === (mp.name || '').toLowerCase())) {
+        showNotif('Already in My Recipes');
+        return;
+      }
+      state.savedRecipes.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        label: mp.name || 'Meal',
+        ingredients: Array.isArray(mp.ingredients) ? mp.ingredients.slice() : [],
+        cals: mp.cals || 0,
+        prot: mp.prot || 0,
+        carbs: mp.carbs || 0,
+        fat: mp.fat || 0,
+        micros: mp.micros || undefined,
+        notes: mp.portion ? `Portion: ${mp.portion}` : '',
+        createdAt: todayStr(),
+      });
+      save();
+      try { renderMealPrep(); } catch (e) {}
+      try { renderSavedRecipes(); } catch (e) {}
+      showNotif(`Saved "${mp.name || 'Meal'}" to My Recipes`);
+    }
+    // T45.2 — Open the meal-prep modal pre-filled with an existing entry's
+    // values so the user can edit it (and optionally save to recipes from there).
+    function openEditMealPrepModal(idx) {
+      const mp = state.mealPrep[idx];
+      if (!mp) return;
+      openModal('modal-meal-prep');
+      const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v != null ? v : ''; };
+      setV('prep-name', mp.name || '');
+      setV('prep-type', mp.type || 'Lunch');
+      setV('prep-portion', mp.portion || '');
+      setV('prep-cals', mp.cals || 0);
+      setV('prep-prot', mp.prot || 0);
+      setV('prep-carbs', mp.carbs || 0);
+      setV('prep-fat', mp.fat || 0);
+      setV('prep-days', mp.days || 'Mon, Tue, Wed, Thu, Fri');
+      setV('prep-edit-idx', String(idx));
+      // Swap modal title + Save button text into edit mode
+      const titleEl = document.querySelector('#modal-meal-prep .modal-title');
+      if (titleEl) titleEl.innerHTML = '<span class="icon-title-slot" data-icon="salad"></span>Edit Meal Prep Item';
+      const saveBtn = document.getElementById('prep-save-btn');
+      if (saveBtn) saveBtn.textContent = 'Save Changes';
+      const saveRecipeBtn = document.getElementById('prep-save-as-recipe-btn');
+      if (saveRecipeBtn) saveRecipeBtn.style.display = '';
+      try { hydrateIcons(document.getElementById('modal-meal-prep')); } catch (e) {}
+    }
+    // T45.2 — From inside the edit modal, push the current form values into
+    // savedRecipes without needing to leave the modal. Useful when the user
+    // wants to fix the recipe (e.g. add ingredients) before saving.
+    function saveCurrentPrepAsRecipe() {
+      const name = (document.getElementById('prep-name') || {}).value || '';
+      if (!name.trim()) { showNotif('Add a meal name first', 'var(--red2)'); return; }
+      state.savedRecipes = state.savedRecipes || [];
+      if (state.savedRecipes.some(r => (r.label || '').toLowerCase() === name.toLowerCase())) {
+        showNotif('Already in My Recipes');
+        return;
+      }
+      const cals = parseInt((document.getElementById('prep-cals') || {}).value) || 0;
+      const prot = parseInt((document.getElementById('prep-prot') || {}).value) || 0;
+      const carbs = parseInt((document.getElementById('prep-carbs') || {}).value) || 0;
+      const fat = parseInt((document.getElementById('prep-fat') || {}).value) || 0;
+      const portion = (document.getElementById('prep-portion') || {}).value || '';
+      state.savedRecipes.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        label: name, ingredients: [],
+        cals, prot, carbs, fat,
+        notes: portion ? `Portion: ${portion}` : '',
+        createdAt: todayStr(),
+      });
+      save();
+      try { renderSavedRecipes(); } catch (e) {}
+      showNotif(`Saved "${name}" to My Recipes`);
     }
     function switchNutTab(tab) {
       // Respect the meal-prep toggle: if disabled, redirect prep requests to daily.
@@ -14361,11 +14796,24 @@ create trigger trg_user_state_updated_at
     }
     // Detect whether today's logged macros meet the daily targets (within tolerance)
     // and update state.stats.macroStreak accordingly. Called whenever a meal is logged.
+    // T45.1 — Also called from start/end fast and on app boot so a fasting day
+    // gets the streak credited automatically without needing a meal log.
     function checkMacroHit() {
       if (!state.stats) state.stats = { totalQuestsCompleted: 0, anyFullDayCompleted: false, macroStreak: 0, lastMacroHitDate: null };
       const today = todayStr();
       // Already credited today — nothing to do.
       if (state.stats.lastMacroHitDate === today) return;
+      // T45.1 — Fasting days auto-credit the streak. The user is intentionally
+      // not eating to macro; we don't want a 30-day fast to break a 90-day streak.
+      if (typeof isFastingToday === 'function' && isFastingToday()) {
+        const last = state.stats.lastMacroHitDate;
+        const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
+        if (last === yesterday) state.stats.macroStreak = (state.stats.macroStreak || 0) + 1;
+        else state.stats.macroStreak = Math.max(1, state.stats.macroStreak || 1);
+        state.stats.lastMacroHitDate = today;
+        if (typeof evaluateTitles === 'function') evaluateTitles();
+        return;
+      }
       const meals = (state.todayMeals || []).filter(m => m.date === today);
       if (!meals.length) return;
       const tot = meals.reduce((a, m) => ({
@@ -14392,9 +14840,11 @@ create trigger trg_user_state_updated_at
       if (typeof evaluateTitles === 'function') evaluateTitles();
     }
     function saveMealPrep() {
-      state.mealPrep.push({
-        // T20.2 — explicit id for cloud-sync dedup (same fix as todayMeals)
-        id: Date.now() + Math.random(),
+      // T45.2 — Edit branch: when prep-edit-idx is set, update the existing
+      // entry in place (preserving id) instead of pushing a new one.
+      const editIdxRaw = (document.getElementById('prep-edit-idx') || {}).value || '';
+      const editIdx = editIdxRaw === '' ? -1 : parseInt(editIdxRaw, 10);
+      const payload = {
         name: document.getElementById('prep-name').value || 'Meal',
         type: document.getElementById('prep-type').value,
         portion: document.getElementById('prep-portion').value,
@@ -14403,6 +14853,17 @@ create trigger trg_user_state_updated_at
         carbs: parseInt(document.getElementById('prep-carbs').value) || 0,
         fat: parseInt(document.getElementById('prep-fat').value) || 0,
         days: document.getElementById('prep-days').value || 'Mon, Tue, Wed, Thu, Fri'
+      };
+      if (editIdx >= 0 && state.mealPrep[editIdx]) {
+        const existing = state.mealPrep[editIdx];
+        state.mealPrep[editIdx] = { ...existing, ...payload };
+        save(); closeModal('modal-meal-prep'); renderMealPrep(); renderDailyNutrition(); showNotif('Meal prep updated!');
+        return;
+      }
+      state.mealPrep.push({
+        // T20.2 — explicit id for cloud-sync dedup (same fix as todayMeals)
+        id: Date.now() + Math.random(),
+        ...payload
       });
       save(); closeModal('modal-meal-prep'); renderMealPrep(); renderDailyNutrition(); showNotif('Meal prep saved!');
     }
