@@ -4873,6 +4873,24 @@
           oninput="onLogExerciseNameChange()">
         <datalist id="log-ex-list"></datalist>
       </div>
+      <!-- T46.1 — Equipment variant. Cable variants halve/quarter the effective
+           load (pulleys multiply mechanical advantage). Smith/Machine/Free are
+           tagged so changing equipment week-to-week doesn't look like regression. -->
+      <div class="form-group" style="margin-bottom:10px;">
+        <label style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Equipment</span>
+          <span id="log-ex-variant-hint" style="font-size:10px;color:var(--text3);"></span>
+        </label>
+        <select id="log-ex-variant" onchange="onLogExerciseVariantChange()" style="padding:8px;">
+          <option value="free">Free Weight</option>
+          <option value="smith">Smith Machine</option>
+          <option value="machine">Machine (Selectorized)</option>
+          <option value="cable1">Cable — 1 Pulley</option>
+          <option value="cable2">Cable — 2 Pulleys (½ effective load)</option>
+          <option value="cable4">Cable — 4 Pulleys (¼ effective load)</option>
+          <option value="bw">Bodyweight</option>
+        </select>
+      </div>
       <div class="form-group" style="margin-bottom:6px;position:relative;">
         <label style="display:flex;justify-content:space-between;align-items:center;">
           <span>Sets</span>
@@ -4925,6 +4943,26 @@
       </div>
       <div id="ex-history-body" style="max-height:50vh;overflow-y:auto;font-size:12px;margin-bottom:12px;"></div>
       <button class="btn btn-full" onclick="closeModal('modal-exercise-history')">Close</button>
+    </div>
+  </div>
+  <!-- T46.2 — Rename / merge an exercise across the entire history log. -->
+  <div class="modal-overlay" id="modal-rename-exercise">
+    <div class="modal">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="edit"></span>Rename Exercise</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
+        Every session logged under <strong id="rename-ex-old"></strong> will be updated.
+        If the new name matches another exercise you've already logged, all entries will
+        merge into one.
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>New name</label>
+        <input type="text" id="rename-ex-new" placeholder="e.g. Bench Press">
+      </div>
+      <div id="rename-ex-merge-warning" style="display:none;font-size:11px;color:var(--gold);background:rgba(244,182,63,0.10);border:1px solid var(--gold);border-radius:6px;padding:8px 10px;margin-bottom:10px;line-height:1.5;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-full" onclick="closeModal('modal-rename-exercise')">Cancel</button>
+        <button class="btn btn-primary btn-full" id="rename-ex-confirm" onclick="confirmRenameExercise()">Rename</button>
+      </div>
     </div>
   </div>
   <div class="modal-overlay" id="modal-generate">
@@ -11301,14 +11339,25 @@ create trigger trg_user_state_updated_at
         'Walking Quad Pull', 'Lateral Lunge (Warm-up)'
       ]
     };
-    const MUSCLE_GROUP_OPTIONS = ['', 'Warm-up', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core', 'Full Body'];
+    // T46.3 — Push / Pull / Legs as virtual mega-groups. On Upper Push days
+    // users want chest + shoulders + triceps in one dropdown (not just chest),
+    // since the same session hits all three. These don't add new exercises;
+    // they pull from the existing groups so library updates stay DRY.
+    const COMBINED_MUSCLE_GROUPS = {
+      'Push (chest + shoulders + arms)': ['Chest', 'Shoulders', 'Arms'],
+      'Pull (back + arms)': ['Back', 'Arms'],
+      'Legs (full lower body)': ['Legs'],
+    };
+    const MUSCLE_GROUP_OPTIONS = ['', 'Push (chest + shoulders + arms)', 'Pull (back + arms)', 'Legs (full lower body)', 'Warm-up', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core', 'Full Body'];
     // Map a workout split → its single primary muscle group, for the sheet-level dropdown.
-    // (Per-row prefill removed — the sheet-level dropdown filters all 8 row dropdowns at once.)
+    // T46.3 — Switched push/pull/leg splits to the new combined groups so
+    // shoulder/triceps exercises auto-populate on push day (etc.) instead of
+    // requiring a manual group switch mid-session.
     function primaryGroupForSplit(split) {
       const map = {
-        'Upper Push': 'Chest',
-        'Upper Pull': 'Back',
-        'Lower Body': 'Legs',
+        'Upper Push': 'Push (chest + shoulders + arms)',
+        'Upper Pull': 'Pull (back + arms)',
+        'Lower Body': 'Legs (full lower body)',
         'Full Body': '',                // leave blank so all exercises show
         'Flexibility / Cardio': '',      // cardio lives in its own row below
         'Rest': ''
@@ -11322,6 +11371,19 @@ create trigger trg_user_state_updated_at
           ...Object.values(MUSCLE_GROUPS).flat(),
           ...((typeof COMMON_LIFTS !== 'undefined') ? COMMON_LIFTS : [])
         ])).sort();
+      }
+      // T46.3 — Combined push/pull/legs groups expand to the union of their
+      // constituent muscle group lists. Single-group keys fall through unchanged.
+      if (COMBINED_MUSCLE_GROUPS[group]) {
+        const out = [];
+        const seen = new Set();
+        COMBINED_MUSCLE_GROUPS[group].forEach(g => {
+          (MUSCLE_GROUPS[g] || []).forEach(ex => {
+            const k = ex.toLowerCase();
+            if (!seen.has(k)) { seen.add(k); out.push(ex); }
+          });
+        });
+        return out.sort();
       }
       return MUSCLE_GROUPS[group] || [];
     }
@@ -14878,12 +14940,59 @@ create trigger trg_user_state_updated_at
       'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise', 'Farmers Carry',
       'Plank', 'Dead Hang',
     ];
+    // ===== T46.1 — EQUIPMENT VARIANTS =====
+    // Same exercise (e.g. Tricep Pulldown) can be done on different equipment that
+    // changes the actual load on the muscle. Tagging variant per session lets us:
+    //   * Show stack weight AND effective load for cable variants (pulley count
+    //     halves/quarters the effective load).
+    //   * Keep Smith / Free Weight / Selectorized Machine separate in the trend
+    //     comparison so swapping equipment doesn't look like a regression.
+    //
+    // `multiplier` is what the muscle actually moves vs the stack/bar reading.
+    // It's ONLY meaningful for cable variants (mechanical disadvantage from pulley
+    // multiplication). Smith / Machine / Free Weight have no clean multiplier (the
+    // bar weight + stabilization profile differ), so we tag without doing math.
+    //
+    // `family` is the comparison group key. Two sessions with the same exercise
+    // name + same family are directly comparable; different families show as
+    // separate trend lines.
+    const EXERCISE_VARIANTS = [
+      { id: 'free',    label: 'Free Weight',           short: 'Free',     multiplier: 1,    family: 'free',    appliesMath: false },
+      { id: 'smith',   label: 'Smith Machine',         short: 'Smith',    multiplier: 1,    family: 'smith',   appliesMath: false },
+      { id: 'machine', label: 'Machine (Selectorized)',short: 'Machine',  multiplier: 1,    family: 'machine', appliesMath: false },
+      { id: 'cable1',  label: 'Cable — 1 Pulley',      short: 'Cable 1P', multiplier: 1,    family: 'cable1',  appliesMath: true  },
+      { id: 'cable2',  label: 'Cable — 2 Pulleys',     short: 'Cable 2P', multiplier: 0.5,  family: 'cable2',  appliesMath: true  },
+      { id: 'cable4',  label: 'Cable — 4 Pulleys',     short: 'Cable 4P', multiplier: 0.25, family: 'cable4',  appliesMath: true  },
+      { id: 'bw',      label: 'Bodyweight',            short: 'BW',       multiplier: 1,    family: 'bw',      appliesMath: false },
+    ];
+    function getVariantMeta(id) {
+      return EXERCISE_VARIANTS.find(v => v.id === id) || EXERCISE_VARIANTS[0];
+    }
+    // What the muscle actually moved. For cables this divides by the pulley count.
+    function effectiveLoad(stackWeight, variantId) {
+      const v = getVariantMeta(variantId);
+      return Math.round((stackWeight || 0) * (v.multiplier || 1) * 10) / 10;
+    }
     function openLogExerciseModal(prefillExercise) {
       const sets = document.getElementById('log-ex-sets');
       if (sets) sets.innerHTML = '';
       document.getElementById('log-ex-name').value = prefillExercise || '';
       document.getElementById('log-ex-notes').value = '';
       document.getElementById('log-ex-suggest').textContent = '';
+      // T46.1 — Default variant to last session's variant for this exercise; else 'free'.
+      const variantSel = document.getElementById('log-ex-variant');
+      if (variantSel) {
+        let defaultVariant = 'free';
+        if (prefillExercise) {
+          const norm = normalizeExerciseName(prefillExercise);
+          const prior = (state.workoutLog || []).filter(e => normalizeExerciseName(e.exercise) === norm);
+          if (prior.length) {
+            const last = prior[prior.length - 1];
+            if (last.variant) defaultVariant = last.variant;
+          }
+        }
+        variantSel.value = defaultVariant;
+      }
       // Build the datalist of previously-logged + common exercises
       const dl = document.getElementById('log-ex-list');
       if (dl) {
@@ -14898,7 +15007,30 @@ create trigger trg_user_state_updated_at
       // Seed with one blank set; if we have history for this exercise, prefill weight/reps from the last session
       addSetRow();
       if (prefillExercise) onLogExerciseNameChange();
+      onLogExerciseVariantChange();
       openModal('modal-log-exercise');
+    }
+    // T46.1 — Show a short helper line under the variant select. For cable
+    // variants we surface the effective-load math so the user knows their 150
+    // on a 2-pulley counts as 75 lb effective — and that's the number the
+    // chart will compare against.
+    function onLogExerciseVariantChange() {
+      const sel = document.getElementById('log-ex-variant');
+      const hint = document.getElementById('log-ex-variant-hint');
+      if (!sel || !hint) return;
+      const meta = getVariantMeta(sel.value);
+      if (meta.appliesMath && meta.multiplier !== 1) {
+        const pct = Math.round(meta.multiplier * 100);
+        hint.textContent = `Stack × ${meta.multiplier} = ${pct}% effective`;
+      } else if (meta.id === 'smith') {
+        hint.textContent = 'Stabilized — compared only to other Smith sessions';
+      } else if (meta.id === 'machine') {
+        hint.textContent = 'Compared only to other machine sessions';
+      } else if (meta.id === 'bw') {
+        hint.textContent = 'Bodyweight — weight column optional';
+      } else {
+        hint.textContent = '';
+      }
     }
     function toggleRpeHelp(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -14991,11 +15123,16 @@ create trigger trg_user_state_updated_at
         rpe: parseInt(r.querySelector('.set-rpe').value) || null,
       })).filter(s => s.reps > 0 || s.weight > 0);
       if (!sets.length) { showNotif('Add at least one set'); return; }
+      // T46.1 — Capture equipment variant. Defaults to 'free' when the select
+      // is missing (e.g. older code paths that push to workoutLog).
+      const variantSel = document.getElementById('log-ex-variant');
+      const variant = (variantSel && variantSel.value) || 'free';
       const entry = {
         id: Date.now(),
         date: todayStr(),
         exercise: name,
         sets,
+        variant,
         notes: document.getElementById('log-ex-notes').value.trim(),
       };
       if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
@@ -15046,16 +15183,27 @@ create trigger trg_user_state_updated_at
         const questBadge = e.source === 'quest'
           ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.08em;background:rgba(79,142,255,0.15);color:var(--accent2);border:1px solid var(--accent2);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">QUEST</span>`
           : '';
+        // T46.1 — Variant tag. Only render when not the default 'free' so legacy
+        // entries (no variant field) don't show a noisy "Free" pill everywhere.
+        const variantMeta = e.variant ? getVariantMeta(e.variant) : null;
+        const variantBadge = (variantMeta && variantMeta.id !== 'free')
+          ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.06em;background:rgba(127,119,221,0.12);color:var(--accent);border:1px solid var(--accent);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">${variantMeta.short}</span>`
+          : '';
         return `<div class="card" style="padding:10px;">
       <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.exercise}${questBadge}</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.exercise}${variantBadge}${questBadge}</div>
           <div style="font-size:11px;color:var(--text3);">${(e.sets || []).length} sets · ${volume ? volume.toLocaleString() + ' lb total' : 'bodyweight'}${topSet && topSet.weight ? ' · top ' + topSet.reps + '×' + topSet.weight + ' lbs' : ''}</div>
         </div>
         <button onclick="deleteWorkoutEntry(${e.id})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;">Delete</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
-        ${(e.sets || []).map((s, i) => `<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:2px 6px;border-radius:4px;">${s.reps || '—'}×${s.weight || 'bw'}${s.rpe ? ` <span style="color:var(--accent2);">@${s.rpe}</span>` : ''}</span>`).join('')}
+        ${(e.sets || []).map((s, i) => {
+          // T46.1 — Cable variants show effective load alongside stack reading.
+          const showEff = variantMeta && variantMeta.appliesMath && variantMeta.multiplier !== 1 && s.weight;
+          const eff = showEff ? ` <span style="color:var(--gold);font-size:9px;">≈${effectiveLoad(s.weight, e.variant)}</span>` : '';
+          return `<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:2px 6px;border-radius:4px;">${s.reps || '—'}×${s.weight || 'bw'}${eff}${s.rpe ? ` <span style="color:var(--accent2);">@${s.rpe}</span>` : ''}</span>`;
+        }).join('')}
       </div>
       ${e.notes ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;font-style:italic;">${e.notes}</div>` : ''}
     </div>`;
@@ -15773,6 +15921,86 @@ create trigger trg_user_state_updated_at
       return best;
     }
 
+    // ===== T46.2 — RENAME / MERGE EXERCISE =====
+    // Opens the rename modal pre-filled with the exercise's current spelling.
+    // The user can correct typos ("benchpress" → "Bench Press"); if the new
+    // name normalizes to an exercise that already exists in the log, we offer
+    // to merge — all entries collapse under the new canonical spelling.
+    let _renameExerciseTarget = '';
+    function openRenameExerciseModal(exercise) {
+      _renameExerciseTarget = exercise || '';
+      const oldEl = document.getElementById('rename-ex-old');
+      const newEl = document.getElementById('rename-ex-new');
+      if (oldEl) oldEl.textContent = exercise || '';
+      if (newEl) newEl.value = exercise || '';
+      updateRenameMergeHint();
+      // Hook live merge-warning update
+      if (newEl && !newEl._renameHooked) {
+        newEl.addEventListener('input', updateRenameMergeHint);
+        newEl._renameHooked = true;
+      }
+      openModal('modal-rename-exercise');
+    }
+    function updateRenameMergeHint() {
+      const newEl = document.getElementById('rename-ex-new');
+      const warn = document.getElementById('rename-ex-merge-warning');
+      const btn = document.getElementById('rename-ex-confirm');
+      if (!newEl || !warn || !btn) return;
+      const newName = (newEl.value || '').trim();
+      if (!newName) { warn.style.display = 'none'; btn.textContent = 'Rename'; return; }
+      const newNorm = normalizeExerciseName(newName);
+      const targetNorm = normalizeExerciseName(_renameExerciseTarget);
+      if (newNorm === targetNorm) {
+        warn.style.display = 'none';
+        btn.textContent = 'Save';
+        return;
+      }
+      // Look for OTHER exercises in the log whose normalized name matches.
+      const conflicting = new Set();
+      (state.workoutLog || []).forEach(e => {
+        if (!e.exercise) return;
+        if (normalizeExerciseName(e.exercise) === newNorm && normalizeExerciseName(e.exercise) !== targetNorm) {
+          conflicting.add(e.exercise);
+        }
+      });
+      if (conflicting.size > 0) {
+        const sample = [...conflicting].slice(0, 3).map(s => `"${s}"`).join(', ');
+        warn.style.display = '';
+        warn.innerHTML = `Will merge with existing ${sample}. All sessions become <strong>${escapeHtml(newName)}</strong>.`;
+        btn.textContent = 'Merge';
+      } else {
+        warn.style.display = 'none';
+        btn.textContent = 'Rename';
+      }
+    }
+    function confirmRenameExercise() {
+      const newEl = document.getElementById('rename-ex-new');
+      const newName = ((newEl && newEl.value) || '').trim();
+      if (!newName) { showNotif('Enter a name', 'var(--red2)'); return; }
+      const target = _renameExerciseTarget;
+      if (!target) { closeModal('modal-rename-exercise'); return; }
+      const targetNorm = normalizeExerciseName(target);
+      const newNorm = normalizeExerciseName(newName);
+      let changed = 0;
+      let merged = 0;
+      (state.workoutLog || []).forEach(e => {
+        if (!e.exercise) return;
+        const norm = normalizeExerciseName(e.exercise);
+        if (norm === targetNorm || norm === newNorm) {
+          if (e.exercise !== newName) { e.exercise = newName; changed++; }
+          if (norm === newNorm && norm !== targetNorm) merged++;
+        }
+      });
+      save();
+      try { renderTrainingLog(); } catch (e) {}
+      try { renderExerciseProgression(); } catch (e) {}
+      try { renderExerciseHistoryPage(); } catch (e) {}
+      closeModal('modal-rename-exercise');
+      // Refresh the history modal — title + body now reflect the merged spelling.
+      try { openExerciseHistory(newName); } catch (e) {}
+      if (merged > 0) showNotif(`Merged ${changed} entries into "${newName}"`);
+      else showNotif(`Renamed ${changed} entries to "${newName}"`);
+    }
     // T24.1 — dedicated History page on the Workouts tab. Shows every exercise
     // ever logged with: last weight × reps × sets, last date, total sessions,
     // estimated 1RM, suggested next target. Bodyweight exercises (weight 0)
@@ -15931,7 +16159,16 @@ create trigger trg_user_state_updated_at
         const weightedSessions = sessions.filter(s => (s.sets || []).some(x => (x.weight || 0) > 0));
         const pool = weightedSessions.length ? weightedSessions : sessions;
         const last = pool[pool.length - 1];
-        const prior = pool.length > 1 ? pool[pool.length - 2] : null;
+        // T46.1 — Trend delta only compares sessions with the SAME variant family.
+        // Otherwise swapping a 2-pulley cable session for a 1-pulley one (or
+        // Smith for free bar) reads as a regression even though the muscle work
+        // changed. Same-family prior is the prior session that shares variant.
+        const lastFamily = (last && last.variant) ? getVariantMeta(last.variant).family : 'free';
+        const sameFamilyPool = pool.filter(s => {
+          const fam = s.variant ? getVariantMeta(s.variant).family : 'free';
+          return fam === lastFamily;
+        });
+        const prior = sameFamilyPool.length > 1 ? sameFamilyPool[sameFamilyPool.length - 2] : null;
         const topOf = s => (s.sets || []).reduce((m, x) => (x.weight || 0) > (m?.weight || 0) ? x : m, null);
         const lastTop = topOf(last);
         const priorTop = prior ? topOf(prior) : null;
@@ -15942,7 +16179,7 @@ create trigger trg_user_state_updated_at
         const last1RM = bestSession1RM(last);
         const prior1RM = prior ? bestSession1RM(prior) : 0;
         const delta1RM = (last1RM && prior1RM) ? last1RM - prior1RM : 0;
-        return { exercise: pickDisplayName(sessions), sessions: sessions.length, lastDate: last.date, lastTop, delta, sug, last1RM, delta1RM };
+        return { exercise: pickDisplayName(sessions), sessions: sessions.length, lastDate: last.date, lastTop, delta, sug, last1RM, delta1RM, lastVariant: last.variant || 'free' };
       }).sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
       el.innerHTML = summaries.map(s => {
         const d = s.lastTop ? `${s.lastTop.reps}×${s.lastTop.weight} lbs` : 'bodyweight';
@@ -15957,9 +16194,15 @@ create trigger trg_user_state_updated_at
           else if (s.delta1RM < 0) { trendColor = 'var(--red2)'; trendText = ` <span style="color:${trendColor};">↓${Math.abs(s.delta1RM)}</span>`; }
           oneRmBadge = `<span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.06em;background:rgba(244,182,63,0.10);color:var(--gold);border:1px solid var(--gold);padding:1px 6px;border-radius:3px;margin-left:6px;vertical-align:middle;">~1RM ${s.last1RM} lb${trendText}</span>`;
         }
+        // T46.1 — Variant tag on the progression card so it's obvious which
+        // equipment the "last" number reflects (and that the delta is intra-family).
+        const lvMeta = getVariantMeta(s.lastVariant);
+        const variantBadge = (lvMeta && lvMeta.id !== 'free')
+          ? `<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;background:rgba(127,119,221,0.12);color:var(--accent);border:1px solid var(--accent);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">${lvMeta.short}</span>`
+          : '';
         return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="openExerciseHistory(${JSON.stringify(s.exercise)})">
       <div style="min-width:0;flex:1;">
-        <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;">${s.exercise}${oneRmBadge}</div>
+        <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;">${s.exercise}${variantBadge}${oneRmBadge}</div>
         <div style="font-size:11px;color:var(--text3);">${s.sessions} session${s.sessions !== 1 ? 's' : ''} · last ${s.lastDate} · ${d} · ${deltaStr}</div>
         ${s.sug ? `<div style="font-size:11px;color:var(--accent2);">Next: ${s.sug.nextReps} × ${s.sug.nextWeight} lbs</div>` : ''}
       </div>
@@ -15982,7 +16225,10 @@ create trigger trg_user_state_updated_at
       ${desc.tip ? `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:4px;font-style:italic;">${desc.tip}</div>` : ''}
     </div>
   ` : '';
-      body.innerHTML = descCard + sessions.map(s => {
+      // T46.2 — Header now offers an Edit Name action so the user can correct
+      // typos ("benchpress" → "Bench Press") and auto-merge duplicate entries.
+      const renameBtn = `<button onclick="openRenameExerciseModal(${JSON.stringify(exercise)})" class="btn btn-sm" style="padding:3px 8px;font-size:10px;color:var(--accent2);border-color:var(--accent2);margin-bottom:10px;">Edit name</button>`;
+      body.innerHTML = descCard + renameBtn + sessions.map(s => {
         const volume = (s.sets || []).reduce((a, x) => a + (x.reps * x.weight || 0), 0);
         const sessionMax = bestSession1RM(s);
         // Per-session header: total tonnage on the right, est. 1RM next to the date.
@@ -15990,13 +16236,21 @@ create trigger trg_user_state_updated_at
         const oneRmHdr = sessionMax > 0
           ? `<span style="font-size:10px;font-weight:700;color:var(--gold);background:rgba(244,182,63,0.10);border:1px solid var(--gold);padding:1px 5px;border-radius:3px;margin-left:6px;">~1RM ${sessionMax}</span>`
           : '';
+        // T46.1 — Per-session variant tag.
+        const vMeta = s.variant ? getVariantMeta(s.variant) : null;
+        const vBadge = (vMeta && vMeta.id !== 'free')
+          ? `<span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(127,119,221,0.12);border:1px solid var(--accent);padding:1px 5px;border-radius:3px;margin-left:6px;">${vMeta.short}</span>`
+          : '';
         return `<div style="padding:8px;border-bottom:1px solid var(--border);">
-      <div style="display:flex;justify-content:space-between;"><span><strong>${s.date}</strong>${oneRmHdr}</span><span style="color:var(--text3);">${volume ? volume.toLocaleString() + ' lb' : 'bw'}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span><strong>${s.date}</strong>${vBadge}${oneRmHdr}</span><span style="color:var(--text3);">${volume ? volume.toLocaleString() + ' lb' : 'bw'}</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
         ${(s.sets || []).map(x => {
           const setMax = estimate1RM(x.weight, x.reps);
           const setMaxBadge = setMax > 0 ? ` <span style="color:var(--gold);font-size:9px;">≈${setMax}</span>` : '';
-          return `<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:2px 6px;border-radius:4px;">${x.reps || '—'}×${x.weight || 'bw'}${x.rpe ? ` <span style="color:var(--accent2);">@${x.rpe}</span>` : ''}${setMaxBadge}</span>`;
+          // T46.1 — Cable variants display the effective load.
+          const showEff = vMeta && vMeta.appliesMath && vMeta.multiplier !== 1 && x.weight;
+          const effBadge = showEff ? ` <span style="color:var(--accent2);font-size:9px;">eff ${effectiveLoad(x.weight, s.variant)}</span>` : '';
+          return `<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:2px 6px;border-radius:4px;">${x.reps || '—'}×${x.weight || 'bw'}${effBadge}${x.rpe ? ` <span style="color:var(--accent2);">@${x.rpe}</span>` : ''}${setMaxBadge}</span>`;
         }).join('')}
       </div>
       ${s.notes ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;font-style:italic;">${s.notes}</div>` : ''}
