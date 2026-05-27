@@ -16115,6 +16115,7 @@ create trigger trg_user_state_updated_at
             </div>
             <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
               <button onclick="event.stopPropagation();openLogExerciseModal(${JSON.stringify(s.exercise)})" class="btn btn-sm" style="padding:4px 10px;font-size:11px;">+ Log</button>
+              <button onclick="event.stopPropagation();openRenameExerciseModal(${JSON.stringify(s.exercise)})" class="btn btn-sm" style="padding:4px 10px;font-size:10px;color:var(--accent2);border-color:var(--accent2);" title="Rename or merge with another exercise (fix typos like 'benchpress' → 'Bench Press')">Rename</button>
               <button onclick="event.stopPropagation();openSubstituteModal(${JSON.stringify(s.exercise)})" class="btn btn-sm" style="padding:4px 10px;font-size:10px;color:var(--text3);" title="Find a substitute exercise that hits the same muscles">Substitute</button>
             </div>
           </div>
@@ -16225,9 +16226,15 @@ create trigger trg_user_state_updated_at
       ${desc.tip ? `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:4px;font-style:italic;">${desc.tip}</div>` : ''}
     </div>
   ` : '';
-      // T46.2 — Header now offers an Edit Name action so the user can correct
-      // typos ("benchpress" → "Bench Press") and auto-merge duplicate entries.
-      const renameBtn = `<button onclick="openRenameExerciseModal(${JSON.stringify(exercise)})" class="btn btn-sm" style="padding:3px 8px;font-size:10px;color:var(--accent2);border-color:var(--accent2);margin-bottom:10px;">Edit name</button>`;
+      // T46.2 — Prominent Rename/Merge action at the top of the modal so the
+      // user can fix typos ("benchpress" → "Bench Press") and merge duplicates.
+      // Styled as a full-width row to match the +Log card actions and stand out.
+      const renameBtn = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button onclick="openRenameExerciseModal(${JSON.stringify(exercise)})" class="btn btn-full" style="padding:8px 12px;font-size:12px;color:var(--accent2);border-color:var(--accent2);display:flex;align-items:center;justify-content:center;gap:6px;">
+        <span class="icon-title-slot" data-icon="edit"></span>Rename / Merge
+      </button>
+    </div>`;
       body.innerHTML = descCard + renameBtn + sessions.map(s => {
         const volume = (s.sets || []).reduce((a, x) => a + (x.reps * x.weight || 0), 0);
         const sessionMax = bestSession1RM(s);
