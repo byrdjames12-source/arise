@@ -2608,6 +2608,43 @@
        body.app-ready when onboarding finishes. */
     body:not(.app-ready) .fab-coach { display: none; }
 
+    /* T48.2 — Quick-log FAB. Bottom-LEFT corner so it doesn't fight the ARIA
+       FAB. Shown only on Quests / Progress screens via .show-quicklog body
+       class so we don't crowd Workouts/Fuel (which already have visible
+       primary "+ Log" buttons in their content area). */
+    .fab-quicklog {
+      position: fixed;
+      left: 16px;
+      bottom: calc(72px + env(safe-area-inset-bottom, 0));
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--accent) 100%);
+      border: 2px solid var(--gold);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #1a1f3a;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      z-index: 95;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: transform 0.15s ease, border-color 0.15s ease;
+      padding: 0 0 4px 0;
+    }
+    body.show-quicklog .fab-quicklog { display: flex; }
+    .fab-quicklog:hover { transform: scale(1.08); }
+    .fab-quicklog:active { transform: scale(0.96); }
+    body:not(.app-ready) .fab-quicklog { display: none; }
+    @media (min-width: 700px) {
+      .fab-quicklog { bottom: 24px; left: 24px; width: 56px; height: 56px; font-size: 32px; }
+    }
+    [data-theme="light"] .fab-quicklog {
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    }
+
     /* T41.3 — Light theme: ARIA's orb shipped with a dark navy fill that
        looked heavy against the bright page. Swap to a clean white→pale
        gradient; the blue border + icon still read clearly against it. */
@@ -3748,12 +3785,20 @@
             <div style="font-size:11px;color:var(--text3);" id="quest-date-label">Loading...</div>
           </div>
           <div class="topbar-right">
+            <!-- T49.1 — Fasting status chip. Hidden when no active fast; tap routes to Fuel. -->
+            <button id="quests-fasting-chip" onclick="switchTab('nutrition')"
+              style="display:none;background:linear-gradient(135deg, rgba(244,182,63,0.18), rgba(79,142,255,0.18));border:1px solid var(--gold);color:var(--gold);font-size:11px;padding:3px 8px;border-radius:12px;cursor:pointer;align-items:center;gap:4px;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:0.5px;"></button>
+            <!-- T48.1 — Tappable coin pill routes to Shop globally. -->
+            <button class="coin-pill" id="quests-coin-pill" onclick="switchTab('shop')"
+              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="quests-coin-count">0</span></button>
             <div
               style="font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;font-weight:700;display:inline-flex;align-items:center;gap:4px;"
               id="streak-display"><span class="icon-title-slot" data-icon="flame"
                 style="color:var(--gold);margin-right:0;"></span><span id="streak-display-value">0</span></div>
-            <button class="btn btn-sm btn-with-icon" onclick="openGenerateModal()">Generate<span class="icon-title-slot"
-                data-icon="arrowupright" data-icon-size="14"></span></button>
+            <!-- T47.1 — Topbar Generate button removed. Quest refresh lives
+                 inside the streak card; quest customization moved to a tertiary
+                 "Customize" link next to Regenerate so there's a single,
+                 calm CTA group. -->
           </div>
         </div>
         <div class="scroll" id="quests-scroll">
@@ -3792,10 +3837,17 @@
             <div
               style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px;flex-wrap:wrap;">
               <div style="font-size:11px;color:var(--text3);" id="quest-summary"></div>
-              <button onclick="regenerateTodayQuests()" class="btn-with-icon"
-                title="Regenerate today's quests from your current workout split"
-                style="background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span
-                  class="icon-title-slot" data-icon="refresh" data-icon-size="11"></span>Regenerate</button>
+              <!-- T47.2 — Tertiary regenerate group. "Regenerate" is the
+                   no-customization quick refresh; "Customize…" opens the
+                   focus/difficulty modal (formerly the topbar Generate). -->
+              <div style="display:inline-flex;align-items:center;gap:6px;">
+                <button onclick="regenerateTodayQuests()" class="btn-with-icon"
+                  title="Regenerate today's quests from your current workout split"
+                  style="background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span
+                    class="icon-title-slot" data-icon="refresh" data-icon-size="11"></span>Regenerate</button>
+                <button onclick="openGenerateModal()" title="Pick focus + difficulty"
+                  style="background:none;border:none;color:var(--text3);font-size:10px;padding:3px 6px;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">Customize…</button>
+              </div>
             </div>
           </div>
           <!-- Penalty warning (shown if not all done by late day) -->
@@ -3879,6 +3931,9 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="trending"></span>Progress</div>
           <div class="topbar-right">
+            <!-- T48.1 — Tappable coin pill routes to Shop. -->
+            <button class="coin-pill" id="progress-coin-pill" onclick="switchTab('shop')"
+              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="progress-coin-count">0</span></button>
             <div class="tab-row" style="gap:4px;">
               <button class="tab-btn active" id="prog-tab-stats" onclick="switchProgressTab('stats')">Stats</button>
               <button class="tab-btn" id="prog-tab-goals" onclick="switchProgressTab('goals')">Goals</button>
@@ -4011,6 +4066,9 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Workouts</div>
           <div class="topbar-right">
+            <!-- T48.1 — Tappable coin pill routes to Shop. -->
+            <button class="coin-pill" id="workouts-coin-pill" onclick="switchTab('shop')"
+              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="workouts-coin-count">0</span></button>
             <!-- T37.2/T37.4 — Order: Log → History → Library → Plans. Library
                  and History swapped so the more frequently used History sits
                  next to Log. Tab label trimmed: "Log Session" → "Log" to keep
@@ -4113,6 +4171,9 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="utensils"></span>Fuel Log</div>
           <div class="topbar-right">
+            <!-- T48.1 — Tappable coin pill routes to Shop. -->
+            <button class="coin-pill" id="fuel-coin-pill" onclick="switchTab('shop')"
+              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="fuel-coin-count">0</span></button>
             <!-- T34.23 — stripped per-button padding/font overrides so Fuel
                  tabs match the size of tabs on every other screen. -->
             <div class="tab-row" style="gap:4px;">
@@ -4280,7 +4341,9 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="settings"></span>Profile</div>
           <div class="topbar-right">
-            <div class="coin-pill" id="profile-coin-pill"><span class="icon-title-slot" data-icon="coin"></span>0</div>
+            <!-- T48.1 — Profile coin pill now routes to Shop (was a static div). -->
+            <button class="coin-pill" id="profile-coin-pill" onclick="switchTab('shop')"
+              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="profile-coin-count">0</span></button>
           </div>
         </div>
         <div class="scroll">
@@ -4515,6 +4578,24 @@
   <button class="fab-coach" id="fab-coach" onclick="openAICoachModal()" aria-label="Ask ARIA" title="Ask ARIA">
     <span class="icon-title-slot" data-icon="sparkles"></span>
   </button>
+  <!-- T48.2 — Quick-log FAB. Opens a small chooser modal with the four most
+       common log actions. Lives bottom-LEFT to avoid the ARIA FAB. Only
+       rendered on Quests/Progress so it doesn't crowd the Workouts/Fuel
+       screens (which already have their own primary log CTAs visible). -->
+  <button class="fab-quicklog" id="fab-quicklog" onclick="openQuickLogModal()" aria-label="Quick log" title="Quick log">+</button>
+  <div class="modal-overlay" id="modal-quick-log">
+    <div class="modal" style="max-width:340px;">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="zap"></span>Quick Log</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Tap what you want to record.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button class="btn btn-primary" onclick="closeModal('modal-quick-log');openLogExerciseModal();" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="dumbbell" data-icon-size="20"></span><span style="font-size:12px;">Log Workout</span></button>
+        <button class="btn btn-primary" onclick="closeModal('modal-quick-log');switchTab('nutrition');setTimeout(()=>openAddMealModal('extra'),100);" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="utensils" data-icon-size="20"></span><span style="font-size:12px;">Log Meal</span></button>
+        <button class="btn" onclick="closeModal('modal-quick-log');logWater(8);" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="water" data-icon-size="20"></span><span style="font-size:12px;">+ 8oz Water</span></button>
+        <button class="btn" onclick="closeModal('modal-quick-log');openLogModal();" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="trending" data-icon-size="20"></span><span style="font-size:12px;">Daily Check-in</span></button>
+      </div>
+      <button class="btn btn-full" onclick="closeModal('modal-quick-log')" style="margin-top:10px;">Close</button>
+    </div>
+  </div>
   <!-- T33.2 — Tutorial overlay. Three layers: a dark backdrop with an SVG
        mask that "cuts out" a rounded rect around the highlighted target;
        a gold ring drawn on top for emphasis; and a tooltip card with
@@ -4943,6 +5024,19 @@
       </div>
       <div id="ex-history-body" style="max-height:50vh;overflow-y:auto;font-size:12px;margin-bottom:12px;"></div>
       <button class="btn btn-full" onclick="closeModal('modal-exercise-history')">Close</button>
+    </div>
+  </div>
+  <!-- T49.2 — Per-row equipment variant picker for the Tracker sheet. -->
+  <div class="modal-overlay" id="modal-tracker-variant">
+    <div class="modal">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Equipment for this row</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
+        Cable variants apply the pulley multiplier so swapping setups week to week
+        doesn't read as a regression. Smith / Machine / Free Weight are tagged but
+        compared only within their own family.
+      </div>
+      <div id="tracker-variant-body" style="display:flex;flex-direction:column;"></div>
+      <button class="btn btn-full" onclick="closeModal('modal-tracker-variant')" style="margin-top:8px;">Close</button>
     </div>
   </div>
   <!-- T46.2 — Rename / merge an exercise across the entire history log. -->
@@ -5425,6 +5519,9 @@
         state.settings.lastSync = new Date().toISOString();
         localStorage.setItem('arise_state', JSON.stringify(state));
       } catch (e) { }
+      // T48.1 / T49.1 — keep global topbar widgets in sync on every save
+      try { if (typeof updateCoinPills === 'function') updateCoinPills(); } catch (e) {}
+      try { if (typeof updateQuestsFastingChip === 'function') updateQuestsFastingChip(); } catch (e) {}
       // Cloud sync — debounced upsert to Supabase. No-op when not configured / signed-out.
       try { if (typeof cloudSyncOnLocalSave === 'function') cloudSyncOnLocalSave(); } catch (e) { }
     }
@@ -8285,6 +8382,35 @@ create trigger trg_user_state_updated_at
       n.textContent = msg; n.style.borderColor = color; n.style.color = color;
       n.classList.add('show'); setTimeout(() => n.classList.remove('show'), 2500);
     }
+    // T48.2 — Open the quick-log chooser modal.
+    function openQuickLogModal() {
+      openModal('modal-quick-log');
+      try { hydrateIcons(document.getElementById('modal-quick-log')); } catch (e) {}
+    }
+    // T48.1 — Keep every topbar coin pill (Quests / Progress / Workouts / Fuel / Profile)
+    // in sync with state.coins. Called from save() and screen-switch.
+    function updateCoinPills() {
+      const c = (state.coins || 0).toLocaleString();
+      ['quests-coin-count', 'progress-coin-count', 'workouts-coin-count',
+       'fuel-coin-count', 'profile-coin-count'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = c;
+      });
+    }
+    // T49.1 — Render the Fasting chip on the Quests topbar. Hidden when no
+    // active fast; shows elapsed time + type when one is running.
+    function updateQuestsFastingChip() {
+      const chip = document.getElementById('quests-fasting-chip');
+      if (!chip) return;
+      const f = (typeof getActiveFast === 'function') ? getActiveFast() : null;
+      if (!f) { chip.style.display = 'none'; return; }
+      const meta = getFastTypeMeta(f.type);
+      const started = new Date(f.startedAt).getTime();
+      const elapsed = msToHumanDuration(Date.now() - started);
+      chip.style.display = 'inline-flex';
+      chip.textContent = `${meta.short} · ${elapsed}`;
+      chip.title = `${meta.label} — tap to open Fuel`;
+    }
     // ===== REMINDERS — meal + water =====
     // Browser Notifications when granted, in-app toast otherwise. The scheduler runs
     // every 60s while the page is open. We track per-time firing on `_remindersFiredToday`
@@ -10714,6 +10840,15 @@ create trigger trg_user_state_updated_at
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       const target = document.getElementById('screen-' + tab);
       if (target) target.classList.add('active');
+      // T48.2 — Quick-log FAB is only useful on screens where the user can't
+      // already see a primary "+ Log" button. Show on Quests + Progress.
+      try {
+        const showQL = (tab === 'quests' || tab === 'progress' || tab === 'stats' || tab === 'goals');
+        document.body.classList.toggle('show-quicklog', !!showQL);
+      } catch (e) {}
+      // T48.1 / T49.1 — refresh topbar widgets on every tab switch.
+      try { updateCoinPills(); } catch (e) {}
+      try { updateQuestsFastingChip(); } catch (e) {}
       // find the right nav button
       document.querySelectorAll('.nav-btn').forEach(b => {
         if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${tab}'`)) b.classList.add('active');
@@ -13640,11 +13775,22 @@ create trigger trg_user_state_updated_at
       <td style="border:1px solid var(--border);padding:1px;">${trackerCellInput(s.reps, 'tr-r', '', `updateTrackerSet(${r},${si},'reps',this.value)`)}</td>
       <td style="border:1px solid var(--border);padding:1px;">${trackerCellInput(s.rpe, 'tr-rpe', '', `updateTrackerSet(${r},${si},'rpe',this.value)`)}</td>
     `).join('');
+        // T49.2 — Per-row equipment variant. Defaults to 'free' (the value
+        // is hidden until the user changes it so the row doesn't get noisier).
+        // When non-free, the variant shows as a tiny tag right after the
+        // exercise input. The icon button to its right opens the picker.
+        const rowVariant = row.variant || 'free';
+        const rowVariantMeta = (typeof getVariantMeta === 'function') ? getVariantMeta(rowVariant) : { short: '', id: 'free' };
+        const variantTag = rowVariantMeta.id !== 'free'
+          ? `<span style="font-size:9px;font-weight:700;color:var(--accent);background:rgba(127,119,221,0.12);border:1px solid var(--accent);padding:1px 4px;border-radius:3px;flex-shrink:0;">${rowVariantMeta.short}</span>`
+          : '';
         return `
       <tr>
         <td style="border:1px solid var(--border);padding:1px;">
           <div style="display:flex;align-items:center;gap:4px;">
             <input type="text" list="tracker-ex-list" value="${(row.exercise || '').replace(/"/g, '&quot;')}" placeholder="${sheet.muscleGroup ? 'pick ' + sheet.muscleGroup.toLowerCase() + ' exercise' : 'exercise'}" oninput="updateTrackerExercise(${r}, this.value)" style="flex:1;padding:5px;background:transparent;border:none;color:var(--text);font-size:12px;min-width:0;">
+            ${variantTag}
+            <button onclick="openTrackerVariantPicker(${r})" title="Equipment variant (Cable / Smith / Free / etc.)" style="background:transparent;border:1px solid var(--border);color:var(--accent);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">📐</button>
             <button onclick="startRestTimer(90)" title="Start 90s rest timer" style="background:transparent;border:1px solid var(--border);color:var(--accent2);font-size:11px;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">⏱</button>
           </div>
         </td>
@@ -13810,6 +13956,36 @@ create trigger trg_user_state_updated_at
       const s = _ensureSheet();
       if (s.rows[rowIdx]) { s.rows[rowIdx].exercise = value; save(); }
     }
+    // T49.2 — Per-tracker-row equipment variant picker. Stores the variant
+    // on the row so commitTrackerToLog can copy it to the workoutLog entry.
+    let _trackerVariantTargetRow = -1;
+    function openTrackerVariantPicker(rowIdx) {
+      _trackerVariantTargetRow = rowIdx;
+      const s = _ensureSheet();
+      const current = (s.rows[rowIdx] && s.rows[rowIdx].variant) || 'free';
+      // Build the picker body from EXERCISE_VARIANTS so it stays DRY with the
+      // +Log modal's options.
+      const body = document.getElementById('tracker-variant-body');
+      if (body) {
+        body.innerHTML = EXERCISE_VARIANTS.map(v => {
+          const isCurrent = v.id === current;
+          const mathHint = (v.appliesMath && v.multiplier !== 1)
+            ? ` <span style="color:var(--gold);font-size:10px;">(×${v.multiplier} effective)</span>`
+            : '';
+          return `<button onclick="selectTrackerVariant(${JSON.stringify(v.id)})" class="btn btn-full" style="text-align:left;padding:10px 12px;margin-bottom:6px;${isCurrent ? 'border-color:var(--accent);color:var(--accent);' : ''}">${v.label}${mathHint}${isCurrent ? ' ✓' : ''}</button>`;
+        }).join('');
+      }
+      openModal('modal-tracker-variant');
+    }
+    function selectTrackerVariant(id) {
+      const s = _ensureSheet();
+      if (s.rows[_trackerVariantTargetRow]) {
+        s.rows[_trackerVariantTargetRow].variant = id;
+        save();
+        renderTrackerSheet();
+      }
+      closeModal('modal-tracker-variant');
+    }
     // Sheet-level muscle group: changing it updates the shared exercise datalist
     // for all rows. We keep any exercises already typed (the user can still see
     // what they entered) but the dropdown options below now reflect the new group.
@@ -13860,6 +14036,9 @@ create trigger trg_user_state_updated_at
         state.workoutLog.push({
           id: Date.now() + Math.floor(Math.random() * 1000),
           date, exercise: ex, sets,
+          // T49.2 — copy the row's equipment variant onto the log entry so
+          // progression charts can group by variant family.
+          variant: row.variant || 'free',
           notes: '',
           source: 'tracker'
         });
@@ -14578,16 +14757,17 @@ create trigger trg_user_state_updated_at
         list.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px;">No meal prep entered yet.</div>';
         return;
       }
-      // T45.2 — Each meal prep entry now exposes Edit (open in modal),
-      // Save to Recipes (push to savedRecipes if not already there), and
-      // Remove. Lets users save a prep recipe they forgot to save before
-      // adding it to the week.
+      // T45.2 / T49.3 — Each meal prep entry exposes Edit, a prominent
+      // ★/☆ Save-as-Recipe star (filled gold when already in My Recipes,
+      // hollow when not), and Remove. The star is the clearest affordance
+      // for "save this to my reusable recipes" — text buttons were getting
+      // missed.
       const savedNames = new Set((state.savedRecipes || []).map(r => (r.label || '').toLowerCase()));
       list.innerHTML = state.mealPrep.map((m, i) => {
         const alreadySaved = savedNames.has((m.name || '').toLowerCase());
-        const saveBtn = alreadySaved
-          ? `<button disabled title="Already in My Recipes" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:default;">✓ Saved</button>`
-          : `<button onclick="saveMealPrepAsRecipe(${i})" title="Save this meal as a reusable recipe in My Recipes" style="background:none;border:none;color:var(--green);font-size:11px;cursor:pointer;">Save to Recipes</button>`;
+        const starBtn = alreadySaved
+          ? `<button disabled title="Already in My Recipes" style="background:none;border:none;color:var(--gold);font-size:18px;cursor:default;line-height:1;padding:0 2px;">★</button>`
+          : `<button onclick="saveMealPrepAsRecipe(${i})" title="Save to My Recipes" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1;padding:0 2px;">☆</button>`;
         return `
     <div class="meal-entry">
       <div style="flex:1;min-width:0;">
@@ -14596,10 +14776,12 @@ create trigger trg_user_state_updated_at
         <div style="font-size:11px;color:var(--text3);">${escapeHtml(m.portion || '')}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <div class="meal-entry-cal">${m.cals || 0}</div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          ${starBtn}
+          <div class="meal-entry-cal">${m.cals || 0}</div>
+        </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
           <button onclick="openEditMealPrepModal(${i})" title="Edit this meal prep" style="background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;">Edit</button>
-          ${saveBtn}
           <button onclick="removeMealPrep(${i})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">Remove</button>
         </div>
       </div>
@@ -16318,9 +16500,8 @@ create trigger trg_user_state_updated_at
       </div>
     `;
       }
-      // Coin pill
-      const coinPill = document.getElementById('profile-coin-pill');
-      if (coinPill) coinPill.innerHTML = `${iconSvg('coin', 16)} ${(state.coins || 0).toLocaleString()}`;
+      // T48.1 — Update all coin pills across topbars.
+      updateCoinPills();
       // Attribute allocator UI removed — see HTML comment in <div id="screen-profile">.
       // Biometrics
       const latest = state.logs[state.logs.length - 1] || {};
@@ -16676,6 +16857,18 @@ create trigger trg_user_state_updated_at
       const indicator = document.getElementById('ai-loading-indicator');
       const content = document.getElementById('ai-quest-content');
       if (!indicator || !content) return;
+      // T47.3 — When no profile exists yet (brand-new user pre-onboarding) the
+      // spinner used to run forever because generateAIQuest short-circuits with
+      // no state.profile. Show an explicit "complete onboarding" hint instead.
+      if (!state.profile || !state.profile.name) {
+        indicator.style.display = 'none';
+        content.style.display = 'block';
+        content.innerHTML = `
+          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px;">Complete your profile to unlock ARIA's daily challenge.</div>
+          <button class="btn btn-sm btn-primary" onclick="switchTab('profile')" style="font-size:11px;">Go to Profile</button>
+        `;
+        return;
+      }
       // T34.24 — Defensive: if quest is null or missing core fields, show an
       // explicit error state with a retry button instead of leaving the card
       // looking half-rendered (header visible, body blank).
@@ -16699,7 +16892,12 @@ create trigger trg_user_state_updated_at
       renderAIChallengeButton(quest);
     }
     async function generateAIQuest(opts) {
-      if (!state.profile) return;
+      // T47.3 — Render the "complete onboarding" hint instead of leaving the
+      // card spinning when the user hasn't finished onboarding yet.
+      if (!state.profile || !state.profile.name) {
+        try { renderAIQuestCard(null); } catch (e) {}
+        return;
+      }
       const force = !!(opts && opts.force);
       const today = todayStr();
       // T21.2 — if we have today's quest cached, render from cache and skip fetch
