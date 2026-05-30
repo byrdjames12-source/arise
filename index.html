@@ -2663,42 +2663,103 @@
        body.app-ready when onboarding finishes. */
     body:not(.app-ready) .fab-coach { display: none; }
 
-    /* T48.2 — Quick-log FAB. Bottom-LEFT corner so it doesn't fight the ARIA
-       FAB. Shown only on Quests / Progress screens via .show-quicklog body
-       class so we don't crowd Workouts/Fuel (which already have visible
-       primary "+ Log" buttons in their content area). */
-    .fab-quicklog {
+    /* T62.1 — Unified FAB menu. .fab-menu is the container that holds both
+       the floating button and the expanded items. When .open is added, the
+       items animate in above the FAB and the FAB shows × instead of the
+       sparkles icon. */
+    .fab-menu {
       position: fixed;
-      left: 16px;
-      bottom: calc(72px + env(safe-area-inset-bottom, 0));
-      width: 52px;
-      height: 52px;
+      right: 16px;
+      bottom: calc(80px + env(safe-area-inset-bottom, 0));
+      z-index: 95;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+    }
+    @media (min-width: 700px) {
+      .fab-menu { right: 24px; bottom: 28px; }
+    }
+    .fab-menu .fab-coach { position: static; bottom: auto; right: auto; }
+    .fab-menu-items {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .fab-menu.open .fab-menu-items {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .fab-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateX(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .fab-menu.open .fab-menu-item {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    /* Staggered entrance for each menu item */
+    .fab-menu.open .fab-menu-item:nth-child(1) { transition-delay: 0.02s; }
+    .fab-menu.open .fab-menu-item:nth-child(2) { transition-delay: 0.04s; }
+    .fab-menu.open .fab-menu-item:nth-child(3) { transition-delay: 0.06s; }
+    .fab-menu.open .fab-menu-item:nth-child(4) { transition-delay: 0.08s; }
+    .fab-menu.open .fab-menu-item:nth-child(5) { transition-delay: 0.10s; }
+    .fab-menu.open .fab-menu-item:nth-child(6) { transition-delay: 0.12s; }
+    .fab-menu.open .fab-menu-item:nth-child(7) { transition-delay: 0.14s; }
+    .fab-menu.open .fab-menu-item:nth-child(8) { transition-delay: 0.16s; }
+    .fab-menu-label {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 18px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    .fab-menu-icon {
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--gold) 0%, var(--accent) 100%);
-      border: 2px solid var(--gold);
-      display: none;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      color: #1a1f3a;
-      font-size: 28px;
+      color: #fff;
+      font-size: 14px;
       font-weight: 700;
-      line-height: 1;
-      z-index: 95;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      transition: transform 0.15s ease, border-color 0.15s ease;
-      padding: 0 0 4px 0;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
     }
-    body.show-quicklog .fab-quicklog { display: flex; }
-    .fab-quicklog:hover { transform: scale(1.08); }
-    .fab-quicklog:active { transform: scale(0.96); }
-    body:not(.app-ready) .fab-quicklog { display: none; }
-    @media (min-width: 700px) {
-      .fab-quicklog { bottom: 24px; left: 24px; width: 56px; height: 56px; font-size: 32px; }
+    .fab-menu-icon .icon-title-slot { color: #fff; }
+    /* FAB button — when menu open, swap icons */
+    .fab-coach .fab-coach-close { display: none; font-size: 26px; font-weight: 700; line-height: 1; }
+    .fab-menu.open .fab-coach .fab-coach-default { display: none; }
+    .fab-menu.open .fab-coach .fab-coach-close { display: inline-flex; align-items: center; justify-content: center; }
+    /* Backdrop appears only when menu is open so outside taps close it. */
+    .fab-menu-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.0);
+      z-index: 94;
+      display: none;
     }
-    [data-theme="light"] .fab-quicklog {
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-    }
+    body.fab-menu-open .fab-menu-backdrop { display: block; }
+    body:not(.app-ready) .fab-menu { display: none; }
 
     /* T41.3 — Light theme: ARIA's orb shipped with a dark navy fill that
        looked heavy against the bright page. Swap to a clean white→pale
@@ -3840,23 +3901,12 @@
             <div style="font-size:11px;color:var(--text3);" id="quest-date-label">Loading...</div>
           </div>
           <div class="topbar-right">
-            <!-- T49.1 — Fasting status chip. Hidden when no active fast; tap routes to Fuel. -->
-            <button id="quests-fasting-chip" onclick="switchTab('nutrition')"
-              style="display:none;background:linear-gradient(135deg, rgba(244,182,63,0.18), rgba(79,142,255,0.18));border:1px solid var(--gold);color:var(--gold);font-size:11px;padding:3px 8px;border-radius:12px;cursor:pointer;align-items:center;gap:4px;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:0.5px;"></button>
-            <!-- T48.1 — Tappable coin pill routes to Shop globally. -->
-            <button class="coin-pill" id="quests-coin-pill" onclick="switchTab('shop')"
-              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="quests-coin-count">0</span></button>
-            <!-- T57 — Global search trigger -->
-            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
-              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
+            <!-- T62.2 — Coin pill, search, and help moved into the FAB menu.
+                 Streak stays in the topbar since it's a per-screen status. -->
             <div
               style="font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;font-weight:700;display:inline-flex;align-items:center;gap:4px;"
               id="streak-display"><span class="icon-title-slot" data-icon="flame"
                 style="color:var(--gold);margin-right:0;"></span><span id="streak-display-value">0</span></div>
-            <!-- T47.1 — Topbar Generate button removed. Quest refresh lives
-                 inside the streak card; quest customization moved to a tertiary
-                 "Customize" link next to Regenerate so there's a single,
-                 calm CTA group. -->
           </div>
         </div>
         <div class="scroll" id="quests-scroll">
@@ -4001,11 +4051,7 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="trending"></span>Progress</div>
           <div class="topbar-right">
-            <!-- T48.1 — Tappable coin pill routes to Shop. -->
-            <button class="coin-pill" id="progress-coin-pill" onclick="switchTab('shop')"
-              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="progress-coin-count">0</span></button>
-            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
-              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
+            <!-- T62.2 — Coin/search/help moved into the FAB menu. -->
             <div class="tab-row" style="gap:4px;">
               <button class="tab-btn active" id="prog-tab-stats" onclick="switchProgressTab('stats')">Stats</button>
               <button class="tab-btn" id="prog-tab-goals" onclick="switchProgressTab('goals')">Goals</button>
@@ -4018,41 +4064,9 @@
         <div id="prog-pane-stats" class="scroll">
           <!-- T51.1 — Day-1 welcome card. -->
           <div id="progress-welcome-slot"></div>
-          <!-- T56 — Inline Daily Check-in. Quick weight + sleep + mood + energy
-               without opening a full modal. The full Log Today modal remains
-               available for richer entries (notes, measurements, photos). -->
-          <div class="card" id="quick-checkin-card" style="padding:10px 12px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-              <div style="font-size:11px;font-weight:700;letter-spacing:0.6px;color:var(--accent2);text-transform:uppercase;">Today's check-in</div>
-              <button class="btn btn-sm" onclick="openLogModal()" style="font-size:10px;color:var(--text3);">Full check-in</button>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:8px;">
-              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
-                Weight (lb)
-                <input id="quick-weight" type="number" inputmode="decimal" placeholder="—" step="0.1"
-                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
-              </label>
-              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
-                Sleep (h)
-                <input id="quick-sleep" type="number" inputmode="decimal" placeholder="—" step="0.25"
-                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
-              </label>
-              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
-                Mood (1-5)
-                <input id="quick-mood" type="number" inputmode="numeric" placeholder="—" min="1" max="5" step="1"
-                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
-              </label>
-              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
-                Energy (1-5)
-                <input id="quick-energy" type="number" inputmode="numeric" placeholder="—" min="1" max="5" step="1"
-                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
-              </label>
-            </div>
-            <div style="display:flex;justify-content:flex-end;margin-top:8px;">
-              <button class="btn btn-sm btn-primary" onclick="saveQuickCheckin()" style="font-size:11px;">Save</button>
-            </div>
-            <div id="quick-checkin-hint" style="font-size:10px;color:var(--text3);margin-top:4px;text-align:right;"></div>
-          </div>
+          <!-- T62.5 — Inline Daily Check-in card removed; the full Log Today
+               modal is now the only entry point (accessible from the FAB
+               menu's Daily Check-in pill or the +Daily Check-in button below). -->
           <!-- Hunter card -->
           <div class="hunter-card">
             <div class="hunter-card-content">
@@ -4168,11 +4182,7 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Workouts</div>
           <div class="topbar-right">
-            <!-- T48.1 — Tappable coin pill routes to Shop. -->
-            <button class="coin-pill" id="workouts-coin-pill" onclick="switchTab('shop')"
-              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="workouts-coin-count">0</span></button>
-            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
-              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
+            <!-- T62.2 — Coin/search/help moved into the FAB menu. -->
             <!-- T37.2/T37.4 — Order: Log → History → Library → Plans. Library
                  and History swapped so the more frequently used History sits
                  next to Log. Tab label trimmed: "Log Session" → "Log" to keep
@@ -4275,11 +4285,7 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="utensils"></span>Fuel Log</div>
           <div class="topbar-right">
-            <!-- T48.1 — Tappable coin pill routes to Shop. -->
-            <button class="coin-pill" id="fuel-coin-pill" onclick="switchTab('shop')"
-              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="fuel-coin-count">0</span></button>
-            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
-              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
+            <!-- T62.2 — Coin/search/help moved into the FAB menu. -->
             <!-- T34.23 — stripped per-button padding/font overrides so Fuel
                  tabs match the size of tabs on every other screen. -->
             <div class="tab-row" style="gap:4px;">
@@ -4294,11 +4300,8 @@
         <div class="nut-panes-wrap">
         <!-- Daily Tab -->
         <div id="nut-daily" class="scroll">
-          <!-- T45.1 — Fasting card. Inactive state shows a "Start Fast" CTA;
-               active state replaces the macro UI with a fasting status panel
-               (elapsed time, type, end-fast button). Macros stay rendered but
-               are visually suppressed via the .macros-suppressed class. -->
-          <div id="fasting-card-slot"></div>
+          <!-- T62.3 — Fasting card moved to Meal Prep tab (it's a planning
+               concern, not a daily intake concern). -->
           <!-- T51.2 — Day-1 hint card. renderDailyNutrition fills this when
                the user hasn't yet computed their personalized macros (state
                still on default 2000/150/200/60). Quick path to Profile. -->
@@ -4392,6 +4395,8 @@
         </div>
         <!-- Meal Prep Tab -->
         <div id="nut-prep" class="scroll" style="display:none;">
+          <!-- T62.3 — Fasting card lives here now. Planning-side concern. -->
+          <div id="fasting-card-slot"></div>
           <!-- T51.3 — Day-1 welcome card. renderMealPrep fills this with a
                single "Start meal prepping" card when nothing has been added
                (no recipes, no avoid list, no prep entries). The full grid
@@ -4457,11 +4462,7 @@
         <div class="topbar">
           <div class="topbar-title"><span class="icon-title-slot" data-icon="settings"></span>Profile</div>
           <div class="topbar-right">
-            <!-- T48.1 — Profile coin pill now routes to Shop (was a static div). -->
-            <button class="coin-pill" id="profile-coin-pill" onclick="switchTab('shop')"
-              title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="profile-coin-count">0</span></button>
-            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
-              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
+            <!-- T62.2 — Coin/search/help moved into the FAB menu. -->
           </div>
         </div>
         <div class="scroll">
@@ -4725,14 +4726,29 @@
        fades to opaque via .active during finishAriaIntro then fades out
        once ob0 is showing. Pointer-events:none so it never blocks taps. -->
   <div id="aria-intro-fade" style="position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:200;transition:opacity 0.6s ease;"></div>
-  <button class="fab-coach" id="fab-coach" onclick="openAICoachModal()" aria-label="Ask ARIA" title="Ask ARIA">
-    <span class="icon-title-slot" data-icon="sparkles"></span>
-  </button>
-  <!-- T48.2 — Quick-log FAB. Opens a small chooser modal with the four most
-       common log actions. Lives bottom-LEFT to avoid the ARIA FAB. Only
-       rendered on Quests/Progress so it doesn't crowd the Workouts/Fuel
-       screens (which already have their own primary log CTAs visible). -->
-  <button class="fab-quicklog" id="fab-quicklog" onclick="openQuickLogModal()" aria-label="Quick log" title="Quick log">+</button>
+  <!-- T62.1 — Unified FAB menu. One floating button at bottom-right (above
+       the bottom nav) expands into a labeled vertical menu of actions:
+       quick log entries, ARIA, Shop, Search, and Help. Replaces the prior
+       two-FAB design (ARIA orb + gold quick-log) AND absorbs the topbar's
+       coin/search/help icons into one discoverable place. -->
+  <div class="fab-menu" id="fab-menu">
+    <div class="fab-menu-items" id="fab-menu-items">
+      <button class="fab-menu-item" onclick="fabAction('workout')"><span class="fab-menu-label">Log Workout</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="dumbbell"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('meal')"><span class="fab-menu-label">Log Meal</span><span class="fab-menu-icon" style="background:var(--green2);"><span class="icon-title-slot" data-icon="utensils"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('water')"><span class="fab-menu-label">+ 8 oz Water</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="water"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('checkin')"><span class="fab-menu-label">Daily Check-in</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="trending"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('aria')"><span class="fab-menu-label">Ask ARIA</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="sparkles"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('shop')"><span class="fab-menu-label" id="fab-menu-shop-label">Shop · 0</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);color:var(--bg);font-size:13px;">🔍</span></button>
+      <button class="fab-menu-item" onclick="fabAction('help')"><span class="fab-menu-label">Help & Support</span><span class="fab-menu-icon" style="background:var(--red2);">?</span></button>
+    </div>
+    <button class="fab-coach" id="fab-coach" onclick="toggleFabMenu(event)" aria-label="Quick actions" title="Quick actions">
+      <span class="fab-coach-default"><span class="icon-title-slot" data-icon="sparkles"></span></span>
+      <span class="fab-coach-close">×</span>
+    </button>
+  </div>
+  <!-- Outside-tap catcher so the menu closes when the user taps anywhere else. -->
+  <div class="fab-menu-backdrop" id="fab-menu-backdrop" onclick="closeFabMenu()"></div>
   <!-- T57 — Global search overlay. Searches exercises, recipes, history,
        goals from one box. Triggered from a small search icon in any topbar
        (rendered next to coin pills via JS so we don't have to touch every
@@ -4747,19 +4763,8 @@
       <button class="btn btn-full" onclick="closeModal('modal-global-search')" style="margin-top:10px;">Close</button>
     </div>
   </div>
-  <div class="modal-overlay" id="modal-quick-log">
-    <div class="modal" style="max-width:340px;">
-      <div class="modal-title"><span class="icon-title-slot" data-icon="zap"></span>Quick Log</div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Tap what you want to record.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button class="btn btn-primary" onclick="closeModal('modal-quick-log');openLogExerciseModal();" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="dumbbell" data-icon-size="20"></span><span style="font-size:12px;">Log Workout</span></button>
-        <button class="btn btn-primary" onclick="closeModal('modal-quick-log');switchTab('nutrition');setTimeout(()=>openAddMealModal('extra'),100);" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="utensils" data-icon-size="20"></span><span style="font-size:12px;">Log Meal</span></button>
-        <button class="btn" onclick="closeModal('modal-quick-log');logWater(8);" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="water" data-icon-size="20"></span><span style="font-size:12px;">+ 8oz Water</span></button>
-        <button class="btn" onclick="closeModal('modal-quick-log');openLogModal();" style="padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="trending" data-icon-size="20"></span><span style="font-size:12px;">Daily Check-in</span></button>
-      </div>
-      <button class="btn btn-full" onclick="closeModal('modal-quick-log')" style="margin-top:10px;">Close</button>
-    </div>
-  </div>
+  <!-- T62.1 — modal-quick-log removed; the FAB menu replaces it. -->
+
   <!-- T33.2 — Tutorial overlay. Three layers: a dark backdrop with an SVG
        mask that "cuts out" a rounded rect around the highlighted target;
        a gold ring drawn on top for emphasis; and a tooltip card with
@@ -4823,13 +4828,12 @@
     <div class="modal">
       <div class="modal-title"><span class="icon-title-slot" data-icon="trending"></span>Log Today's Stats</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
+        <!-- T62.4 — Single-line labels so the input row stays aligned.
+             BF descriptor moves to a hint line BELOW the input. -->
         <div class="form-row">
           <div class="form-group"><label>Weight (lbs)</label><input type="number" id="log-weight" step="0.1"
               placeholder="e.g. 195.2"></div>
-          <div class="form-group"><label>Body Fat % <span
-                style="color:var(--text3);font-weight:400;font-size:10px;">(optional — auto-estimated from waist if
-                blank)</span></label><input type="number" id="log-bf" step="0.1" placeholder="leave blank to estimate">
-          </div>
+          <div class="form-group"><label>Body Fat %</label><input type="number" id="log-bf" step="0.1" placeholder="leave blank to estimate"><span style="color:var(--text3);font-weight:400;font-size:10px;line-height:1.3;">Optional — auto-estimated from waist if blank</span></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Waist (in)</label><input type="number" id="log-waist" step="0.1"
@@ -6225,29 +6229,9 @@ create trigger trg_user_state_updated_at
     // support is always one tap away. Done at boot rather than as 6 markup
     // edits (each screen has its own .topbar). Idempotent — won't double-add
     // if called multiple times.
-    function injectHelpButtons() {
-      try {
-        document.querySelectorAll('.topbar').forEach(bar => {
-          if (bar.querySelector('.topbar-help-btn')) return; // already injected
-          let rightSlot = bar.querySelector('.topbar-right');
-          // Some topbars don't have a .topbar-right container — create one.
-          if (!rightSlot) {
-            rightSlot = document.createElement('div');
-            rightSlot.className = 'topbar-right';
-            rightSlot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto;';
-            bar.appendChild(rightSlot);
-          }
-          const btn = document.createElement('button');
-          btn.className = 'topbar-help-btn';
-          btn.setAttribute('aria-label', 'Contact support');
-          btn.setAttribute('title', 'Contact support');
-          btn.onclick = openSupportModal;
-          btn.style.cssText = 'width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0;';
-          btn.textContent = '?';
-          rightSlot.appendChild(btn);
-        });
-      } catch (e) { console.warn('injectHelpButtons failed:', e); }
-    }
+    // T62.2 — Help is now in the FAB menu. This function is kept as a no-op
+    // so legacy callers don't error.
+    function injectHelpButtons() { /* moved to FAB menu */ }
 
     // ===== SUPPORT MESSAGES (T36.5) =====
     // Lets users send a support note without leaving the app. Writes to a
@@ -8686,49 +8670,9 @@ create trigger trg_user_state_updated_at
         </button>`;
       }).join('') + (hits.length > limited.length ? `<div style="font-size:11px;color:var(--text3);text-align:center;padding:6px;">${hits.length - limited.length} more matches — refine the query to narrow it down.</div>` : '');
     }
-    // T56 — Quick daily check-in. Writes the same shape that openLogModal()
-    // produces so downstream rendering (renderStats, weight trend, etc.) is
-    // unaffected. Same-day re-save updates in place.
-    function saveQuickCheckin() {
-      if (!Array.isArray(state.logs)) state.logs = [];
-      const today = todayStr();
-      const w = parseFloat((document.getElementById('quick-weight') || {}).value);
-      const sleep = parseFloat((document.getElementById('quick-sleep') || {}).value);
-      const mood = parseFloat((document.getElementById('quick-mood') || {}).value);
-      const energy = parseFloat((document.getElementById('quick-energy') || {}).value);
-      const hasAny = isFinite(w) || isFinite(sleep) || isFinite(mood) || isFinite(energy);
-      if (!hasAny) { showNotif('Enter a value first', 'var(--red2)'); return; }
-      let entry = state.logs.find(l => l && l.date === today);
-      if (!entry) {
-        entry = { date: today };
-        state.logs.push(entry);
-      }
-      if (isFinite(w)) entry.weight = w;
-      if (isFinite(sleep)) entry.sleep = sleep;
-      if (isFinite(mood)) entry.mood = mood;
-      if (isFinite(energy)) entry.energy = energy;
-      save();
-      try { renderStats(); } catch (e) {}
-      try { renderHomeDashboard(); } catch (e) {}
-      const hint = document.getElementById('quick-checkin-hint');
-      if (hint) {
-        hint.textContent = `Saved at ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-      }
-      showNotif('Check-in saved');
-    }
-    // T56 — Prefill inputs from today's existing log so re-saving updates,
-    // not overwrites with blanks. Called from renderStats.
-    function prefillQuickCheckin() {
-      const today = todayStr();
-      const entry = (state.logs || []).find(l => l && l.date === today);
-      const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v != null && isFinite(v)) ? v : ''; };
-      setV('quick-weight', entry && entry.weight);
-      setV('quick-sleep', entry && entry.sleep);
-      setV('quick-mood', entry && entry.mood);
-      setV('quick-energy', entry && entry.energy);
-      const hint = document.getElementById('quick-checkin-hint');
-      if (hint) hint.textContent = entry ? 'Tap Save to update' : '';
-    }
+    // T62.5 — saveQuickCheckin / prefillQuickCheckin removed; the inline
+    // quick check-in card was retired. The full Log Today modal handles all
+    // daily check-in writes.
     // T55 — Toggle between the live coach chat and the archive view. The
     // archive lists every assistant + user message grouped by date so the
     // user can search past coaching without scrolling the live thread.
@@ -8850,10 +8794,50 @@ create trigger trg_user_state_updated_at
       } catch (e) {}
       el.textContent = txt;
     }
-    // T48.2 — Open the quick-log chooser modal.
-    function openQuickLogModal() {
-      openModal('modal-quick-log');
-      try { hydrateIcons(document.getElementById('modal-quick-log')); } catch (e) {}
+    // T62.1 — FAB menu toggle. Opens/closes the labeled action list above
+    // the floating button. Closes on outside tap, on action selection, and
+    // when switching screens.
+    function toggleFabMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('fab-menu');
+      if (!menu) return;
+      const willOpen = !menu.classList.contains('open');
+      menu.classList.toggle('open', willOpen);
+      document.body.classList.toggle('fab-menu-open', willOpen);
+      if (willOpen) {
+        try { updateFabMenuShopLabel(); } catch (err) {}
+        try { hydrateIcons(menu); } catch (err) {}
+      }
+    }
+    function closeFabMenu() {
+      const menu = document.getElementById('fab-menu');
+      if (!menu) return;
+      menu.classList.remove('open');
+      document.body.classList.remove('fab-menu-open');
+    }
+    function updateFabMenuShopLabel() {
+      const el = document.getElementById('fab-menu-shop-label');
+      if (el) el.textContent = `Shop · ${(state.coins || 0).toLocaleString()}`;
+    }
+    // T62.1 — Route each FAB menu pill to its action. Always closes the menu
+    // first so the destination UI isn't covered.
+    function fabAction(kind) {
+      closeFabMenu();
+      // Small delay so the menu collapse doesn't overlap modal open animations
+      setTimeout(() => {
+        try {
+          switch (kind) {
+            case 'workout': openLogExerciseModal(); break;
+            case 'meal':    switchTab('nutrition'); setTimeout(() => openAddMealModal('extra'), 80); break;
+            case 'water':   logWater(8); break;
+            case 'checkin': openLogModal(); break;
+            case 'aria':    openAICoachModal(); break;
+            case 'shop':    switchTab('shop'); break;
+            case 'search':  openGlobalSearch(); break;
+            case 'help':    openSupportModal(); break;
+          }
+        } catch (err) { console.warn('fabAction', kind, err); }
+      }, 60);
     }
     // T48.1 — Keep every topbar coin pill (Quests / Progress / Workouts / Fuel / Profile)
     // in sync with state.coins. Called from save() and screen-switch.
@@ -11327,12 +11311,9 @@ create trigger trg_user_state_updated_at
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       const target = document.getElementById('screen-' + tab);
       if (target) target.classList.add('active');
-      // T48.2 — Quick-log FAB is only useful on screens where the user can't
-      // already see a primary "+ Log" button. Show on Quests + Progress.
-      try {
-        const showQL = (tab === 'quests' || tab === 'progress' || tab === 'stats' || tab === 'goals');
-        document.body.classList.toggle('show-quicklog', !!showQL);
-      } catch (e) {}
+      // T62.1 — Close the FAB menu on screen change so it doesn't sit open
+      // across navigations.
+      try { closeFabMenu(); } catch (e) {}
       // T48.1 / T49.1 — refresh topbar widgets on every tab switch.
       try { updateCoinPills(); } catch (e) {}
       try { updateQuestsFastingChip(); } catch (e) {}
@@ -13463,8 +13444,6 @@ create trigger trg_user_state_updated_at
     }
     // ===== STATS =====
     function renderStats() {
-      // T56 — Keep the inline quick-checkin synced with today's log entry.
-      try { prefillQuickCheckin(); } catch (e) {}
       // T51.1 — Day-1 welcome card. Show only when the user hasn't logged
       // their first daily check-in yet (state.logs is empty).
       try {
@@ -14986,8 +14965,8 @@ create trigger trg_user_state_updated_at
       // nothing happens" even though logWater() ran fine.
       if (!Array.isArray(state.todayMeals)) state.todayMeals = [];
       if (!Array.isArray(state.mealPrep)) state.mealPrep = [];
-      // T45.1 — Render the fasting card before the macro UI so it shows up at the top.
-      try { renderFastingCard(); } catch (e) {}
+      // T62.3 — Fasting card moved to the Meal Prep tab; renderFastingCard
+      // is called from switchNutTab('prep') instead.
       // T51.2 — Show a "personalize your targets" hint when macros are still
       // the literal default. This catches users who skipped or bounced out
       // of onboarding before macros were computed from their profile.
@@ -15450,6 +15429,8 @@ create trigger trg_user_state_updated_at
         try { renderBlocklist(); } catch (e) {}
         try { renderSavedRecipes(); } catch (e) {}
         try { renderRecipeSuggestions(); } catch (e) {}
+        // T62.3 — Fasting card lives on the Meal Prep tab now.
+        try { renderFastingCard(); } catch (e) {}
       }
       if (tab === 'daily') {
         try { renderDailyNutrition(); } catch (e) {}
@@ -16940,9 +16921,15 @@ create trigger trg_user_state_updated_at
       const el = document.getElementById('exercise-progression-list');
       if (!el) return;
       // T54 — Filter out manual-toggle entries (they earn streak/XP only).
-      const log = (state.workoutLog || []).filter(e => e.source !== 'manual-toggle');
+      // T62.6 — Progress shows TODAY's exercises only. The full history
+      // lives on Workouts > History, so this surface stays focused on
+      // "what did I just do" instead of dragging in every prior session.
+      const today = todayStr();
+      const log = (state.workoutLog || [])
+        .filter(e => e.source !== 'manual-toggle')
+        .filter(e => e.date === today);
       if (!log.length) {
-        el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:8px 0;">No exercises logged yet. Log a session from the Quests tab to start tracking progression.</div>`;
+        el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:14px 8px;font-size:12px;line-height:1.5;">Nothing logged today.<br><span style="font-size:11px;">Once you save a session it will show up here with today's top set. Full history lives on <strong>Workouts → History</strong>.</span></div>`;
         return;
       }
       // T25.6 — Group by NORMALIZED exercise name so plurals/punctuation merge.
