@@ -2676,7 +2676,15 @@
       flex-direction: column;
       align-items: flex-end;
       gap: 10px;
+      /* T63.3 — Container ignores pointer events so the invisible space
+         taken up by the collapsed menu items doesn't block scrolls/taps on
+         the right side of the screen. Children re-enable pointer-events
+         where they need to be tappable. */
+      pointer-events: none;
     }
+    .fab-menu .fab-coach { pointer-events: auto; }
+    .fab-menu.open .fab-menu-items { pointer-events: auto; }
+    .fab-menu.open .fab-menu-item { pointer-events: auto; }
     @media (min-width: 700px) {
       .fab-menu { right: 24px; bottom: 28px; }
     }
@@ -2745,7 +2753,24 @@
       flex-shrink: 0;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
     }
-    .fab-menu-icon .icon-title-slot { color: #fff; }
+    /* T63.4 — Center the icon-title-slot SVG inside each colored circle.
+       Without these rules the inline-flex slot defaults to baseline-align
+       and the icons sit slightly off-center. */
+    .fab-menu-icon .icon-title-slot {
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      margin: 0;
+    }
+    .fab-menu-icon .icon-title-slot svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+      stroke: currentColor;
+    }
     /* FAB button — when menu open, swap icons */
     .fab-coach .fab-coach-close { display: none; font-size: 26px; font-weight: 700; line-height: 1; }
     .fab-menu.open .fab-coach .fab-coach-default { display: none; }
@@ -4288,9 +4313,10 @@
             <!-- T62.2 — Coin/search/help moved into the FAB menu. -->
             <!-- T34.23 — stripped per-button padding/font overrides so Fuel
                  tabs match the size of tabs on every other screen. -->
+            <!-- T63.1 — Weekly subtab removed; the daily macro card already
+                 surfaces what users actually need to know day-to-day. -->
             <div class="tab-row" style="gap:4px;">
               <button class="tab-btn active" id="nut-tab-daily" onclick="switchNutTab('daily')">Daily</button>
-              <button class="tab-btn" id="nut-tab-weekly" onclick="switchNutTab('weekly')">Weekly</button>
               <button class="tab-btn" id="nut-tab-prep" onclick="switchNutTab('prep')">Meal Prep</button>
             </div>
           </div>
@@ -4388,11 +4414,8 @@
             </div>
           </div>
         </div>
-        <!-- Weekly Tab -->
-        <div id="nut-weekly" class="scroll" style="display:none;">
-          <div class="section-label">THIS WEEK AT A GLANCE</div>
-          <div id="weekly-macro-summary"></div>
-        </div>
+        <!-- T63.1 — Weekly pane removed. -->
+
         <!-- Meal Prep Tab -->
         <div id="nut-prep" class="scroll" style="display:none;">
           <!-- T62.3 — Fasting card lives here now. Planning-side concern. -->
@@ -4733,14 +4756,18 @@
        coin/search/help icons into one discoverable place. -->
   <div class="fab-menu" id="fab-menu">
     <div class="fab-menu-items" id="fab-menu-items">
+      <!-- T63.4 — Order: Daily Check-in, Log Workout, Log Meal, Water,
+           Ask ARIA, Shop (no count), Search, Help & Support. Each icon is
+           rendered via the standard data-icon system so it's centered in
+           its circle (was misaligned before). -->
+      <button class="fab-menu-item" onclick="fabAction('checkin')"><span class="fab-menu-label">Daily Check-in</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="trending"></span></span></button>
       <button class="fab-menu-item" onclick="fabAction('workout')"><span class="fab-menu-label">Log Workout</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="dumbbell"></span></span></button>
       <button class="fab-menu-item" onclick="fabAction('meal')"><span class="fab-menu-label">Log Meal</span><span class="fab-menu-icon" style="background:var(--green2);"><span class="icon-title-slot" data-icon="utensils"></span></span></button>
       <button class="fab-menu-item" onclick="fabAction('water')"><span class="fab-menu-label">+ 8 oz Water</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="water"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('checkin')"><span class="fab-menu-label">Daily Check-in</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="trending"></span></span></button>
       <button class="fab-menu-item" onclick="fabAction('aria')"><span class="fab-menu-label">Ask ARIA</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="sparkles"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('shop')"><span class="fab-menu-label" id="fab-menu-shop-label">Shop · 0</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);color:var(--bg);font-size:13px;">🔍</span></button>
-      <button class="fab-menu-item" onclick="fabAction('help')"><span class="fab-menu-label">Help & Support</span><span class="fab-menu-icon" style="background:var(--red2);">?</span></button>
+      <button class="fab-menu-item" onclick="fabAction('shop')"><span class="fab-menu-label">Shop</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);"><span class="icon-title-slot" data-icon="search"></span></span></button>
+      <button class="fab-menu-item" onclick="fabAction('help')"><span class="fab-menu-label">Help & Support</span><span class="fab-menu-icon" style="background:var(--red2);font-size:16px;font-weight:700;">?</span></button>
     </div>
     <button class="fab-coach" id="fab-coach" onclick="toggleFabMenu(event)" aria-label="Quick actions" title="Quick actions">
       <span class="fab-coach-default"><span class="icon-title-slot" data-icon="sparkles"></span></span>
@@ -5567,6 +5594,8 @@
       salad: '<path d="M7 21h10"/><path d="M5 21a8 8 0 0 1-2-5.5c0-1.1.8-2 1.8-2 .66 0 1.3.3 1.7.8 1.3-1.5 3-2.3 4.5-2.3 1.5 0 3.2.8 4.5 2.3.4-.5 1-.8 1.7-.8 1 0 1.8.9 1.8 2A8 8 0 0 1 17 21"/>',
       ghost: '<path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/>',
       sparkles: '<path d="M9.9 15.5A2 2 0 0 0 8.5 14.1l-6.1-1.6a.5.5 0 0 1 0-1L8.5 9.9A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5A2 2 0 0 0 15.5 9.9l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z"/>',
+      // T63.4 — Line-graphic search (magnifying glass) for the FAB menu.
+      search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/>',
       hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22"/><path d="M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4A2 2 0 0 0 17 6.2V2"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       rocket: '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.7-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
@@ -8805,7 +8834,6 @@ create trigger trg_user_state_updated_at
       menu.classList.toggle('open', willOpen);
       document.body.classList.toggle('fab-menu-open', willOpen);
       if (willOpen) {
-        try { updateFabMenuShopLabel(); } catch (err) {}
         try { hydrateIcons(menu); } catch (err) {}
       }
     }
@@ -8814,10 +8842,6 @@ create trigger trg_user_state_updated_at
       if (!menu) return;
       menu.classList.remove('open');
       document.body.classList.remove('fab-menu-open');
-    }
-    function updateFabMenuShopLabel() {
-      const el = document.getElementById('fab-menu-shop-label');
-      if (el) el.textContent = `Shop · ${(state.coins || 0).toLocaleString()}`;
     }
     // T62.1 — Route each FAB menu pill to its action. Always closes the menu
     // first so the destination UI isn't covered.
@@ -14286,8 +14310,9 @@ create trigger trg_user_state_updated_at
           <div style="display:flex;align-items:center;gap:4px;">
             <input type="text" list="tracker-ex-list" value="${(row.exercise || '').replace(/"/g, '&quot;')}" placeholder="${sheet.muscleGroup ? 'pick ' + sheet.muscleGroup.toLowerCase() + ' exercise' : 'exercise'}" oninput="updateTrackerExercise(${r}, this.value)" style="flex:1;padding:5px;background:transparent;border:none;color:var(--text);font-size:12px;min-width:0;">
             ${variantTag}
+            <!-- T63.2 — Per-row rest-timer button removed; the sheet-level
+                 "Rest: 60s / 90s / 3min" buttons cover this concern. -->
             <button onclick="openTrackerVariantPicker(${r})" title="Equipment variant (Cable / Smith / Free / etc.)" style="background:transparent;border:1px solid var(--border);color:var(--accent);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">📐</button>
-            <button onclick="startRestTimer(90)" title="Start 90s rest timer" style="background:transparent;border:1px solid var(--border);color:var(--accent2);font-size:11px;padding:2px 6px;border-radius:3px;cursor:pointer;flex-shrink:0;">⏱</button>
           </div>
         </td>
         ${setCells}
@@ -14863,7 +14888,9 @@ create trigger trg_user_state_updated_at
     function renderNutrition() {
       applyMealPrepVisibility();
       renderDailyNutrition();
-      renderWeeklyNutrition();
+      // T63.1 — Weekly pane retired; renderWeeklyNutrition kept as a no-op
+      // safety call so legacy callers don't error.
+      try { renderWeeklyNutrition && renderWeeklyNutrition(); } catch (e) {}
       renderMealPrep();
       renderBlocklist();
       renderSavedRecipes();
@@ -15415,15 +15442,16 @@ create trigger trg_user_state_updated_at
     function switchNutTab(tab) {
       // Respect the meal-prep toggle: if disabled, redirect prep requests to daily.
       if (tab === 'prep' && state.settings && state.settings.mealPrepEnabled === false) tab = 'daily';
-      ['daily', 'weekly', 'prep'].forEach(t => {
-        document.getElementById('nut-' + t).style.display = t === tab ? 'flex' : 'none';
-        document.getElementById('nut-tab-' + t).classList.toggle('active', t === tab);
+      // T63.1 — Legacy 'weekly' alias routes to 'daily' so any old callers
+      // (cloud snapshots, tour steps) don't break.
+      if (tab === 'weekly') tab = 'daily';
+      ['daily', 'prep'].forEach(t => {
+        const pane = document.getElementById('nut-' + t);
+        const btn = document.getElementById('nut-tab-' + t);
+        if (pane) pane.style.display = t === tab ? 'flex' : 'none';
+        if (btn) btn.classList.toggle('active', t === tab);
       });
-      // T21.4 — re-render the active pane's data on every switch. Without this, a
-      // cloud sync that landed while the user was on a different tab won't be
-      // reflected (avoid list shows pre-sync items, prep list looks empty even when
-      // data exists). Cheap to call, idempotent.
-      if (tab === 'weekly') renderWeeklyNutrition();
+      // T21.4 — re-render the active pane's data on every switch.
       if (tab === 'prep') {
         try { renderMealPrep(); } catch (e) {}
         try { renderBlocklist(); } catch (e) {}
