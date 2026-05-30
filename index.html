@@ -1957,6 +1957,61 @@
       color: var(--text);
     }
 
+    /* T53.3 — Narrow-phone tightening so the four hunter-card chips
+       (weight / BF / Rank / Avatar) fit on one row instead of wrapping
+       and pushing the XP bar down. */
+    @media (max-width: 400px) {
+      .avatar-chip {
+        padding: 3px 7px;
+        font-size: 10px;
+        letter-spacing: 0.3px;
+      }
+    }
+
+    /* T53.5 — Dim the ARIA FAB when the user is near the bottom of a
+       scrollable pane (Fuel daily, Quests, Workouts, etc.). Keeps the FAB
+       discoverable but lets bottom-of-screen buttons (Log Meal, Water reset)
+       breathe instead of being covered. JS toggles .fab-coach-dimmed on
+       <body> based on each .scroll pane's position. */
+    body.fab-coach-dimmed .fab-coach {
+      opacity: 0.35;
+      pointer-events: auto;
+      transition: opacity 0.18s ease;
+    }
+    body.fab-coach-dimmed .fab-coach:hover {
+      opacity: 1;
+    }
+    .fab-coach {
+      transition: opacity 0.18s ease, transform 0.15s ease, border-color 0.15s ease;
+    }
+    /* T53.4 — Tiny ± steppers next to reps + weight inputs on the Log
+       Exercise modal. Thumb-friendly without taking much grid space. */
+    .log-set-stepbtn {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 14px;
+      font-weight: 700;
+      width: 22px;
+      flex-shrink: 0;
+      cursor: pointer;
+      border-radius: 4px;
+      line-height: 1;
+      padding: 0;
+      user-select: none;
+    }
+    .log-set-stepbtn:hover { background: var(--bg3); color: var(--text); }
+    .log-set-stepbtn:active { transform: scale(0.92); }
+    /* Hide the native spinners — our ± buttons replace them */
+    .log-set-stepper input[type="number"]::-webkit-inner-spin-button,
+    .log-set-stepper input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .log-set-stepper input[type="number"] {
+      -moz-appearance: textfield;
+    }
+
     /* ATTRIBUTE ALLOCATOR */
     .attr-alloc-row {
       display: flex;
@@ -3289,7 +3344,7 @@
               <span class="icon-title-slot" data-icon="swords" data-icon-size="32" style="flex-shrink:0;margin:0;color:var(--gold);width:32px;height:32px;"></span>
               <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:2px;">Train smarter</div>
-                <div style="font-size:12px;color:var(--text3);line-height:1.5;">Multi-week programs, real-time tracking, smart deloads when an injury flags. Built around your equipment, schedule, and goals.</div>
+                <div style="font-size:12px;color:var(--text3);line-height:1.5;">Multi-week plans, real-time tracking, smart deloads when an injury flags. Built around your equipment, schedule, and goals.</div>
               </div>
             </div>
             <div style="display:flex;gap:12px;align-items:flex-start;">
@@ -3653,12 +3708,12 @@
           <div style="display:flex;gap:8px;">
             <button class="btn" onclick="obBack(3)" style="flex:0 0 80px;"><span class="icon-title-slot"
                 data-icon="arrowleft" data-icon-size="14"></span>Back</button>
-            <button class="btn btn-primary btn-full btn-with-icon" onclick="obNext(3)">Next: Nutrition<span
+            <button class="btn btn-primary btn-full btn-with-icon" onclick="obNext(3)">Next: Fuel<span
                 class="icon-title-slot" data-icon="arrowright" data-icon-size="14"></span></button>
           </div>
         </div>
       </div>
-      <!-- Step 4: Nutrition -->
+      <!-- Step 4: Fuel -->
       <div id="ob4" class="ob-screen">
         <div class="ob-header">
           <div
@@ -3791,6 +3846,9 @@
             <!-- T48.1 — Tappable coin pill routes to Shop globally. -->
             <button class="coin-pill" id="quests-coin-pill" onclick="switchTab('shop')"
               title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="quests-coin-count">0</span></button>
+            <!-- T57 — Global search trigger -->
+            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
+              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
             <div
               style="font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;font-weight:700;display:inline-flex;align-items:center;gap:4px;"
               id="streak-display"><span class="icon-title-slot" data-icon="flame"
@@ -3826,6 +3884,12 @@
               <div class="home-id-today-split" id="home-id-today-split">—</div>
             </div>
           </div>
+          <!-- T61 — First Session checklist. Auto-shows on Quests after a
+               new user completes onboarding (state.profile exists) until they
+               complete three minimal actions: log weight, log a meal, log a
+               workout. Each step auto-ticks when its data arrives. The user
+               can dismiss the card. -->
+          <div id="first-session-slot"></div>
           <!-- Streak row -->
           <div class="card" style="padding:10px 12px;">
             <div class="streak-wrap">
@@ -3859,29 +3923,35 @@
           <!-- Quest list -->
           <div id="quest-list-container"></div>
           <!-- AI Quest -->
-          <div class="section-label" data-desktop-hide="ai-label" style="margin-top:4px;">AI-POWERED CHALLENGE</div>
+          <div class="section-label" data-desktop-hide="ai-label" style="margin-top:4px;">ARIA CHALLENGE</div>
           <div class="ai-card" id="ai-quest-card">
             <div class="ai-card-content">
               <div class="ai-card-header">
                 <span class="ai-tag"><span class="icon-title-slot" data-icon="zap"
                     style="color:var(--accent);margin-right:0;"></span>SYSTEM</span>
-                <span class="ai-tag" style="color:var(--text3);letter-spacing:1.5px;">DAILY CHALLENGE</span>
+                <span class="ai-tag" style="color:var(--text3);letter-spacing:1.5px;">ARIA CHALLENGE</span>
               </div>
               <div class="ai-loading" id="ai-loading-indicator">
                 <div class="ai-dot"></div>
                 <div class="ai-dot"></div>
                 <div class="ai-dot"></div>
-                <span style="font-size:12px;">Generating daily challenge...</span>
+                <span style="font-size:12px;">Drafting today's challenge…</span>
               </div>
               <div class="ai-content" id="ai-quest-content" style="display:none;"></div>
             </div>
           </div>
           <!-- Training Log -->
           <div class="section-label"
-            style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;">
+            style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
             <span>TRAINING LOG</span>
-            <button class="btn btn-sm" onclick="openLogExerciseModal()" style="padding:3px 8px;font-size:11px;">+ Log
-              Exercise</button>
+            <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <!-- T54 — One-tap workout credit for users who don't itemize sets.
+                   Creates a synthetic workoutLog entry flagged
+                   source:'manual-toggle' so streak/XP credit, but it never
+                   appears in progression charts. -->
+              <button class="btn btn-sm" id="quick-workout-toggle" onclick="quickLogWorkout()" style="padding:3px 8px;font-size:11px;color:var(--green);border-color:var(--green);">✓ Worked out</button>
+              <button class="btn btn-sm" onclick="openLogExerciseModal()" style="padding:3px 8px;font-size:11px;">+ Log Workout</button>
+            </div>
           </div>
           <div id="training-log-today"></div>
           <!-- T22.2 — Desktop-only home dashboard: trends panel (right column).
@@ -3934,6 +4004,8 @@
             <!-- T48.1 — Tappable coin pill routes to Shop. -->
             <button class="coin-pill" id="progress-coin-pill" onclick="switchTab('shop')"
               title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="progress-coin-count">0</span></button>
+            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
+              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
             <div class="tab-row" style="gap:4px;">
               <button class="tab-btn active" id="prog-tab-stats" onclick="switchProgressTab('stats')">Stats</button>
               <button class="tab-btn" id="prog-tab-goals" onclick="switchProgressTab('goals')">Goals</button>
@@ -3944,9 +4016,43 @@
              wrapper uses display:contents on mobile to keep the original tab toggle. -->
         <div class="prog-panes-wrap">
         <div id="prog-pane-stats" class="scroll">
-          <!-- + Log Today CTA pinned at top of Stats subtab -->
-          <div style="display:flex;justify-content:flex-end;margin-bottom:-4px;"><button class="btn btn-sm"
-              onclick="openLogModal()">+ Log Today</button></div>
+          <!-- T51.1 — Day-1 welcome card. -->
+          <div id="progress-welcome-slot"></div>
+          <!-- T56 — Inline Daily Check-in. Quick weight + sleep + mood + energy
+               without opening a full modal. The full Log Today modal remains
+               available for richer entries (notes, measurements, photos). -->
+          <div class="card" id="quick-checkin-card" style="padding:10px 12px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+              <div style="font-size:11px;font-weight:700;letter-spacing:0.6px;color:var(--accent2);text-transform:uppercase;">Today's check-in</div>
+              <button class="btn btn-sm" onclick="openLogModal()" style="font-size:10px;color:var(--text3);">Full check-in</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:8px;">
+              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
+                Weight (lb)
+                <input id="quick-weight" type="number" inputmode="decimal" placeholder="—" step="0.1"
+                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
+                Sleep (h)
+                <input id="quick-sleep" type="number" inputmode="decimal" placeholder="—" step="0.25"
+                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
+                Mood (1-5)
+                <input id="quick-mood" type="number" inputmode="numeric" placeholder="—" min="1" max="5" step="1"
+                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;">
+                Energy (1-5)
+                <input id="quick-energy" type="number" inputmode="numeric" placeholder="—" min="1" max="5" step="1"
+                  style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:700;text-align:center;">
+              </label>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+              <button class="btn btn-sm btn-primary" onclick="saveQuickCheckin()" style="font-size:11px;">Save</button>
+            </div>
+            <div id="quick-checkin-hint" style="font-size:10px;color:var(--text3);margin-top:4px;text-align:right;"></div>
+          </div>
           <!-- Hunter card -->
           <div class="hunter-card">
             <div class="hunter-card-content">
@@ -4014,18 +4120,14 @@
             <div id="exercise-progression-list" style="font-size:12px;display:flex;flex-direction:column;gap:10px;">
             </div>
           </div>
-          <!-- Export/Import — moved here from former screen-stats -->
+          <!-- T52.3 — Export/Import deduped. The full set lives on Profile > Tools.
+               This card is now a single shortcut to keep the trail discoverable. -->
           <div class="card">
             <div class="card-title">Data</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-sm btn-with-icon" onclick="exportData()"><span class="icon-title-slot"
-                  data-icon="download"></span>Export CSV</button>
-              <label class="btn btn-sm btn-with-icon" style="cursor:pointer;"><span class="icon-title-slot"
-                  data-icon="upload"></span>Import CSV<input type="file" accept=".csv,.json" style="display:none;"
-                  onchange="importData(this)"></label>
-              <button class="btn btn-sm btn-with-icon" onclick="exportJSON()"><span class="icon-title-slot"
-                  data-icon="download"></span>Export JSON</button>
-            </div>
+            <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-bottom:8px;">Backup, export, and import live under Profile → Tools.</div>
+            <button class="btn btn-sm btn-with-icon" onclick="switchTab('profile');setTimeout(()=>{try{switchProfileTab('tools')}catch(e){}},80);">
+              <span class="icon-title-slot" data-icon="settings"></span>Open Tools
+            </button>
           </div>
         </div>
         <!-- Goals subtab pane — moved from former screen-goals; tracker subtab removed (Workouts is its own nav now). -->
@@ -4069,6 +4171,8 @@
             <!-- T48.1 — Tappable coin pill routes to Shop. -->
             <button class="coin-pill" id="workouts-coin-pill" onclick="switchTab('shop')"
               title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="workouts-coin-count">0</span></button>
+            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
+              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
             <!-- T37.2/T37.4 — Order: Log → History → Library → Plans. Library
                  and History swapped so the more frequently used History sits
                  next to Log. Tab label trimmed: "Log Session" → "Log" to keep
@@ -4107,7 +4211,7 @@
                     <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;letter-spacing:1px;">EXERCISE HISTORY</div>
                     <div style="font-size:11px;color:var(--text3);">Last logged · current best · suggested next target</div>
                   </div>
-                  <input type="text" id="hist-search" placeholder="Filter by name..." oninput="onHistorySearch(this.value)" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;width:180px;">
+                  <input type="text" id="hist-search" placeholder="Filter by name..." oninput="onHistorySearch(this.value)" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;flex:1;min-width:120px;max-width:240px;">
                 </div>
                 <div id="exercise-history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
               </div>
@@ -4131,19 +4235,19 @@
             <div class="work-pane-collapse-btn" onclick="toggleWorkoutPaneCollapsed('prog')" title="Collapse this pane"></div>
             <div class="work-pane-content">
               <div style="margin-bottom:10px;">
-                <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;letter-spacing:1px;">PROGRAMS</div>
+                <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;letter-spacing:1px;">PLANS</div>
                 <div style="font-size:11px;color:var(--text3);">Pick a multi-week plan. The tracker will pre-fill today's prescribed exercises with target sets, reps, and a suggested weight.</div>
                 <!-- T33.10 — Surface ARIA as the customization path. Three presets
                      can't fit every hunter; ARIA can build a plan around their
                      equipment, schedule, experience, and goal. -->
-                <div style="font-size:11px;color:var(--gold,#ffd76e);background:rgba(255,215,110,0.08);border:1px solid rgba(255,215,110,0.3);border-radius:6px;padding:8px 10px;margin-top:8px;line-height:1.45;">
-                  <strong>Don't see the right fit?</strong> Ask ARIA for a custom program tailored to your equipment, schedule, and goal — she can draft one in seconds.
+                <div style="font-size:11px;color:var(--text2);background:rgba(127,119,221,0.06);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:8px;line-height:1.45;">
+                  None of these match? You can build your own from the tracker, or have ARIA draft one based on your equipment and goal.
                 </div>
               </div>
               <div id="programs-active-slot"></div>
               <div id="programs-list" style="display:flex;flex-direction:column;gap:10px;"></div>
             </div>
-            <div class="work-pane-collapsed-rail" onclick="toggleWorkoutPaneCollapsed('prog')" title="Expand">PROGRAMS</div>
+            <div class="work-pane-collapsed-rail" onclick="toggleWorkoutPaneCollapsed('prog')" title="Expand">PLANS</div>
           </div>
           <div id="work-pane-lib" class="scroll" style="display:none;">
             <div class="work-pane-collapse-btn" onclick="toggleWorkoutPaneCollapsed('lib')" title="Collapse this pane"></div>
@@ -4174,6 +4278,8 @@
             <!-- T48.1 — Tappable coin pill routes to Shop. -->
             <button class="coin-pill" id="fuel-coin-pill" onclick="switchTab('shop')"
               title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="fuel-coin-count">0</span></button>
+            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
+              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
             <!-- T34.23 — stripped per-button padding/font overrides so Fuel
                  tabs match the size of tabs on every other screen. -->
             <div class="tab-row" style="gap:4px;">
@@ -4193,6 +4299,10 @@
                (elapsed time, type, end-fast button). Macros stay rendered but
                are visually suppressed via the .macros-suppressed class. -->
           <div id="fasting-card-slot"></div>
+          <!-- T51.2 — Day-1 hint card. renderDailyNutrition fills this when
+               the user hasn't yet computed their personalized macros (state
+               still on default 2000/150/200/60). Quick path to Profile. -->
+          <div id="fuel-targets-slot"></div>
           <div class="card" id="macros-card-daily">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
               <div>
@@ -4212,8 +4322,7 @@
           <!-- Today's meals -->
           <div class="section-label">TODAY'S MEALS</div>
           <div id="today-meals-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-          <button class="btn btn-full" id="log-food-btn" onclick="openAddMealModal('extra')" style="border-style:dashed;margin-top:4px;">+
-            Log additional food</button>
+          <button class="btn btn-full" id="log-food-btn" onclick="openAddMealModal('extra')" style="border-style:dashed;margin-top:4px;">+ Log Meal</button>
           <button class="btn btn-full btn-with-icon" onclick="openAddMealModal('swap')"
             style="border-style:dashed;"><span class="icon-title-slot" data-icon="swap"
               data-icon-size="14"></span>Substitute a meal prep meal</button>
@@ -4283,6 +4392,12 @@
         </div>
         <!-- Meal Prep Tab -->
         <div id="nut-prep" class="scroll" style="display:none;">
+          <!-- T51.3 — Day-1 welcome card. renderMealPrep fills this with a
+               single "Start meal prepping" card when nothing has been added
+               (no recipes, no avoid list, no prep entries). The full grid
+               below is hidden via inline display when this card is visible. -->
+          <div id="meal-prep-welcome-slot"></div>
+          <div id="meal-prep-sections">
           <!-- AVOID LIST (allergens + disliked ingredients) -->
           <div class="section-label"><span class="icon-title-slot" data-icon="ban"></span>AVOID LIST</div>
           <div class="card" style="padding:10px;">
@@ -4321,6 +4436,7 @@
             <div style="font-size:12px;">Upload meal prep CSV or photo</div>
             <input type="file" id="prep-upload" accept=".csv,.jpg,.png" onchange="handlePrepUpload(this)">
           </label>
+          </div><!-- /#meal-prep-sections -->
         </div>
         </div><!-- /.nut-panes-wrap -->
         <div class="nav">
@@ -4344,177 +4460,211 @@
             <!-- T48.1 — Profile coin pill now routes to Shop (was a static div). -->
             <button class="coin-pill" id="profile-coin-pill" onclick="switchTab('shop')"
               title="Open the Hunter Shop" style="background:none;border:none;cursor:pointer;padding:0;"><span class="icon-title-slot" data-icon="coin"></span><span id="profile-coin-count">0</span></button>
+            <button class="topbar-search-btn" onclick="openGlobalSearch()" title="Search"
+              style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:4px 6px;font-size:12px;">🔍</button>
           </div>
         </div>
         <div class="scroll">
-          <!-- Hunter Status -->
-          <div class="card" id="profile-hunter-status" style="padding:14px;"></div>
-          <!-- Attributes UI removed: was tied to the avatar concept (STR/AGI/VIT/INT/PER).
-           state.attributes + renderAttributeAllocator remain in code for backwards
-           compatibility / future reintroduction; just no longer surfaced to the user. -->
-          <!-- Shop entry -->
-          <button class="btn btn-primary btn-full" onclick="switchTab('shop')" style="margin-top:4px;"><span
-              class="icon-title-slot" data-icon="store"></span><span data-label-key="enter_hunter_shop">Enter Hunter
-              Shop</span></button>
-          <div class="section-label" style="margin-top:4px;">BIOMETRICS</div>
-          <div class="card" id="profile-bio-display"></div>
-          <!-- T27.6 — Equipment availability. Drives the "Find substitute"
-               filter and (when ARIA is configured) the AI Coach's plan output. -->
-          <div class="section-label" style="margin-top:4px;">EQUIPMENT</div>
-          <div class="card" id="profile-equipment-display"></div>
-          <div class="section-label" style="margin-top:4px;">DIETARY PREFERENCES</div>
-          <div class="card" id="profile-diet-display"></div>
-          <div class="section-label" style="margin-top:4px;">WORKOUT SPLIT</div>
-          <div id="split-recommender-slot"></div>
-          <div class="card" style="padding:10px;">
-            <table class="split-table" id="split-table-display"></table>
-            <div id="split-actions-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
-              <button class="btn btn-sm" onclick="promptSaveCurrentSplit()" style="font-size:11px;">Save Current as Preset…</button>
-              <button class="btn btn-sm" onclick="showRecommenderCard()" style="font-size:11px;">Get a Recommendation</button>
-              <button class="btn btn-sm" onclick="clearWorkoutSplit()"
-                style="font-size:11px;color:var(--red2);border-color:var(--red2);">Clear Split</button>
-            </div>
+          <!-- T52.1 — Profile subtabs. Reorganized from a 15-section scroll
+               into 4 focused panes. Each pane is rendered the same; we just
+               toggle display. switchProfileTab() handles the switch. -->
+          <div class="tab-row" style="gap:4px;margin-bottom:8px;flex-wrap:wrap;">
+            <button class="tab-btn active" id="prof-tab-profile" onclick="switchProfileTab('profile')">Profile</button>
+            <button class="tab-btn" id="prof-tab-settings" onclick="switchProfileTab('settings')">Settings</button>
+            <button class="tab-btn" id="prof-tab-modes" onclick="switchProfileTab('modes')">Modes</button>
+            <button class="tab-btn" id="prof-tab-tools" onclick="switchProfileTab('tools')">Tools</button>
           </div>
-          <div id="split-tips-slot"></div>
-          <div id="saved-splits-slot"></div>
-          <!-- Coach Tips — beginner-only, rotating coaching content. Hidden when beginner mode is off. -->
-          <div class="beginner-only">
-            <div class="section-label" style="margin-top:4px;">COACH TIPS</div>
-            <div id="coach-tips-slot"></div>
-          </div>
-          <!-- Graduation prompt slot — surfaces a one-time CTA when criteria are met. Beginner-only. -->
-          <div class="beginner-only">
-            <div id="graduation-slot"></div>
-          </div>
-          <div class="section-label" style="margin-top:4px;">MACRO SETTINGS</div>
-          <div class="card" id="profile-macro-display"></div>
-          <div id="profile-macro-warning"></div>
-          <div class="section-label" style="margin-top:4px;">SETTINGS</div>
-          <div class="card">
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <div class="toggle-wrap">
-                <div class="toggle" id="beginner-mode-toggle" onclick="toggleBeginnerMode()"></div>
-                <div class="toggle-label">Beginner mode <span style="color:var(--text3);font-size:10px;">— hides
-                    advanced fields, gentler defaults</span></div>
-              </div>
-              <div class="toggle-wrap">
-                <div class="toggle" id="plain-mode-toggle" onclick="togglePlainMode()"></div>
-                <div class="toggle-label">Plain mode <span style="color:var(--text3);font-size:10px;">— swaps Solo
-                    Leveling theme labels for neutral fitness terms</span></div>
-              </div>
-              <div class="toggle-wrap">
-                <div class="toggle on" id="adaptive-toggle-main"
-                  onclick="this.classList.toggle('on');state.settings.adaptiveMacros=this.classList.contains('on');save();">
-                </div>
-                <div class="toggle-label">Adaptive macro adjustments</div>
-              </div>
-              <div class="toggle-wrap">
-                <div class="toggle on" id="penalty-toggle"
-                  onclick="this.classList.toggle('on');state.settings.penaltyMode=this.classList.contains('on');save();">
-                </div>
-                <div class="toggle-label">Quest penalty mode</div>
-              </div>
-              <div class="toggle-wrap">
-                <div class="toggle on" id="notify-toggle"
-                  onclick="this.classList.toggle('on');state.settings.notify=this.classList.contains('on');save();">
-                </div>
-                <div class="toggle-label">Daily quest reminders</div>
-              </div>
-              <div class="toggle-wrap">
-                <div class="toggle on" id="mealprep-toggle"
-                  onclick="this.classList.toggle('on');state.settings.mealPrepEnabled=this.classList.contains('on');save();if(typeof applyMealPrepVisibility==='function')applyMealPrepVisibility();if(typeof renderMealPrep==='function')renderMealPrep();if(typeof renderDailyNutrition==='function')renderDailyNutrition();">
-                </div>
-                <div class="toggle-label">Show meal prep dashboard</div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:4px;">
-                <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Vacation mode <span
-                    style="color:var(--text3);font-size:10px;">— two flavors when you can't do your normal lifts</span>
-                </div>
-                <select id="vacation-select" onchange="setVacationMode(this.value)"
-                  style="font-size:12px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-                  <option value="off">Off — normal training</option>
-                  <option value="travel">Travel mode — bodyweight quest substitutions</option>
-                  <option value="rest">Rest block — skip workout quests entirely</option>
-                </select>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:4px;">
-                <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Recovery Mode <span
-                    style="color:var(--text3);font-size:10px;">— route around injured muscle groups</span>
-                </div>
-                <button class="btn btn-sm" id="injury-mode-button" onclick="openInjuryModal()" style="font-size:12px;padding:6px 10px;">Manage Active Injuries…</button>
+          <!-- ===================== PROFILE pane ===================== -->
+          <div id="prof-pane-profile">
+            <!-- Hunter Status -->
+            <div class="card" id="profile-hunter-status" style="padding:14px;"></div>
+            <!-- Shop entry -->
+            <button class="btn btn-primary btn-full" onclick="switchTab('shop')" style="margin-top:4px;"><span
+                class="icon-title-slot" data-icon="store"></span><span data-label-key="enter_hunter_shop">Enter Hunter
+                Shop</span></button>
+            <div class="section-label" style="margin-top:4px;">BIOMETRICS</div>
+            <div class="card" id="profile-bio-display"></div>
+            <!-- T27.6 — Equipment availability. Drives the "Find substitute"
+                 filter and (when ARIA is configured) the AI Coach's plan output. -->
+            <div class="section-label" style="margin-top:4px;">EQUIPMENT</div>
+            <div class="card" id="profile-equipment-display"></div>
+            <div class="section-label" style="margin-top:4px;">DIETARY PREFERENCES</div>
+            <div class="card" id="profile-diet-display"></div>
+            <div class="section-label" style="margin-top:4px;">WORKOUT SPLIT</div>
+            <div id="split-recommender-slot"></div>
+            <div class="card" style="padding:10px;">
+              <table class="split-table" id="split-table-display"></table>
+              <div id="split-actions-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+                <button class="btn btn-sm" onclick="promptSaveCurrentSplit()" style="font-size:11px;">Save Current as Preset…</button>
+                <button class="btn btn-sm" onclick="showRecommenderCard()" style="font-size:11px;">Get a Recommendation</button>
+                <button class="btn btn-sm" onclick="clearWorkoutSplit()"
+                  style="font-size:11px;color:var(--red2);border-color:var(--red2);">Clear Split</button>
               </div>
             </div>
-          </div>
-          <!-- T35.3 — Appearance: theme toggle. Rendered by renderThemeCard()
-               in renderProfile(). Segmented control for Dark / Light / System. -->
-          <div class="section-label" style="margin-top:4px;">APPEARANCE</div>
-          <div class="card" id="theme-settings"></div>
-          <div class="section-label" style="margin-top:4px;">REMINDER ALERTS</div>
-          <div class="card" id="reminder-settings"></div>
-          <!-- Cloud Account — sign in/out + status. Hidden when Supabase isn't configured. -->
-          <div class="section-label" style="margin-top:4px;">CLOUD ACCOUNT</div>
-          <div class="card" id="cloud-account-card"></div>
-          <!-- Strava integration — auto-imports activities from Strava when connected. Hidden until configured. -->
-          <div id="strava-section-wrapper" style="display:none;">
-            <div class="section-label" style="margin-top:4px;">STRAVA SYNC</div>
-            <div class="card" id="strava-card"></div>
-          </div>
-          <!-- AI Coach — open the chat from Profile. Hidden until configured. -->
-          <div id="ai-coach-section-wrapper" style="display:none;">
-            <div class="section-label" style="margin-top:4px;">ARIA</div>
-            <div class="card" id="ai-coach-card"></div>
-          </div>
-          <!-- T33.2 — Tour & tips section — lets the user replay the Hunter Orientation tour anytime. -->
-          <div class="section-label" style="margin-top:4px;">TOUR & TIPS</div>
-          <div class="card">
-            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Two guided tours. The
-              quick <strong>Hunter Orientation</strong> highlights the five tabs and ARIA. The
-              <strong>Full Tour</strong> goes deeper — a ~15-stop walkthrough of every system: quests, the workout
-              tracker, nutrition, progress, the shop, and more.</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-sm btn-with-icon" onclick="startTutorial()"><span class="icon-title-slot"
-                  data-icon="sparkles"></span>Replay Tour</button>
-              <button class="btn btn-sm btn-with-icon" onclick="startComprehensiveTour()"><span class="icon-title-slot"
-                  data-icon="swords"></span>Full Tour</button>
+            <div id="split-tips-slot"></div>
+            <div id="saved-splits-slot"></div>
+            <!-- Coach Tips — beginner-only, rotating coaching content. -->
+            <div class="beginner-only">
+              <div class="section-label" style="margin-top:4px;">COACH TIPS</div>
+              <div id="coach-tips-slot"></div>
+            </div>
+            <!-- Graduation prompt slot — surfaces a one-time CTA. Beginner-only. -->
+            <div class="beginner-only">
+              <div id="graduation-slot"></div>
             </div>
           </div>
-          <!-- T34.9 / T36.5 — Contact & feedback. Primary path is the in-app
-               form (writes to Supabase support_messages table). Mailto stays
-               as a secondary fallback for users not signed in or who prefer it. -->
-          <div class="section-label" style="margin-top:4px;">SUPPORT & FEEDBACK</div>
-          <div class="card">
-            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
-              Found a bug, have an idea, or stuck on something? Send a note — usually answered within 24 hours.
+          <!-- ===================== SETTINGS pane ===================== -->
+          <div id="prof-pane-settings" style="display:none;">
+            <div class="section-label" style="margin-top:4px;">MACRO SETTINGS</div>
+            <div class="card" id="profile-macro-display"></div>
+            <div id="profile-macro-warning"></div>
+            <div class="section-label" style="margin-top:4px;">PREFERENCES</div>
+            <div class="card">
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div class="toggle-wrap">
+                  <div class="toggle" id="beginner-mode-toggle" onclick="toggleBeginnerMode()"></div>
+                  <div class="toggle-label">Beginner mode <span style="color:var(--text3);font-size:10px;">— hides
+                      advanced fields, gentler defaults</span></div>
+                </div>
+                <div class="toggle-wrap">
+                  <div class="toggle" id="plain-mode-toggle" onclick="togglePlainMode()"></div>
+                  <div class="toggle-label">Plain mode <span style="color:var(--text3);font-size:10px;">— swaps Solo
+                      Leveling theme labels for neutral fitness terms</span></div>
+                </div>
+                <div class="toggle-wrap">
+                  <div class="toggle on" id="adaptive-toggle-main"
+                    onclick="this.classList.toggle('on');state.settings.adaptiveMacros=this.classList.contains('on');save();">
+                  </div>
+                  <div class="toggle-label">Adaptive macro adjustments</div>
+                </div>
+                <div class="toggle-wrap">
+                  <div class="toggle on" id="penalty-toggle"
+                    onclick="this.classList.toggle('on');state.settings.penaltyMode=this.classList.contains('on');save();">
+                  </div>
+                  <div class="toggle-label">Quest penalty mode</div>
+                </div>
+                <div class="toggle-wrap">
+                  <div class="toggle on" id="notify-toggle"
+                    onclick="this.classList.toggle('on');state.settings.notify=this.classList.contains('on');save();">
+                  </div>
+                  <div class="toggle-label">Daily quest reminders</div>
+                </div>
+                <div class="toggle-wrap">
+                  <div class="toggle on" id="mealprep-toggle"
+                    onclick="this.classList.toggle('on');state.settings.mealPrepEnabled=this.classList.contains('on');save();if(typeof applyMealPrepVisibility==='function')applyMealPrepVisibility();if(typeof renderMealPrep==='function')renderMealPrep();if(typeof renderDailyNutrition==='function')renderDailyNutrition();">
+                  </div>
+                  <div class="toggle-label">Show meal prep dashboard</div>
+                </div>
+              </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-sm btn-with-icon" onclick="openSupportModal()">
-                <span class="icon-title-slot" data-icon="mail"></span>Contact Support
-              </button>
-              <a href="mailto:support.arisefitness@gmail.com?subject=ARISE%20Fitness%20Feedback" class="btn btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;font-size:11px;color:var(--text3);">
-                or email directly
-              </a>
+            <!-- T35.3 — Appearance: theme toggle. Rendered by renderThemeCard(). -->
+            <div class="section-label" style="margin-top:4px;">APPEARANCE</div>
+            <div class="card" id="theme-settings"></div>
+            <div class="section-label" style="margin-top:4px;">REMINDER ALERTS</div>
+            <div class="card" id="reminder-settings"></div>
+            <!-- AI Coach — open the chat from Profile. Hidden until configured. -->
+            <div id="ai-coach-section-wrapper" style="display:none;">
+              <div class="section-label" style="margin-top:4px;">ARIA</div>
+              <div class="card" id="ai-coach-card"></div>
+            </div>
+            <!-- Strava integration — hidden until configured. -->
+            <div id="strava-section-wrapper" style="display:none;">
+              <div class="section-label" style="margin-top:4px;">STRAVA SYNC</div>
+              <div class="card" id="strava-card"></div>
             </div>
           </div>
-          <div class="section-label" style="margin-top:4px;">BACKUP & EXPORT</div>
-          <div class="card">
-            <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Even with cloud sync,
-              manual backups are useful for archiving or sharing. Export saves the full state as JSON; import overwrites
-              it.</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-sm btn-with-icon" onclick="exportBackup()"><span class="icon-title-slot"
-                  data-icon="download"></span>Export Backup (JSON)</button>
-              <label class="btn btn-sm btn-with-icon" style="cursor:pointer;"><span class="icon-title-slot"
-                  data-icon="upload"></span>Import Backup<input type="file" accept=".json" style="display:none;"
-                  onchange="importBackup(this)"></label>
-              <button class="btn btn-sm btn-with-icon" onclick="exportData()"><span class="icon-title-slot"
-                  data-icon="download"></span>Stats CSV</button>
+          <!-- ===================== MODES pane ===================== -->
+          <!-- T52.2 — Single Training Mode card consolidating Vacation,
+               Recovery, and Deload. Deload is auto-detected from active plan
+               so it's surfaced read-only here. -->
+          <div id="prof-pane-modes" style="display:none;">
+            <div class="section-label" style="margin-top:4px;"><span class="icon-title-slot" data-icon="dumbbell"></span>TRAINING MODE</div>
+            <div class="card">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5;">
+                Temporarily adjust how quests and workouts behave. Use these when life or your body interrupts normal training.
+              </div>
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Vacation mode <span
+                      style="color:var(--text3);font-size:10px;">— two flavors when you can't do your normal lifts</span>
+                  </div>
+                  <select id="vacation-select" onchange="setVacationMode(this.value)"
+                    style="font-size:12px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+                    <option value="off">Off — normal training</option>
+                    <option value="travel">Travel mode — bodyweight quest substitutions</option>
+                    <option value="rest">Rest block — skip workout quests entirely</option>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Recovery Mode <span
+                      style="color:var(--text3);font-size:10px;">— route around injured muscle groups</span>
+                  </div>
+                  <button class="btn btn-sm" id="injury-mode-button" onclick="openInjuryModal()" style="font-size:12px;padding:6px 10px;">Manage Active Injuries…</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <div class="toggle-label" style="display:flex;align-items:center;gap:6px;">Deload week <span
+                      style="color:var(--text3);font-size:10px;">— auto-detected from your active plan</span>
+                  </div>
+                  <div id="deload-status-card" style="font-size:11px;color:var(--text2);padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;">No active plan with a deload week scheduled.</div>
+                </div>
+              </div>
             </div>
-            <div id="sync-status" style="font-size:11px;color:var(--text3);margin-top:8px;"></div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-            <button class="btn btn-sm" style="color:var(--red2);border-color:var(--red2);"
-              onclick="openResetConfirmModal()"><span class="icon-title-slot" data-icon="alert"
-                style="color:var(--red2);"></span>Reset All Data</button>
+          <!-- ===================== TOOLS pane ===================== -->
+          <div id="prof-pane-tools" style="display:none;">
+            <!-- Cloud Account — sign in/out + status. -->
+            <div class="section-label" style="margin-top:4px;">CLOUD ACCOUNT</div>
+            <div class="card" id="cloud-account-card"></div>
+            <!-- T33.2 — Tour & tips. -->
+            <div class="section-label" style="margin-top:4px;">TOUR & TIPS</div>
+            <div class="card">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Two guided tours. The
+                quick <strong>Hunter Orientation</strong> highlights the five tabs and ARIA. The
+                <strong>Full Tour</strong> goes deeper — a ~15-stop walkthrough of every system: quests, the workout
+                tracker, fuel, progress, the shop, and more.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-with-icon" onclick="startTutorial()"><span class="icon-title-slot"
+                    data-icon="sparkles"></span>Replay Tour</button>
+                <button class="btn btn-sm btn-with-icon" onclick="startComprehensiveTour()"><span class="icon-title-slot"
+                    data-icon="swords"></span>Full Tour</button>
+              </div>
+            </div>
+            <!-- T34.9 / T36.5 — Support & feedback. -->
+            <div class="section-label" style="margin-top:4px;">SUPPORT & FEEDBACK</div>
+            <div class="card">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
+                Found a bug, have an idea, or stuck on something? Send a note — usually answered within 24 hours.
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-with-icon" onclick="openSupportModal()">
+                  <span class="icon-title-slot" data-icon="mail"></span>Contact Support
+                </button>
+                <a href="mailto:support.arisefitness@gmail.com?subject=ARISE%20Fitness%20Feedback" class="btn btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;font-size:11px;color:var(--text3);">
+                  or email directly
+                </a>
+              </div>
+            </div>
+            <div class="section-label" style="margin-top:4px;">BACKUP & EXPORT</div>
+            <div class="card">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Even with cloud sync,
+                manual backups are useful for archiving or sharing. Export saves the full state as JSON; import overwrites
+                it.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-with-icon" onclick="exportBackup()"><span class="icon-title-slot"
+                    data-icon="download"></span>Export Backup (JSON)</button>
+                <label class="btn btn-sm btn-with-icon" style="cursor:pointer;"><span class="icon-title-slot"
+                    data-icon="upload"></span>Import Backup<input type="file" accept=".json" style="display:none;"
+                    onchange="importBackup(this)"></label>
+                <button class="btn btn-sm btn-with-icon" onclick="exportData()"><span class="icon-title-slot"
+                    data-icon="download"></span>Stats CSV</button>
+              </div>
+              <div id="sync-status" style="font-size:11px;color:var(--text3);margin-top:8px;"></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+              <button class="btn btn-sm" style="color:var(--red2);border-color:var(--red2);"
+                onclick="openResetConfirmModal()"><span class="icon-title-slot" data-icon="alert"
+                  style="color:var(--red2);"></span>Reset All Data</button>
+            </div>
           </div>
         </div>
         <div class="nav">
@@ -4583,6 +4733,20 @@
        rendered on Quests/Progress so it doesn't crowd the Workouts/Fuel
        screens (which already have their own primary log CTAs visible). -->
   <button class="fab-quicklog" id="fab-quicklog" onclick="openQuickLogModal()" aria-label="Quick log" title="Quick log">+</button>
+  <!-- T57 — Global search overlay. Searches exercises, recipes, history,
+       goals from one box. Triggered from a small search icon in any topbar
+       (rendered next to coin pills via JS so we don't have to touch every
+       topbar's markup). -->
+  <div class="modal-overlay" id="modal-global-search">
+    <div class="modal" style="max-width:520px;">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="trending"></span>Search</div>
+      <input type="text" id="global-search-input" placeholder="Search exercises, recipes, history, goals…"
+        oninput="runGlobalSearch(this.value)"
+        style="width:100%;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;margin-bottom:10px;">
+      <div id="global-search-results" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;font-size:12px;"></div>
+      <button class="btn btn-full" onclick="closeModal('modal-global-search')" style="margin-top:10px;">Close</button>
+    </div>
+  </div>
   <div class="modal-overlay" id="modal-quick-log">
     <div class="modal" style="max-width:340px;">
       <div class="modal-title"><span class="icon-title-slot" data-icon="zap"></span>Quick Log</div>
@@ -4756,7 +4920,7 @@
   </div>
   <div class="modal-overlay" id="modal-add-meal">
     <div class="modal">
-      <div class="modal-title" id="meal-modal-title">+ Log Food</div>
+      <div class="modal-title" id="meal-modal-title">+ Log Meal</div>
       <input type="hidden" id="meal-modal-type" value="extra">
       <!-- T44.1 — when set to a logged meal's id, Save updates that entry in
            place (edit mode) instead of pushing a new one. -->
@@ -4981,8 +5145,11 @@
               style="width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--text2);font-size:10px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;">?</button>
           </span>
         </label>
+        <!-- T53.1 — Fixed-position so it never hides under the iOS keyboard
+             or clips on a narrow phone. JS clamps it to the viewport when
+             toggled open. -->
         <div id="rpe-help-popover"
-          style="display:none;position:absolute;right:0;top:30px;z-index:50;width:260px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-size:11px;color:var(--text2);line-height:1.5;">
+          style="display:none;position:fixed;z-index:200;width:min(260px, calc(100vw - 24px));background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-size:11px;color:var(--text2);line-height:1.5;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <strong style="font-size:12px;color:var(--text);">RPE — Rate of Perceived Exertion</strong>
             <button type="button" onclick="toggleRpeHelp(event)"
@@ -5309,14 +5476,27 @@
   <!-- ARIA chat modal (T15.3, renamed from AI Coach in T25.1). -->
   <div class="modal-overlay" id="modal-ai-coach">
     <div class="modal" style="max-width:520px;display:flex;flex-direction:column;max-height:80vh;">
-      <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <span><span class="icon-title-slot" data-icon="sparkles"></span>ARIA <span style="font-size:11px;color:var(--text3);font-weight:400;letter-spacing:0;text-transform:none;margin-left:6px;">your AI fitness coach</span></span>
-        <button onclick="resetCoachChat()" title="Start the conversation over"
-          style="background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;">Reset
-          chat</button>
+        <div style="display:inline-flex;gap:6px;">
+          <!-- T55 — History toggle. Switches between the current chat view
+               and a searchable archive of past messages. -->
+          <button id="coach-history-btn" onclick="toggleCoachHistory()" title="Search past conversations"
+            style="background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;">History</button>
+          <button onclick="resetCoachChat()" title="Start the conversation over"
+            style="background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;">Reset
+            chat</button>
+        </div>
       </div>
       <div id="coach-messages"
         style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px 4px;margin-bottom:10px;min-height:240px;">
+      </div>
+      <!-- T55 — History view. Hidden by default; toggled on by the History button. -->
+      <div id="coach-history-view" style="display:none;flex:1;flex-direction:column;gap:8px;min-height:240px;">
+        <input type="text" id="coach-history-search" placeholder="Search past messages…"
+          oninput="renderCoachHistory(this.value)"
+          style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;">
+        <div id="coach-history-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;font-size:12px;"></div>
       </div>
       <div id="coach-typing-indicator"
         style="display:none;font-size:11px;color:var(--text3);margin-bottom:8px;font-style:italic;">ARIA is thinking…
@@ -8382,6 +8562,294 @@ create trigger trg_user_state_updated_at
       n.textContent = msg; n.style.borderColor = color; n.style.color = color;
       n.classList.add('show'); setTimeout(() => n.classList.remove('show'), 2500);
     }
+    // T61 — Render the First Session checklist on Quests. Persists a "dismissed"
+    // flag in state.settings so it doesn't re-appear once cleared. Auto-checks
+    // each step as the user satisfies it (weight log, meal log, workout log).
+    function renderFirstSessionCard() {
+      const slot = document.getElementById('first-session-slot');
+      if (!slot) return;
+      if (!state.profile || !state.profile.name) { slot.innerHTML = ''; return; }
+      const dismissed = !!(state.settings && state.settings.firstSessionDismissed);
+      if (dismissed) { slot.innerHTML = ''; return; }
+      const hasWeight = (state.logs || []).some(l => l && (l.weight != null && isFinite(l.weight)));
+      const hasMeal = (state.todayMeals || []).length > 0;
+      const hasWorkout = (state.workoutLog || []).length > 0;
+      if (hasWeight && hasMeal && hasWorkout) {
+        // All complete — auto-dismiss permanently so the card doesn't return.
+        try { state.settings = state.settings || {}; state.settings.firstSessionDismissed = true; save(); } catch (e) {}
+        slot.innerHTML = '';
+        return;
+      }
+      const mk = (done, label, action) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${done ? 'opacity:0.55;' : ''}">
+          <span style="width:18px;height:18px;border-radius:50%;border:2px solid ${done ? 'var(--green)' : 'var(--text3)'};display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:${done ? 'var(--green)' : 'var(--text3)'};flex-shrink:0;">${done ? '✓' : ''}</span>
+          <span style="flex:1;font-size:12px;${done ? 'text-decoration:line-through;color:var(--text3);' : 'color:var(--text2);'}">${label}</span>
+          ${done ? '' : `<button class="btn btn-sm btn-primary" onclick="${action}" style="font-size:10px;padding:3px 8px;">Do it</button>`}
+        </div>`;
+      slot.innerHTML = `
+        <div class="card" style="padding:12px 14px;background:linear-gradient(135deg, rgba(127,119,221,0.10), rgba(244,182,63,0.06));border:1px solid var(--accent);margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--accent2);">First session — log three things</div>
+            <button onclick="dismissFirstSession()" title="Dismiss" style="background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;line-height:1;padding:0 4px;">×</button>
+          </div>
+          ${mk(hasWeight, 'Log your weight', "openLogModal()")}
+          ${mk(hasMeal,   'Log a meal',      "switchTab('nutrition');setTimeout(()=>openAddMealModal('extra'),100)")}
+          ${mk(hasWorkout,'Log a workout',   "openLogExerciseModal()")}
+        </div>`;
+    }
+    function dismissFirstSession() {
+      state.settings = state.settings || {};
+      state.settings.firstSessionDismissed = true;
+      save();
+      try { renderFirstSessionCard(); } catch (e) {}
+    }
+    // T57 — Global search. Opens an overlay that searches exercises (library
+    // + history), recipes (saved + suggestions), past goals, and ARIA chat
+    // history from a single query. Each result has a tap target that jumps
+    // the user to the right surface.
+    function openGlobalSearch() {
+      const input = document.getElementById('global-search-input');
+      if (input) input.value = '';
+      const results = document.getElementById('global-search-results');
+      if (results) results.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px;">Try names like "bench press", "oats", "macro streak"…</div>';
+      openModal('modal-global-search');
+      setTimeout(() => { if (input) input.focus(); }, 50);
+    }
+    function runGlobalSearch(query) {
+      const results = document.getElementById('global-search-results');
+      if (!results) return;
+      const q = (query || '').trim().toLowerCase();
+      if (q.length < 2) {
+        results.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px;">Keep typing… (min 2 chars)</div>';
+        return;
+      }
+      const hits = [];
+      const push = (kind, label, sub, onClick) => {
+        hits.push({ kind, label, sub, onClick });
+      };
+      // Exercise library
+      try {
+        Object.entries(MUSCLE_GROUPS).forEach(([group, list]) => {
+          list.forEach(ex => {
+            if (ex.toLowerCase().includes(q)) push('Exercise', ex, group, `closeModal('modal-global-search');openLogExerciseModal(${JSON.stringify(ex)})`);
+          });
+        });
+      } catch (e) {}
+      // Exercise history (unique by normalized name)
+      try {
+        const seen = new Set();
+        (state.workoutLog || []).forEach(e => {
+          if (e.source === 'manual-toggle') return;
+          if (!e.exercise) return;
+          const norm = normalizeExerciseName(e.exercise);
+          if (seen.has(norm)) return;
+          seen.add(norm);
+          if (e.exercise.toLowerCase().includes(q)) push('History', e.exercise, `${e.date || ''}`, `closeModal('modal-global-search');openExerciseHistory(${JSON.stringify(e.exercise)})`);
+        });
+      } catch (e) {}
+      // Saved recipes
+      try {
+        (state.savedRecipes || []).forEach(r => {
+          const lbl = (r.label || '').toLowerCase();
+          if (lbl.includes(q)) push('Recipe', r.label, `${r.cals || 0} kcal · P${r.prot || 0}g`, `closeModal('modal-global-search');switchTab('nutrition');setTimeout(()=>switchNutTab('prep'),80)`);
+        });
+      } catch (e) {}
+      // Goals
+      try {
+        (state.goals || []).forEach(g => {
+          const lbl = (g.name || '').toLowerCase();
+          if (lbl.includes(q)) push('Goal', g.name, g.cat || '', `closeModal('modal-global-search');switchTab('progress');setTimeout(()=>switchProgressTab('goals'),80)`);
+        });
+      } catch (e) {}
+      // ARIA chat messages (snippets)
+      try {
+        ((state.aiCoach && state.aiCoach.messages) || []).forEach(m => {
+          if (!m.content) return;
+          const txt = String(m.content);
+          if (txt.toLowerCase().includes(q)) {
+            const snippet = txt.length > 120 ? txt.slice(0, 120) + '…' : txt;
+            push('ARIA', snippet, m.role === 'user' ? 'You said' : 'ARIA said',
+              `closeModal('modal-global-search');openAICoachModal();setTimeout(toggleCoachHistory,80)`);
+          }
+        });
+      } catch (e) {}
+      if (!hits.length) {
+        results.innerHTML = `<div style="color:var(--text3);font-size:11px;padding:8px;">No matches for "${escapeHtml(query)}".</div>`;
+        return;
+      }
+      const limited = hits.slice(0, 30);
+      results.innerHTML = limited.map(h => {
+        const kindColor = ({ Exercise: 'var(--accent2)', History: 'var(--gold)', Recipe: 'var(--green)', Goal: 'var(--accent)', ARIA: 'var(--gold)' })[h.kind] || 'var(--text3)';
+        return `<button onclick="${h.onClick}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--text);">
+          <div style="display:flex;align-items:center;gap:6px;width:100%;"><span style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:${kindColor};">${h.kind}</span><span style="font-weight:600;">${escapeHtml(h.label)}</span></div>
+          ${h.sub ? `<div style="font-size:10px;color:var(--text3);">${escapeHtml(h.sub)}</div>` : ''}
+        </button>`;
+      }).join('') + (hits.length > limited.length ? `<div style="font-size:11px;color:var(--text3);text-align:center;padding:6px;">${hits.length - limited.length} more matches — refine the query to narrow it down.</div>` : '');
+    }
+    // T56 — Quick daily check-in. Writes the same shape that openLogModal()
+    // produces so downstream rendering (renderStats, weight trend, etc.) is
+    // unaffected. Same-day re-save updates in place.
+    function saveQuickCheckin() {
+      if (!Array.isArray(state.logs)) state.logs = [];
+      const today = todayStr();
+      const w = parseFloat((document.getElementById('quick-weight') || {}).value);
+      const sleep = parseFloat((document.getElementById('quick-sleep') || {}).value);
+      const mood = parseFloat((document.getElementById('quick-mood') || {}).value);
+      const energy = parseFloat((document.getElementById('quick-energy') || {}).value);
+      const hasAny = isFinite(w) || isFinite(sleep) || isFinite(mood) || isFinite(energy);
+      if (!hasAny) { showNotif('Enter a value first', 'var(--red2)'); return; }
+      let entry = state.logs.find(l => l && l.date === today);
+      if (!entry) {
+        entry = { date: today };
+        state.logs.push(entry);
+      }
+      if (isFinite(w)) entry.weight = w;
+      if (isFinite(sleep)) entry.sleep = sleep;
+      if (isFinite(mood)) entry.mood = mood;
+      if (isFinite(energy)) entry.energy = energy;
+      save();
+      try { renderStats(); } catch (e) {}
+      try { renderHomeDashboard(); } catch (e) {}
+      const hint = document.getElementById('quick-checkin-hint');
+      if (hint) {
+        hint.textContent = `Saved at ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      }
+      showNotif('Check-in saved');
+    }
+    // T56 — Prefill inputs from today's existing log so re-saving updates,
+    // not overwrites with blanks. Called from renderStats.
+    function prefillQuickCheckin() {
+      const today = todayStr();
+      const entry = (state.logs || []).find(l => l && l.date === today);
+      const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v != null && isFinite(v)) ? v : ''; };
+      setV('quick-weight', entry && entry.weight);
+      setV('quick-sleep', entry && entry.sleep);
+      setV('quick-mood', entry && entry.mood);
+      setV('quick-energy', entry && entry.energy);
+      const hint = document.getElementById('quick-checkin-hint');
+      if (hint) hint.textContent = entry ? 'Tap Save to update' : '';
+    }
+    // T55 — Toggle between the live coach chat and the archive view. The
+    // archive lists every assistant + user message grouped by date so the
+    // user can search past coaching without scrolling the live thread.
+    function toggleCoachHistory() {
+      const live = document.getElementById('coach-messages');
+      const hist = document.getElementById('coach-history-view');
+      const btn = document.getElementById('coach-history-btn');
+      if (!live || !hist || !btn) return;
+      const showHistory = live.style.display !== 'none';
+      live.style.display = showHistory ? 'none' : '';
+      hist.style.display = showHistory ? 'flex' : 'none';
+      btn.textContent = showHistory ? 'Back to chat' : 'History';
+      if (showHistory) renderCoachHistory('');
+    }
+    function renderCoachHistory(query) {
+      const list = document.getElementById('coach-history-list');
+      if (!list) return;
+      const q = (query || '').trim().toLowerCase();
+      const msgs = (state.aiCoach && state.aiCoach.messages) || [];
+      if (!msgs.length) {
+        list.innerHTML = '<div style="text-align:center;color:var(--text3);padding:20px;font-size:12px;">No past conversations yet.</div>';
+        return;
+      }
+      // Group by date (YYYY-MM-DD). Each group renders date header + matches.
+      const byDate = new Map();
+      msgs.forEach(m => {
+        if (!m || !m.content) return;
+        if (q && !String(m.content).toLowerCase().includes(q)) return;
+        const day = (m.ts ? new Date(m.ts) : new Date()).toISOString().slice(0, 10);
+        if (!byDate.has(day)) byDate.set(day, []);
+        byDate.get(day).push(m);
+      });
+      if (byDate.size === 0) {
+        list.innerHTML = `<div style="text-align:center;color:var(--text3);padding:20px;font-size:12px;">No messages match "${escapeHtml(query)}".</div>`;
+        return;
+      }
+      const sortedDays = [...byDate.keys()].sort((a, b) => b.localeCompare(a));
+      list.innerHTML = sortedDays.map(day => {
+        const items = byDate.get(day);
+        return `
+          <div style="margin-top:8px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:0.6px;color:var(--accent2);text-transform:uppercase;margin-bottom:4px;">${day}</div>
+            ${items.map(m => {
+              const role = m.role === 'user' ? 'You' : 'ARIA';
+              const color = m.role === 'user' ? 'var(--accent)' : 'var(--gold)';
+              const snippet = String(m.content).length > 260 ? String(m.content).slice(0, 260) + '…' : m.content;
+              return `<div style="padding:6px 8px;background:var(--bg2);border-left:2px solid ${color};border-radius:4px;line-height:1.4;"><strong style="color:${color};font-size:10px;letter-spacing:0.5px;">${role}</strong><br><span style="color:var(--text2);">${escapeHtml(snippet)}</span></div>`;
+            }).join('')}
+          </div>`;
+      }).join('');
+    }
+    // T54 — Quick workout-credit for users who don't itemize sets. Creates
+    // a synthetic workoutLog entry per day so streak/XP land, but the entry
+    // is flagged source:'manual-toggle' so the renderExerciseProgression
+    // and renderExerciseHistoryPage code paths can filter it out.
+    function quickLogWorkout() {
+      if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
+      const today = todayStr();
+      const existing = state.workoutLog.find(e => e.date === today && e.source === 'manual-toggle');
+      if (existing) {
+        if (!confirm('You already marked today as worked out. Remove the credit?')) return;
+        state.workoutLog = state.workoutLog.filter(e => e !== existing);
+        state.xp = Math.max(0, (state.xp || 0) - 30);
+        save();
+        try { renderTrainingLog(); } catch (e) {}
+        try { renderStats(); } catch (e) {}
+        showNotif('Worked-out credit removed', 'var(--text2)');
+        return;
+      }
+      state.workoutLog.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        date: today,
+        exercise: 'Workout (manual credit)',
+        sets: [],
+        notes: 'Quick credit — no details logged',
+        source: 'manual-toggle',
+      });
+      const xp = 30;
+      state.xp += xp;
+      try { if (typeof checkLevelUp === 'function') checkLevelUp(); } catch (e) {}
+      save();
+      try { renderTrainingLog(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
+      showNotif(`Workout credited · +${xp} XP`);
+    }
+    // T52.1 — Switch among the four Profile subtabs (profile / settings /
+    // modes / tools). Updates active tab button + pane visibility. Refreshes
+    // the deload status when the Modes pane becomes visible.
+    let _activeProfileTab = 'profile';
+    function switchProfileTab(tab) {
+      const tabs = ['profile', 'settings', 'modes', 'tools'];
+      if (!tabs.includes(tab)) tab = 'profile';
+      _activeProfileTab = tab;
+      tabs.forEach(t => {
+        const btn = document.getElementById('prof-tab-' + t);
+        const pane = document.getElementById('prof-pane-' + t);
+        if (btn) btn.classList.toggle('active', t === tab);
+        if (pane) pane.style.display = (t === tab) ? '' : 'none';
+      });
+      if (tab === 'modes') { try { updateDeloadStatusCard(); } catch (e) {} }
+      // Reset scroll to top of the new pane
+      const scroll = document.querySelector('#screen-profile .scroll');
+      if (scroll) scroll.scrollTop = 0;
+    }
+    // T52.2 — Read-only deload status shown on the Modes pane. Sources from
+    // isInActiveDeload / isDeloadWeek if they exist; otherwise reports no
+    // active plan.
+    function updateDeloadStatusCard() {
+      const el = document.getElementById('deload-status-card');
+      if (!el) return;
+      let txt = 'No active plan with a deload week scheduled.';
+      try {
+        if (typeof isDeloadWeek === 'function' && isDeloadWeek()) {
+          txt = 'You\'re in a deload week — strength quests apply a ~60% load.';
+        } else if (typeof getActiveProgramTemplate === 'function') {
+          const tpl = getActiveProgramTemplate();
+          if (tpl) txt = `Active plan: ${tpl.name}. Deload weeks (when scheduled) apply automatically.`;
+        }
+      } catch (e) {}
+      el.textContent = txt;
+    }
     // T48.2 — Open the quick-log chooser modal.
     function openQuickLogModal() {
       openModal('modal-quick-log');
@@ -8395,6 +8863,22 @@ create trigger trg_user_state_updated_at
        'fuel-coin-count', 'profile-coin-count'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = c;
+      });
+    }
+    // T53.5 — Watch each .scroll pane and dim the ARIA FAB when the user is
+    // within 120px of the bottom (where +Log Meal / Water Reset / etc. live).
+    // Restores full opacity once they scroll back up. Idempotent — safe to
+    // wire on every screen switch.
+    let _fabDimAttached = new WeakSet();
+    function wireFabCoachDimming() {
+      const panes = document.querySelectorAll('.scroll');
+      panes.forEach(p => {
+        if (_fabDimAttached.has(p)) return;
+        _fabDimAttached.add(p);
+        p.addEventListener('scroll', () => {
+          const nearBottom = (p.scrollHeight - p.scrollTop - p.clientHeight) < 120;
+          document.body.classList.toggle('fab-coach-dimmed', !!nearBottom);
+        }, { passive: true });
       });
     }
     // T49.1 — Render the Fasting chip on the Quests topbar. Hidden when no
@@ -8466,7 +8950,7 @@ create trigger trg_user_state_updated_at
         meal.times.forEach(t => {
           if (reminderTimeMatchesNow(t) && !_remindersFiredToday.mealTimes[t]) {
             _remindersFiredToday.mealTimes[t] = true;
-            fireReminder('Meal time', `Time to eat. Log it on the Nutrition tab.`);
+            fireReminder('Meal time', `Time to eat. Log it on the Fuel tab.`);
           }
         });
       }
@@ -9900,6 +10384,9 @@ create trigger trg_user_state_updated_at
       try { updateCoachOrb(); } catch (e) { }
       // T42.1 — Paint the equipped card frame onto the hunter card at boot.
       try { applyEquippedFrame(); } catch (e) { }
+      // T53.5 — Attach scroll listeners so the ARIA FAB dims when content is
+      // crowded near the bottom of any pane.
+      try { wireFabCoachDimming(); } catch (e) { }
     }
     // ===== COACH TIPS — beginner-mode learning content =====
     // Curated, rotating tips that help beginners build training literacy. Cycled by the
@@ -10849,6 +11336,10 @@ create trigger trg_user_state_updated_at
       // T48.1 / T49.1 — refresh topbar widgets on every tab switch.
       try { updateCoinPills(); } catch (e) {}
       try { updateQuestsFastingChip(); } catch (e) {}
+      // T53.5 — re-wire FAB-dimming scroll listeners (idempotent for already-wired panes).
+      try { wireFabCoachDimming(); } catch (e) {}
+      // Reset dimming when entering a new screen
+      try { document.body.classList.remove('fab-coach-dimmed'); } catch (e) {}
       // find the right nav button
       document.querySelectorAll('.nav-btn').forEach(b => {
         if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${tab}'`)) b.classList.add('active');
@@ -12492,6 +12983,9 @@ create trigger trg_user_state_updated_at
         state.quests = quests;
         save();
       }
+      // T61 — Refresh the First Session checklist on every quest render so
+      // it ticks items off as the user completes them.
+      try { renderFirstSessionCard(); } catch (e) {}
       const doneCount = state.quests.filter(q => q.done).length;
       const totalXP = state.quests.reduce((a, q) => a + (q.done ? q.xp : 0), 0);
       document.getElementById('quest-date-label').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + (state.workoutSplit[dayOfWeek()] || 'Rest') + (vacationMode ? ' · 🏝 Vacation' : '');
@@ -12508,7 +13002,7 @@ create trigger trg_user_state_updated_at
         const label = variant === 'rest' ? 'REST BLOCK' : 'TRAVEL MODE';
         const subtext = variant === 'rest'
           ? 'workout quests skipped — nutrition + habit + challenge still active.'
-          : 'quests are bodyweight-only. Nutrition unchanged.';
+          : 'quests are bodyweight-only. Fuel unchanged.';
         banner.innerHTML = `<div><strong style="color:var(--gold);">${label}</strong> — ${subtext}</div><button class="btn btn-sm" onclick="setVacationMode('off')" style="font-size:10px;flex-shrink:0;">Turn off</button>`;
         container.appendChild(banner);
       }
@@ -12969,6 +13463,29 @@ create trigger trg_user_state_updated_at
     }
     // ===== STATS =====
     function renderStats() {
+      // T56 — Keep the inline quick-checkin synced with today's log entry.
+      try { prefillQuickCheckin(); } catch (e) {}
+      // T51.1 — Day-1 welcome card. Show only when the user hasn't logged
+      // their first daily check-in yet (state.logs is empty).
+      try {
+        const slot = document.getElementById('progress-welcome-slot');
+        if (slot) {
+          const noLogs = !Array.isArray(state.logs) || state.logs.length === 0;
+          if (noLogs) {
+            slot.innerHTML = `
+              <div class="card" style="padding:14px;background:linear-gradient(135deg, rgba(79,142,255,0.08), rgba(127,119,221,0.06));border:1px solid var(--accent);margin-bottom:8px;">
+                <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--accent2);margin-bottom:4px;">Welcome — let's fill this page in</div>
+                <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:10px;">Body stats, weight trend, and exercise progression unlock the moment you log your first check-in or workout.</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn btn-sm btn-primary" onclick="openLogModal()" style="font-size:11px;">Log first weight</button>
+                  <button class="btn btn-sm" onclick="openLogExerciseModal()" style="font-size:11px;">Log first workout</button>
+                </div>
+              </div>`;
+          } else {
+            slot.innerHTML = '';
+          }
+        }
+      } catch (e) {}
       const r = state.rank;
       const color = RANK_COLORS[r];
       const rankBadge = document.getElementById('rank-badge');
@@ -13821,7 +14338,7 @@ create trigger trg_user_state_updated_at
             programBannerHtml = `
               <div style="background:linear-gradient(135deg,rgba(127,119,221,0.10),rgba(79,142,255,0.04));border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-                  <div style="font-size:11px;color:var(--accent2);font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:1px;">PROGRAM · ${escapeHtml(tpl.name)}</div>
+                  <div style="font-size:11px;color:var(--accent2);font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:1px;">PLAN · ${escapeHtml(tpl.name)}</div>
                   <div style="font-size:10px;color:var(--text3);">Week ${wk} of ${tpl.weeks}${isDeload ? ' · DELOAD' : ''}</div>
                 </div>
                 <div style="font-size:12px;color:var(--text);margin-top:4px;">Today: <strong>${escapeHtml(session.name)}</strong></div>
@@ -14471,6 +14988,25 @@ create trigger trg_user_state_updated_at
       if (!Array.isArray(state.mealPrep)) state.mealPrep = [];
       // T45.1 — Render the fasting card before the macro UI so it shows up at the top.
       try { renderFastingCard(); } catch (e) {}
+      // T51.2 — Show a "personalize your targets" hint when macros are still
+      // the literal default. This catches users who skipped or bounced out
+      // of onboarding before macros were computed from their profile.
+      try {
+        const slot = document.getElementById('fuel-targets-slot');
+        if (slot) {
+          const m = state.macros || {};
+          const isDefault = m.calories === 2000 && m.protein === 150 && m.carbs === 200 && m.fat === 60;
+          if (isDefault) {
+            slot.innerHTML = `
+              <div class="card" style="padding:10px 12px;background:rgba(244,182,63,0.06);border:1px solid var(--gold);margin-bottom:6px;">
+                <div style="font-size:12px;color:var(--text2);line-height:1.5;">These targets are starting estimates. Finish your profile (weight, height, goal) and ARIA will personalize them.</div>
+                <button class="btn btn-sm" onclick="switchTab('profile')" style="font-size:11px;margin-top:6px;color:var(--gold);border-color:var(--gold);">Personalize targets</button>
+              </div>`;
+          } else {
+            slot.innerHTML = '';
+          }
+        }
+      } catch (e) {}
       // T25.5 — roll over water counter to 0 if it's a new local day
       try { ensureTodayWaterFresh(); } catch (e) {}
       const meals = state.todayMeals.filter(m => m && m.date === todayStr());
@@ -14573,7 +15109,7 @@ create trigger trg_user_state_updated_at
         // Extra logged meals
         meals.forEach(m => allMeals.push(m));
         if (allMeals.length === 0) {
-          mealList.innerHTML = '<div style="text-align:center;padding:20px 14px;color:var(--text3);font-size:13px;line-height:1.5;">No meals logged today yet.<br><span style="font-size:11px;">Tap <strong>+ Add Meal</strong> below to log food. Scan a barcode 📷 or search the library to fill macros instantly.</span></div>';
+          mealList.innerHTML = '<div style="text-align:center;padding:20px 14px;color:var(--text3);font-size:13px;line-height:1.5;">No meals logged today yet.<br><span style="font-size:11px;">Tap <strong>+ Log Meal</strong> below to add food. Scan a barcode 📷 or search the library to fill macros instantly.</span></div>';
         } else {
           mealList.innerHTML = allMeals.map((m, i) => {
             // T44.1 — Logged meals (not meal-prep templates) are tappable to
@@ -14751,6 +15287,33 @@ create trigger trg_user_state_updated_at
   `;
     }
     function renderMealPrep() {
+      // T51.3 — Day-1 collapse. Show one welcome card instead of five empty
+      // sections when the user hasn't entered anything meal-prep-related yet.
+      try {
+        const welcome = document.getElementById('meal-prep-welcome-slot');
+        const sections = document.getElementById('meal-prep-sections');
+        if (welcome && sections) {
+          const noPrep = !Array.isArray(state.mealPrep) || state.mealPrep.length === 0;
+          const noRecipes = !Array.isArray(state.savedRecipes) || state.savedRecipes.length === 0;
+          const noBlocklist = !Array.isArray(state.blocklist) || state.blocklist.length === 0;
+          if (noPrep && noRecipes && noBlocklist) {
+            welcome.innerHTML = `
+              <div class="card" style="padding:16px;background:linear-gradient(135deg, rgba(127,119,221,0.08), rgba(244,182,63,0.06));border:1px solid var(--accent);text-align:center;">
+                <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--accent2);margin-bottom:6px;">Start meal prepping</div>
+                <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px;">Add a recipe, plan weekly meals, or tell ARIA what to avoid. The sections below unlock once you start.</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                  <button class="btn btn-sm btn-primary" onclick="openMealPrepModal()" style="font-size:11px;">+ Add meal prep</button>
+                  <button class="btn btn-sm" onclick="document.getElementById('blocklist-input')?.focus()" style="font-size:11px;color:var(--accent2);border-color:var(--accent2);">Set avoid list</button>
+                </div>
+              </div>`;
+            sections.style.display = 'none';
+            return;
+          } else {
+            welcome.innerHTML = '';
+            sections.style.display = '';
+          }
+        }
+      } catch (e) {}
       const list = document.getElementById('meal-prep-list');
       if (!list) return;
       if (state.mealPrep.length === 0) {
@@ -15217,10 +15780,40 @@ create trigger trg_user_state_updated_at
     function toggleRpeHelp(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       const pop = document.getElementById('rpe-help-popover');
+      const btn = document.getElementById('rpe-help-btn');
       if (!pop) return;
       const isOpen = pop.style.display === 'block';
       pop.style.display = isOpen ? 'none' : 'block';
       if (!isOpen) {
+        // T53.1 — Clamp the popover to the viewport. Position below the help
+        // button if there's room; otherwise above. Horizontal clamp keeps
+        // a 12px margin so it never bleeds past the screen edge.
+        try {
+          const margin = 12;
+          const vw = window.innerWidth || document.documentElement.clientWidth;
+          const vh = window.innerHeight || document.documentElement.clientHeight;
+          // Render off-screen first to measure
+          pop.style.left = '-9999px';
+          pop.style.top = '-9999px';
+          const popW = pop.offsetWidth || 260;
+          const popH = pop.offsetHeight || 240;
+          let left = vw - popW - margin; // default: right-aligned
+          let top = margin;
+          if (btn) {
+            const r = btn.getBoundingClientRect();
+            // Prefer right edge under the button
+            left = Math.min(r.right - popW, vw - popW - margin);
+            top = r.bottom + 8;
+            // Flip above if it overflows below
+            if (top + popH > vh - margin) {
+              top = Math.max(margin, r.top - popH - 8);
+            }
+            // Clamp horizontal
+            left = Math.max(margin, left);
+          }
+          pop.style.left = left + 'px';
+          pop.style.top = top + 'px';
+        } catch (err) {}
         // Close on outside click
         setTimeout(() => {
           const onDoc = (ev) => {
@@ -15233,6 +15826,21 @@ create trigger trg_user_state_updated_at
         }, 0);
       }
     }
+    // T53.4 — Step a sibling input in a log-set-row stepper by `delta`.
+    // Used by the ± buttons next to reps + weight to avoid keyboard taps
+    // for small adjustments. Clamps reps to ≥ 0; weight to ≥ 0.
+    function stepLogSetInput(btn, sel, delta) {
+      const wrap = btn && btn.parentElement;
+      if (!wrap) return;
+      const input = wrap.querySelector(sel);
+      if (!input) return;
+      const cur = parseFloat(input.value) || 0;
+      const next = Math.max(0, cur + delta);
+      input.value = (sel === '.set-weight' && next % 1 !== 0)
+        ? next.toFixed(1)
+        : String(Math.round(next));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     function addSetRow(prefill) {
       const wrap = document.getElementById('log-ex-sets');
       if (!wrap) return;
@@ -15243,10 +15851,22 @@ create trigger trg_user_state_updated_at
       const row = document.createElement('div');
       row.className = 'log-set-row';
       row.style.cssText = 'display:grid;grid-template-columns:26px 1fr 1fr 70px 26px;gap:6px;align-items:center;';
+      // T53.4 — Wrap reps + weight inputs with tiny ± stepper buttons so
+      // thumbs don't have to fight the soft keyboard. Reps step by 1, weight
+      // by 5. Buttons sit inside the same cell so the grid template doesn't
+      // change. Inputs flex inside the wrapper.
       row.innerHTML = `
     <div style="font-size:11px;color:var(--text3);text-align:center;">${n}</div>
-    <input type="number" inputmode="numeric" class="set-reps" placeholder="reps" value="${reps}" style="padding:6px;">
-    <input type="number" inputmode="decimal" class="set-weight" placeholder="lbs" value="${weight}" style="padding:6px;">
+    <div class="log-set-stepper" style="display:flex;align-items:stretch;gap:2px;min-width:0;">
+      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-reps',-1)" aria-label="−1 rep">−</button>
+      <input type="number" inputmode="numeric" class="set-reps" placeholder="reps" value="${reps}" style="padding:6px;flex:1;min-width:0;text-align:center;">
+      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-reps',1)" aria-label="+1 rep">+</button>
+    </div>
+    <div class="log-set-stepper" style="display:flex;align-items:stretch;gap:2px;min-width:0;">
+      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-weight',-5)" aria-label="−5 lb">−</button>
+      <input type="number" inputmode="decimal" class="set-weight" placeholder="lbs" value="${weight}" style="padding:6px;flex:1;min-width:0;text-align:center;">
+      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-weight',5)" aria-label="+5 lb">+</button>
+    </div>
     <select class="set-rpe" style="padding:6px;">
       <option value="">RPE</option>
       ${[5, 6, 7, 8, 9, 10].map(v => `<option value="${v}"${v == rpe ? ' selected' : ''}">${v}</option>`).join('')}
@@ -15356,7 +15976,7 @@ create trigger trg_user_state_updated_at
       const today = todayStr();
       const entries = (state.workoutLog || []).filter(e => e.date === today);
       if (!entries.length) {
-        el.innerHTML = `<div class="card" style="padding:14px;text-align:center;color:var(--text3);font-size:13px;">No exercises logged today.<br><span style="font-size:11px;">Tap <em>+ Log Exercise</em> to record sets, weight, and RPE.</span></div>`;
+        el.innerHTML = `<div class="card" style="padding:14px;text-align:center;color:var(--text3);font-size:13px;">No exercises logged today.<br><span style="font-size:11px;">Tap <em>+ Log Workout</em> to record sets, weight, and RPE.</span></div>`;
         return;
       }
       el.innerHTML = entries.map(e => {
@@ -16190,7 +16810,8 @@ create trigger trg_user_state_updated_at
     function renderExerciseHistoryPage() {
       const el = document.getElementById('exercise-history-list');
       if (!el) return;
-      const log = state.workoutLog || [];
+      // T54 — Filter out manual-toggle entries; they earn streak/XP only.
+      const log = (state.workoutLog || []).filter(e => e.source !== 'manual-toggle');
       if (!log.length) {
         el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px 12px;font-size:13px;">No exercises logged yet. Use the tracker on the <strong>Log Session</strong> tab — every exercise you log will appear here with its last numbers and a suggested next target.</div>`;
         return;
@@ -16318,7 +16939,8 @@ create trigger trg_user_state_updated_at
     function renderExerciseProgression() {
       const el = document.getElementById('exercise-progression-list');
       if (!el) return;
-      const log = state.workoutLog || [];
+      // T54 — Filter out manual-toggle entries (they earn streak/XP only).
+      const log = (state.workoutLog || []).filter(e => e.source !== 'manual-toggle');
       if (!log.length) {
         el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:8px 0;">No exercises logged yet. Log a session from the Quests tab to start tracking progression.</div>`;
         return;
@@ -16864,7 +17486,7 @@ create trigger trg_user_state_updated_at
         indicator.style.display = 'none';
         content.style.display = 'block';
         content.innerHTML = `
-          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px;">Complete your profile to unlock ARIA's daily challenge.</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px;">Complete your profile to unlock ARIA's challenge.</div>
           <button class="btn btn-sm btn-primary" onclick="switchTab('profile')" style="font-size:11px;">Go to Profile</button>
         `;
         return;
@@ -16884,7 +17506,7 @@ create trigger trg_user_state_updated_at
       indicator.style.display = 'none';
       content.style.display = 'block';
       content.innerHTML = `
-      <div style="font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--text);margin-bottom:6px;">${quest.questName || 'Daily Challenge'} <span style="font-size:13px;color:var(--gold);">+${quest.xpReward || 0} XP</span></div>
+      <div style="font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--text);margin-bottom:6px;">${quest.questName || 'ARIA Challenge'} <span style="font-size:13px;color:var(--gold);">+${quest.xpReward || 0} XP</span></div>
       <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${quest.description || ''}</div>
       <div style="font-size:12px;color:var(--accent2);font-style:italic;border-left:2px solid var(--accent);padding-left:8px;">"${quest.systemMessage || ''}"</div>
       <div id="ai-challenge-btn-slot"></div>
@@ -18701,6 +19323,19 @@ create trigger trg_user_state_updated_at
       if (!pane) return;
       const gear = (state.inventory.gear || []).map(id => SHOP_ITEMS[id]).filter(Boolean);
       const buffs = Object.entries(state.inventory.buffs || {}).filter(([, n]) => n > 0).map(([id, n]) => ({ ...SHOP_ITEMS[id], count: n }));
+      // T51.4 — Inventory day-1 welcome. When everything is empty, show one
+      // warm welcome card with a path to earning coins, instead of three cold
+      // "Nothing here" lines.
+      const activeBuffs = state.activeBuffs || [];
+      if (gear.length === 0 && buffs.length === 0 && activeBuffs.length === 0) {
+        pane.innerHTML = `
+          <div class="card" style="padding:18px;text-align:center;margin-top:10px;background:linear-gradient(135deg, rgba(127,119,221,0.10), rgba(244,182,63,0.06));border:1px solid var(--accent);">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--accent2);margin-bottom:6px;">Your vault is empty</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px;">Complete daily quests to earn coins, then visit the Shop to unlock frames, titles, and buffs.</div>
+            <button class="btn btn-sm btn-primary" onclick="switchShopTab('shop')" style="font-size:11px;">Browse the Shop</button>
+          </div>`;
+        return;
+      }
       pane.innerHTML = `
     <div class="section-label" style="margin-top:8px;">OWNED GEAR</div>
     ${gear.length === 0 ? `<div style="color:var(--text3);padding:10px;font-size:12px;">No gear yet — grind some quests.</div>` : `<div class="shop-grid">${gear.map(it => {
