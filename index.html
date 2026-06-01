@@ -5152,16 +5152,32 @@
   </div>
   <div class="modal-overlay" id="modal-log-exercise">
     <div class="modal">
-      <div class="modal-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Log Exercise</div>
+      <div class="modal-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Log Workout</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:10px;" id="log-ex-suggest"></p>
-      <!-- T64.1 — Editable date so users can backdate a workout they forgot
-           to log live. Defaults to today via openLogExerciseModal. -->
+      <!-- T65.2 — Resistance / Cardio mode toggle. Resistance shows the
+           sets table; Cardio swaps in distance + pace fields and uses
+           Total Time as duration. -->
       <div class="form-group" style="margin-bottom:10px;">
-        <label style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Date</span>
-          <span id="log-ex-date-hint" style="font-size:10px;color:var(--text3);"></span>
-        </label>
-        <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" style="padding:8px;">
+        <label>Type</label>
+        <div class="tab-row" style="gap:4px;">
+          <button type="button" class="tab-btn active" id="log-ex-type-resistance" onclick="setLogExerciseType('resistance')">Resistance</button>
+          <button type="button" class="tab-btn" id="log-ex-type-cardio" onclick="setLogExerciseType('cardio')">Cardio</button>
+        </div>
+      </div>
+      <!-- T64.1 / T65.1 — Date + Total time row. Both default to today / blank
+           in openLogExerciseModal. Date supports backdating. -->
+      <div class="form-row" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Date</span>
+            <span id="log-ex-date-hint" style="font-size:10px;color:var(--text3);"></span>
+          </label>
+          <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" style="padding:8px;">
+        </div>
+        <div class="form-group">
+          <label>Total time (min)</label>
+          <input type="number" id="log-ex-total-min" placeholder="e.g. 60" inputmode="numeric" step="1" style="padding:8px;">
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:10px;">
         <label>Exercise</label>
@@ -5169,10 +5185,8 @@
           oninput="onLogExerciseNameChange()">
         <datalist id="log-ex-list"></datalist>
       </div>
-      <!-- T46.1 — Equipment variant. Cable variants halve/quarter the effective
-           load (pulleys multiply mechanical advantage). Smith/Machine/Free are
-           tagged so changing equipment week-to-week doesn't look like regression. -->
-      <div class="form-group" style="margin-bottom:10px;">
+      <!-- T46.1 — Equipment variant. Resistance-only; hidden in cardio mode. -->
+      <div class="form-group log-ex-resistance-field" id="log-ex-variant-group" style="margin-bottom:10px;">
         <label style="display:flex;justify-content:space-between;align-items:center;">
           <span>Equipment</span>
           <span id="log-ex-variant-hint" style="font-size:10px;color:var(--text3);"></span>
@@ -5187,7 +5201,27 @@
           <option value="bw">Bodyweight</option>
         </select>
       </div>
-      <div class="form-group" style="margin-bottom:6px;position:relative;">
+      <!-- T65.2 — Cardio fields. Hidden in resistance mode. -->
+      <div class="form-group log-ex-cardio-field" id="log-ex-cardio-group" style="margin-bottom:10px;display:none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Distance</label>
+            <div style="display:flex;gap:6px;align-items:stretch;">
+              <input type="number" id="log-ex-distance" placeholder="e.g. 5.2" inputmode="decimal" step="0.01" style="flex:1;padding:8px;">
+              <select id="log-ex-distance-unit" style="padding:8px;flex-shrink:0;">
+                <option value="mi">mi</option>
+                <option value="km">km</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Pace / Speed</label>
+            <input type="text" id="log-ex-pace" placeholder="e.g. 12 min/mi or 18 mph" style="padding:8px;">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.4;">Duration comes from the <strong>Total time</strong> field above.</div>
+      </div>
+      <div class="form-group log-ex-resistance-field" id="log-ex-sets-group" style="margin-bottom:6px;position:relative;">
         <label style="display:flex;justify-content:space-between;align-items:center;">
           <span>Sets</span>
           <span style="font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:6px;">
@@ -15756,6 +15790,12 @@ create trigger trg_user_state_updated_at
       // T64.1 — Default date to today; users can edit to backdate.
       const dateEl = document.getElementById('log-ex-date');
       if (dateEl) { dateEl.value = todayStr(); }
+      // T65.1 — Reset total time + cardio fields.
+      ['log-ex-total-min', 'log-ex-distance', 'log-ex-pace'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      // T65.2 — Default mode is Resistance.
+      try { setLogExerciseType('resistance'); } catch (e) {}
       try { onLogExerciseDateChange(); } catch (e) {}
       // T46.1 — Default variant to last session's variant for this exercise; else 'free'.
       const variantSel = document.getElementById('log-ex-variant');
@@ -15787,6 +15827,34 @@ create trigger trg_user_state_updated_at
       if (prefillExercise) onLogExerciseNameChange();
       onLogExerciseVariantChange();
       openModal('modal-log-exercise');
+    }
+    // T65.2 — Switch between Resistance and Cardio modes on the Log Workout
+    // modal. Toggles which field groups show; the data shape on save is
+    // chosen by saveExerciseLog based on the current type.
+    let _logExType = 'resistance';
+    function setLogExerciseType(kind) {
+      if (kind !== 'cardio') kind = 'resistance';
+      _logExType = kind;
+      const btnR = document.getElementById('log-ex-type-resistance');
+      const btnC = document.getElementById('log-ex-type-cardio');
+      if (btnR) btnR.classList.toggle('active', kind === 'resistance');
+      if (btnC) btnC.classList.toggle('active', kind === 'cardio');
+      document.querySelectorAll('.log-ex-resistance-field').forEach(el => {
+        el.style.display = (kind === 'resistance') ? '' : 'none';
+      });
+      document.querySelectorAll('.log-ex-cardio-field').forEach(el => {
+        el.style.display = (kind === 'cardio') ? '' : 'none';
+      });
+      // Make sure resistance mode has at least one set row to fill in.
+      if (kind === 'resistance') {
+        const wrap = document.getElementById('log-ex-sets');
+        if (wrap && wrap.children.length === 0) {
+          try { addSetRow(); } catch (e) {}
+        }
+      }
+      // Update exercise input placeholder hint per mode.
+      const nameEl = document.getElementById('log-ex-name');
+      if (nameEl) nameEl.placeholder = kind === 'cardio' ? 'e.g. Bike, Run, Treadmill' : 'e.g. Bench Press';
     }
     // T64.1 — Surface a "backdated" hint when the date is not today, so the
     // user is aware the session won't count for today's quests/streak.
@@ -15964,6 +16032,54 @@ create trigger trg_user_state_updated_at
     function saveExerciseLog() {
       const name = document.getElementById('log-ex-name').value.trim();
       if (!name) { showNotif('Enter an exercise name'); return; }
+      // T64.1 — Use the date input's value (defaults to today) so backdated
+      // sessions land on the correct day. Falls back to today if blank.
+      const dateInput = document.getElementById('log-ex-date');
+      const entryDate = (dateInput && dateInput.value) || todayStr();
+      // T65.1 — Total session time (minutes). Optional; only stored if entered.
+      const totalMinRaw = parseFloat((document.getElementById('log-ex-total-min') || {}).value);
+      const totalMin = isFinite(totalMinRaw) && totalMinRaw > 0 ? Math.round(totalMinRaw) : undefined;
+      const notes = (document.getElementById('log-ex-notes') || {}).value.trim();
+      // T65.2 — Cardio branch. Write workoutLog entry with a `cardio` block;
+      // sets stays empty so progression/history filters can skip it.
+      if (_logExType === 'cardio') {
+        const distVal = parseFloat((document.getElementById('log-ex-distance') || {}).value);
+        const distUnit = (document.getElementById('log-ex-distance-unit') || {}).value || 'mi';
+        const distance = isFinite(distVal) && distVal > 0
+          ? `${distVal} ${distUnit}`
+          : '';
+        const pace = (document.getElementById('log-ex-pace') || {}).value.trim();
+        if (!distance && !totalMin && !pace) { showNotif('Add distance, time, or pace'); return; }
+        const entry = {
+          id: Date.now(),
+          date: entryDate,
+          exercise: name,
+          sets: [],
+          cardio: {
+            duration: totalMin ? `${totalMin}` : '',
+            speed: pace,
+            distance,
+          },
+          totalMin,
+          notes,
+        };
+        if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
+        state.workoutLog.push(entry);
+        const xp = 60; // flat cardio XP — refine later if needed
+        state.xp += xp;
+        save();
+        closeModal('modal-log-exercise');
+        try { renderTrainingLog(); } catch (e) {}
+        try { renderStats(); } catch (e) {}
+        const nameEl = document.getElementById('log-ex-name'); if (nameEl) nameEl.value = '';
+        const notesEl = document.getElementById('log-ex-notes'); if (notesEl) notesEl.value = '';
+        ['log-ex-total-min', 'log-ex-distance', 'log-ex-pace'].forEach(id => {
+          const el = document.getElementById(id); if (el) el.value = '';
+        });
+        showNotif(`Cardio logged · +${xp} XP`);
+        return;
+      }
+      // Resistance branch — original behavior.
       const rows = [...document.querySelectorAll('#log-ex-sets > .log-set-row')];
       const sets = rows.map(r => ({
         reps: parseInt(r.querySelector('.set-reps').value) || 0,
@@ -15975,17 +16091,14 @@ create trigger trg_user_state_updated_at
       // is missing (e.g. older code paths that push to workoutLog).
       const variantSel = document.getElementById('log-ex-variant');
       const variant = (variantSel && variantSel.value) || 'free';
-      // T64.1 — Use the date input's value (defaults to today) so backdated
-      // sessions land on the correct day. Falls back to today if blank.
-      const dateInput = document.getElementById('log-ex-date');
-      const entryDate = (dateInput && dateInput.value) || todayStr();
       const entry = {
         id: Date.now(),
         date: entryDate,
         exercise: name,
         sets,
         variant,
-        notes: document.getElementById('log-ex-notes').value.trim(),
+        totalMin,
+        notes,
       };
       if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
       state.workoutLog.push(entry);
@@ -16030,22 +16143,44 @@ create trigger trg_user_state_updated_at
         return;
       }
       el.innerHTML = entries.map(e => {
-        const topSet = (e.sets || []).reduce((m, s) => (s.weight || 0) > (m?.weight || 0) ? s : m, null);
-        const volume = (e.sets || []).reduce((a, s) => a + (s.reps * s.weight || 0), 0);
         const questBadge = e.source === 'quest'
           ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.08em;background:rgba(79,142,255,0.15);color:var(--accent2);border:1px solid var(--accent2);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">QUEST</span>`
           : '';
+        // T65.4 — Cardio entries render with duration / distance / pace
+        // instead of the sets / volume line.
+        if (e.cardio && (e.cardio.duration || e.cardio.distance || e.cardio.speed)) {
+          const c = e.cardio;
+          const parts = [];
+          if (c.distance) parts.push(c.distance);
+          if (c.duration) parts.push(`${c.duration} min`);
+          if (c.speed) parts.push(c.speed);
+          const cardioBadge = `<span style="font-size:9px;font-weight:700;letter-spacing:0.06em;background:rgba(79,142,255,0.12);color:var(--accent2);border:1px solid var(--accent2);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">CARDIO</span>`;
+          return `<div class="card" style="padding:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.exercise}${cardioBadge}${questBadge}</div>
+          <div style="font-size:11px;color:var(--text3);">${parts.join(' · ') || 'cardio'}</div>
+        </div>
+        <button onclick="deleteWorkoutEntry(${e.id})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;">Delete</button>
+      </div>
+      ${e.notes ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;font-style:italic;">${e.notes}</div>` : ''}
+    </div>`;
+        }
+        const topSet = (e.sets || []).reduce((m, s) => (s.weight || 0) > (m?.weight || 0) ? s : m, null);
+        const volume = (e.sets || []).reduce((a, s) => a + (s.reps * s.weight || 0), 0);
         // T46.1 — Variant tag. Only render when not the default 'free' so legacy
         // entries (no variant field) don't show a noisy "Free" pill everywhere.
         const variantMeta = e.variant ? getVariantMeta(e.variant) : null;
         const variantBadge = (variantMeta && variantMeta.id !== 'free')
           ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.06em;background:rgba(127,119,221,0.12);color:var(--accent);border:1px solid var(--accent);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">${variantMeta.short}</span>`
           : '';
+        // T65.1 — Show total session time if recorded.
+        const timeLine = e.totalMin ? ` · ${e.totalMin} min` : '';
         return `<div class="card" style="padding:10px;">
       <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.exercise}${variantBadge}${questBadge}</div>
-          <div style="font-size:11px;color:var(--text3);">${(e.sets || []).length} sets · ${volume ? volume.toLocaleString() + ' lb total' : 'bodyweight'}${topSet && topSet.weight ? ' · top ' + topSet.reps + '×' + topSet.weight + ' lbs' : ''}</div>
+          <div style="font-size:11px;color:var(--text3);">${(e.sets || []).length} sets · ${volume ? volume.toLocaleString() + ' lb total' : 'bodyweight'}${topSet && topSet.weight ? ' · top ' + topSet.reps + '×' + topSet.weight + ' lbs' : ''}${timeLine}</div>
         </div>
         <button onclick="deleteWorkoutEntry(${e.id})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;">Delete</button>
       </div>
@@ -16861,7 +16996,10 @@ create trigger trg_user_state_updated_at
       const el = document.getElementById('exercise-history-list');
       if (!el) return;
       // T54 — Filter out manual-toggle entries; they earn streak/XP only.
-      const log = (state.workoutLog || []).filter(e => e.source !== 'manual-toggle');
+      // T65.5 — Cardio entries don't have set-based progression either.
+      const log = (state.workoutLog || [])
+        .filter(e => e.source !== 'manual-toggle')
+        .filter(e => !e.cardio || !(e.cardio.duration || e.cardio.distance || e.cardio.speed));
       if (!log.length) {
         el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px 12px;font-size:13px;">No exercises logged yet. Use the tracker on the <strong>Log Session</strong> tab — every exercise you log will appear here with its last numbers and a suggested next target.</div>`;
         return;
@@ -16990,12 +17128,12 @@ create trigger trg_user_state_updated_at
       const el = document.getElementById('exercise-progression-list');
       if (!el) return;
       // T54 — Filter out manual-toggle entries (they earn streak/XP only).
-      // T62.6 — Progress shows TODAY's exercises only. The full history
-      // lives on Workouts > History, so this surface stays focused on
-      // "what did I just do" instead of dragging in every prior session.
+      // T62.6 — Progress shows TODAY's exercises only.
+      // T65.5 — Skip cardio entries — they don't have set/weight progression.
       const today = todayStr();
       const log = (state.workoutLog || [])
         .filter(e => e.source !== 'manual-toggle')
+        .filter(e => !e.cardio || !(e.cardio.duration || e.cardio.distance || e.cardio.speed))
         .filter(e => e.date === today);
       if (!log.length) {
         el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:14px 8px;font-size:12px;line-height:1.5;">Nothing logged today.<br><span style="font-size:11px;">Once you save a session it will show up here with today's top set. Full history lives on <strong>Workouts → History</strong>.</span></div>`;
