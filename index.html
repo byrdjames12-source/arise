@@ -5201,25 +5201,26 @@
           <option value="bw">Bodyweight</option>
         </select>
       </div>
-      <!-- T65.2 — Cardio fields. Hidden in resistance mode. -->
-      <div class="form-group log-ex-cardio-field" id="log-ex-cardio-group" style="margin-bottom:10px;display:none;">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Distance</label>
-            <div style="display:flex;gap:6px;align-items:stretch;">
-              <input type="number" id="log-ex-distance" placeholder="e.g. 5.2" inputmode="decimal" step="0.01" style="flex:1;padding:8px;">
-              <select id="log-ex-distance-unit" style="padding:8px;flex-shrink:0;">
-                <option value="mi">mi</option>
-                <option value="km">km</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Pace / Speed</label>
-            <input type="text" id="log-ex-pace" placeholder="e.g. 12 min/mi or 18 mph" style="padding:8px;">
+      <!-- T65.2 — Cardio fields. Hidden in resistance mode. T66 — Distance
+           and Pace are stacked into their own rows so neither gets squashed
+           by the parent form-row constraints. The distance unit select is
+           pinned to 72px so the number input has real estate to breathe. -->
+      <div class="log-ex-cardio-field" id="log-ex-cardio-group" style="display:none;">
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Distance</label>
+          <div style="display:flex;gap:6px;align-items:stretch;">
+            <input type="number" id="log-ex-distance" placeholder="e.g. 5.2" inputmode="decimal" step="0.01" style="flex:1;padding:8px;min-width:0;">
+            <select id="log-ex-distance-unit" style="padding:8px;width:72px;flex-shrink:0;">
+              <option value="mi">mi</option>
+              <option value="km">km</option>
+            </select>
           </div>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.4;">Duration comes from the <strong>Total time</strong> field above.</div>
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Pace / Speed</label>
+          <input type="text" id="log-ex-pace" placeholder="e.g. 12 min/mi or 18 mph" style="padding:8px;">
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:10px;line-height:1.4;">Duration comes from the <strong>Total time</strong> field above.</div>
       </div>
       <div class="form-group log-ex-resistance-field" id="log-ex-sets-group" style="margin-bottom:6px;position:relative;">
         <label style="display:flex;justify-content:space-between;align-items:center;">
