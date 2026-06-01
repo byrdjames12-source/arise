@@ -2775,15 +2775,26 @@
     .fab-coach .fab-coach-close { display: none; font-size: 26px; font-weight: 700; line-height: 1; }
     .fab-menu.open .fab-coach .fab-coach-default { display: none; }
     .fab-menu.open .fab-coach .fab-coach-close { display: inline-flex; align-items: center; justify-content: center; }
-    /* Backdrop appears only when menu is open so outside taps close it. */
+    /* T64.2 — Backdrop now fades to a tinted overlay when the menu opens so
+       pill labels stay readable over busy pages. Catches outside taps to
+       close the menu. The backdrop stays mounted; opacity carries the
+       transition for a smooth fade-in/out. */
     .fab-menu-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.0);
+      background: rgba(8, 12, 24, 0.55);
       z-index: 94;
-      display: none;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
     }
-    body.fab-menu-open .fab-menu-backdrop { display: block; }
+    body.fab-menu-open .fab-menu-backdrop {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    [data-theme="light"] .fab-menu-backdrop {
+      background: rgba(255, 255, 255, 0.62);
+    }
     body:not(.app-ready) .fab-menu { display: none; }
 
     /* T41.3 — Light theme: ARIA's orb shipped with a dark navy fill that
@@ -5143,6 +5154,15 @@
     <div class="modal">
       <div class="modal-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Log Exercise</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:10px;" id="log-ex-suggest"></p>
+      <!-- T64.1 — Editable date so users can backdate a workout they forgot
+           to log live. Defaults to today via openLogExerciseModal. -->
+      <div class="form-group" style="margin-bottom:10px;">
+        <label style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Date</span>
+          <span id="log-ex-date-hint" style="font-size:10px;color:var(--text3);"></span>
+        </label>
+        <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" style="padding:8px;">
+      </div>
       <div class="form-group" style="margin-bottom:10px;">
         <label>Exercise</label>
         <input type="text" id="log-ex-name" list="log-ex-list" placeholder="e.g. Bench Press"
@@ -15733,6 +15753,10 @@ create trigger trg_user_state_updated_at
       document.getElementById('log-ex-name').value = prefillExercise || '';
       document.getElementById('log-ex-notes').value = '';
       document.getElementById('log-ex-suggest').textContent = '';
+      // T64.1 — Default date to today; users can edit to backdate.
+      const dateEl = document.getElementById('log-ex-date');
+      if (dateEl) { dateEl.value = todayStr(); }
+      try { onLogExerciseDateChange(); } catch (e) {}
       // T46.1 — Default variant to last session's variant for this exercise; else 'free'.
       const variantSel = document.getElementById('log-ex-variant');
       if (variantSel) {
@@ -15763,6 +15787,19 @@ create trigger trg_user_state_updated_at
       if (prefillExercise) onLogExerciseNameChange();
       onLogExerciseVariantChange();
       openModal('modal-log-exercise');
+    }
+    // T64.1 — Surface a "backdated" hint when the date is not today, so the
+    // user is aware the session won't count for today's quests/streak.
+    function onLogExerciseDateChange() {
+      const el = document.getElementById('log-ex-date');
+      const hint = document.getElementById('log-ex-date-hint');
+      if (!el || !hint) return;
+      if (el.value && el.value !== todayStr()) {
+        hint.textContent = '📅 backdated — won\'t count for today\'s streak';
+        hint.style.color = 'var(--gold)';
+      } else {
+        hint.textContent = '';
+      }
     }
     // T46.1 — Show a short helper line under the variant select. For cable
     // variants we surface the effective-load math so the user knows their 150
@@ -15938,9 +15975,13 @@ create trigger trg_user_state_updated_at
       // is missing (e.g. older code paths that push to workoutLog).
       const variantSel = document.getElementById('log-ex-variant');
       const variant = (variantSel && variantSel.value) || 'free';
+      // T64.1 — Use the date input's value (defaults to today) so backdated
+      // sessions land on the correct day. Falls back to today if blank.
+      const dateInput = document.getElementById('log-ex-date');
+      const entryDate = (dateInput && dateInput.value) || todayStr();
       const entry = {
         id: Date.now(),
-        date: todayStr(),
+        date: entryDate,
         exercise: name,
         sets,
         variant,
