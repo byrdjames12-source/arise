@@ -2676,7 +2676,37 @@
       flex-direction: column;
       align-items: flex-end;
       gap: 10px;
-      /* T63.3 — Container ignores pointer events so the invisible space
+      /* T68.1 — Force the Log Workout Date + Total time inputs to identical
+       sizing. iOS Safari's native date control was applying its own font /
+       padding and bleeding past its grid column. !important is required to
+       override the agent stylesheet's date-input rules. */
+    .log-ex-datetime {
+      width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+      padding: 8px !important;
+      font-size: 13px !important;
+      font-family: inherit !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      background: var(--bg2) !important;
+      border: 1px solid var(--border) !important;
+      color: var(--text) !important;
+      border-radius: 6px !important;
+      height: 38px !important;
+      line-height: 1.2 !important;
+    }
+    /* iOS date input quirks — strip the calendar / textfield decorations
+       that add intrinsic width past 100%. */
+    input[type="date"].log-ex-datetime::-webkit-date-and-time-value {
+      text-align: left;
+      min-height: 0;
+    }
+    input[type="date"].log-ex-datetime::-webkit-calendar-picker-indicator {
+      opacity: 0.6;
+      margin-left: auto;
+    }
+    /* T63.3 — Container ignores pointer events so the invisible space
          taken up by the collapsed menu items doesn't block scrolls/taps on
          the right side of the screen. Children re-enable pointer-events
          where they need to be tappable. */
@@ -5154,32 +5184,33 @@
     <div class="modal">
       <div class="modal-title"><span class="icon-title-slot" data-icon="dumbbell"></span>Log Workout</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:10px;" id="log-ex-suggest"></p>
-      <!-- T65.2 — Resistance / Cardio mode toggle. Resistance shows the
-           sets table; Cardio swaps in distance + pace fields and uses
-           Total Time as duration. -->
+      <!-- T65.2 / T68.2 — Type toggle. Resistance shows the sets table;
+           Cardio swaps in distance/pace; Held captures hold time (sec)
+           per set instead of reps — for planks, hangs, wall sits, etc. -->
       <div class="form-group" style="margin-bottom:10px;">
         <label>Type</label>
         <div class="tab-row" style="gap:4px;">
           <button type="button" class="tab-btn active" id="log-ex-type-resistance" onclick="setLogExerciseType('resistance')">Resistance</button>
+          <button type="button" class="tab-btn" id="log-ex-type-held" onclick="setLogExerciseType('held')">Held</button>
           <button type="button" class="tab-btn" id="log-ex-type-cardio" onclick="setLogExerciseType('cardio')">Cardio</button>
         </div>
       </div>
-      <!-- T64.1 / T65.1 — Date + Total time row. Both default to today / blank
-           in openLogExerciseModal. Date supports backdating.
-           T67 — width:100%;min-width:0;box-sizing:border-box on both inputs
-           so the iOS native date control can't push past its 50% slot and
-           bleed into the Total time field. -->
-      <div class="form-row" style="margin-bottom:10px;">
-        <div class="form-group">
+      <!-- T64.1 / T65.1 / T68.1 — Date + Total time row. Uses grid (not flex)
+           so the iOS native date control can't break out of its 50% column.
+           Grid columns are strict 1fr 1fr regardless of intrinsic content
+           width, and the input gets appearance:none to strip the iOS
+           Safari calendar chrome that fights every width override. -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div class="form-group" style="min-width:0;">
           <label style="display:flex;justify-content:space-between;align-items:center;">
             <span>Date</span>
             <span id="log-ex-date-hint" style="font-size:10px;color:var(--text3);"></span>
           </label>
-          <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" style="padding:8px;width:100%;min-width:0;box-sizing:border-box;font-size:13px;">
+          <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" class="log-ex-datetime">
         </div>
-        <div class="form-group">
+        <div class="form-group" style="min-width:0;">
           <label>Total time (min)</label>
-          <input type="number" id="log-ex-total-min" placeholder="e.g. 60" inputmode="numeric" step="1" style="padding:8px;width:100%;min-width:0;box-sizing:border-box;font-size:13px;">
+          <input type="number" id="log-ex-total-min" placeholder="e.g. 60" inputmode="numeric" step="1" class="log-ex-datetime">
         </div>
       </div>
       <div class="form-group" style="margin-bottom:10px;">
@@ -5229,7 +5260,7 @@
         <label style="display:flex;justify-content:space-between;align-items:center;">
           <span>Sets</span>
           <span style="font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:6px;">
-            reps × weight · RPE
+            <span id="log-ex-sets-hint">reps × weight · RPE</span>
             <button type="button" id="rpe-help-btn" onclick="toggleRpeHelp(event)" aria-label="What is RPE?"
               style="width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--text2);font-size:10px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;">?</button>
           </span>
@@ -14551,7 +14582,10 @@ create trigger trg_user_state_updated_at
           const mathHint = (v.appliesMath && v.multiplier !== 1)
             ? ` <span style="color:var(--gold);font-size:10px;">(×${v.multiplier} effective)</span>`
             : '';
-          return `<button onclick="selectTrackerVariant(${JSON.stringify(v.id)})" class="btn btn-full" style="text-align:left;padding:10px 12px;margin-bottom:6px;${isCurrent ? 'border-color:var(--accent);color:var(--accent);' : ''}">${v.label}${mathHint}${isCurrent ? ' ✓' : ''}</button>`;
+          // T68.3 — Use single-quoted onclick attribute so the double
+          // quotes JSON.stringify emits don't collide and break the HTML
+          // (which was silently swallowing the click before).
+          return `<button onclick='selectTrackerVariant(${JSON.stringify(v.id)})' class="btn btn-full" style="text-align:left;padding:10px 12px;margin-bottom:6px;${isCurrent ? 'border-color:var(--accent);color:var(--accent);' : ''}">${v.label}${mathHint}${isCurrent ? ' ✓' : ''}</button>`;
         }).join('');
       }
       openModal('modal-tracker-variant');
@@ -15832,33 +15866,68 @@ create trigger trg_user_state_updated_at
       onLogExerciseVariantChange();
       openModal('modal-log-exercise');
     }
-    // T65.2 — Switch between Resistance and Cardio modes on the Log Workout
-    // modal. Toggles which field groups show; the data shape on save is
-    // chosen by saveExerciseLog based on the current type.
+    // T65.2 / T68.2 — Switch between Resistance / Held / Cardio modes on the
+    // Log Workout modal. Resistance is the default. Held captures hold time
+    // (sec) per set instead of reps — for planks, hangs, wall sits. Toggles
+    // which field groups show; saveExerciseLog chooses the entry shape.
     let _logExType = 'resistance';
     function setLogExerciseType(kind) {
-      if (kind !== 'cardio') kind = 'resistance';
+      if (!['resistance', 'cardio', 'held'].includes(kind)) kind = 'resistance';
+      const prev = _logExType;
       _logExType = kind;
-      const btnR = document.getElementById('log-ex-type-resistance');
-      const btnC = document.getElementById('log-ex-type-cardio');
-      if (btnR) btnR.classList.toggle('active', kind === 'resistance');
-      if (btnC) btnC.classList.toggle('active', kind === 'cardio');
+      ['resistance', 'cardio', 'held'].forEach(k => {
+        const btn = document.getElementById('log-ex-type-' + k);
+        if (btn) btn.classList.toggle('active', k === kind);
+      });
+      // Resistance + Held share the same sets table — only Cardio swaps it.
+      const showSetsLike = (kind === 'resistance' || kind === 'held');
       document.querySelectorAll('.log-ex-resistance-field').forEach(el => {
-        el.style.display = (kind === 'resistance') ? '' : 'none';
+        el.style.display = showSetsLike ? '' : 'none';
       });
       document.querySelectorAll('.log-ex-cardio-field').forEach(el => {
         el.style.display = (kind === 'cardio') ? '' : 'none';
       });
-      // Make sure resistance mode has at least one set row to fill in.
-      if (kind === 'resistance') {
+      // Equipment isn't meaningful for held exercises — hide it in held mode.
+      const varGroup = document.getElementById('log-ex-variant-group');
+      if (varGroup) varGroup.style.display = (kind === 'resistance') ? '' : 'none';
+      // Re-render existing set rows if the mode changed between reps/hold
+      // so the column labels match.
+      if (prev !== kind && showSetsLike) {
+        try { rerenderLogSetRows(); } catch (e) {}
+      }
+      // Make sure sets-like modes have at least one row.
+      if (showSetsLike) {
         const wrap = document.getElementById('log-ex-sets');
         if (wrap && wrap.children.length === 0) {
           try { addSetRow(); } catch (e) {}
         }
       }
-      // Update exercise input placeholder hint per mode.
+      // Update exercise input placeholder per mode.
       const nameEl = document.getElementById('log-ex-name');
-      if (nameEl) nameEl.placeholder = kind === 'cardio' ? 'e.g. Bike, Run, Treadmill' : 'e.g. Bench Press';
+      if (nameEl) {
+        nameEl.placeholder = kind === 'cardio' ? 'e.g. Bike, Run, Treadmill'
+                          : kind === 'held'   ? 'e.g. Plank, Wall Sit, Dead Hang'
+                          : 'e.g. Bench Press';
+      }
+      // Update the Sets row hint text for held mode.
+      const setsHint = document.getElementById('log-ex-sets-hint');
+      if (setsHint) {
+        setsHint.textContent = kind === 'held' ? 'sec × weight · RPE' : 'reps × weight · RPE';
+      }
+    }
+    // T68.2 — Re-render all existing set rows to swap reps ↔ hold-time
+    // columns when the user toggles between Resistance and Held.
+    function rerenderLogSetRows() {
+      const wrap = document.getElementById('log-ex-sets');
+      if (!wrap) return;
+      // Capture current values from existing rows so the user doesn't lose data.
+      const existing = [...wrap.children].map(r => ({
+        reps: parseFloat((r.querySelector('.set-reps') || {}).value) || 0,
+        weight: parseFloat((r.querySelector('.set-weight') || {}).value) || 0,
+        rpe: (r.querySelector('.set-rpe') || {}).value || '',
+      }));
+      wrap.innerHTML = '';
+      existing.forEach(s => addSetRow(s));
     }
     // T64.1 — Surface a "backdated" hint when the date is not today, so the
     // user is aware the session won't count for today's quests/streak.
@@ -15971,18 +16040,24 @@ create trigger trg_user_state_updated_at
       row.style.cssText = 'display:grid;grid-template-columns:26px 1fr 1fr 70px 26px;gap:6px;align-items:center;';
       // T53.4 — Wrap reps + weight inputs with tiny ± stepper buttons so
       // thumbs don't have to fight the soft keyboard. Reps step by 1, weight
-      // by 5. Buttons sit inside the same cell so the grid template doesn't
-      // change. Inputs flex inside the wrapper.
+      // by 5. T68.2 — In Held mode, the first column captures hold time (sec)
+      // instead of reps; ± step by 5 seconds. The set-reps class name stays
+      // so saveExerciseLog can read the value uniformly; only the placeholder
+      // and ± delta change.
+      const isHeld = (typeof _logExType !== 'undefined') && _logExType === 'held';
+      const firstColPh = isHeld ? 'sec' : 'reps';
+      const firstColStep = isHeld ? 5 : 1;
+      const firstColLabel = isHeld ? 'sec' : 'rep';
       row.innerHTML = `
     <div style="font-size:11px;color:var(--text3);text-align:center;">${n}</div>
     <div class="log-set-stepper" style="display:flex;align-items:stretch;gap:2px;min-width:0;">
-      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-reps',-1)" aria-label="−1 rep">−</button>
-      <input type="number" inputmode="numeric" class="set-reps" placeholder="reps" value="${reps}" style="padding:6px;flex:1;min-width:0;text-align:center;">
-      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-reps',1)" aria-label="+1 rep">+</button>
+      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-reps',-${firstColStep})" aria-label="−${firstColStep} ${firstColLabel}">−</button>
+      <input type="number" inputmode="numeric" class="set-reps" placeholder="${firstColPh}" value="${reps}" style="padding:6px;flex:1;min-width:0;text-align:center;">
+      <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-reps',${firstColStep})" aria-label="+${firstColStep} ${firstColLabel}">+</button>
     </div>
     <div class="log-set-stepper" style="display:flex;align-items:stretch;gap:2px;min-width:0;">
       <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-weight',-5)" aria-label="−5 lb">−</button>
-      <input type="number" inputmode="decimal" class="set-weight" placeholder="lbs" value="${weight}" style="padding:6px;flex:1;min-width:0;text-align:center;">
+      <input type="number" inputmode="decimal" class="set-weight" placeholder="${isHeld ? 'lbs (opt)' : 'lbs'}" value="${weight}" style="padding:6px;flex:1;min-width:0;text-align:center;">
       <button type="button" class="log-set-stepbtn" onclick="stepLogSetInput(this,'.set-weight',5)" aria-label="+5 lb">+</button>
     </div>
     <select class="set-rpe" style="padding:6px;">
@@ -16083,18 +16158,24 @@ create trigger trg_user_state_updated_at
         showNotif(`Cardio logged · +${xp} XP`);
         return;
       }
-      // Resistance branch — original behavior.
+      // Resistance + Held branch. Held mode stores the first column as
+      // holdSec instead of reps; weight is optional. Saving still uses the
+      // unified `sets` array — entries with `holdSec` are recognized by the
+      // training-log render path.
       const rows = [...document.querySelectorAll('#log-ex-sets > .log-set-row')];
-      const sets = rows.map(r => ({
-        reps: parseInt(r.querySelector('.set-reps').value) || 0,
-        weight: parseFloat(r.querySelector('.set-weight').value) || 0,
-        rpe: parseInt(r.querySelector('.set-rpe').value) || null,
-      })).filter(s => s.reps > 0 || s.weight > 0);
-      if (!sets.length) { showNotif('Add at least one set'); return; }
+      const isHeld = _logExType === 'held';
+      const sets = rows.map(r => {
+        const firstCol = parseInt(r.querySelector('.set-reps').value) || 0;
+        const weight = parseFloat(r.querySelector('.set-weight').value) || 0;
+        const rpe = parseInt(r.querySelector('.set-rpe').value) || null;
+        return isHeld ? { holdSec: firstCol, weight, rpe } : { reps: firstCol, weight, rpe };
+      }).filter(s => (s.reps || 0) > 0 || (s.holdSec || 0) > 0 || s.weight > 0);
+      if (!sets.length) { showNotif(isHeld ? 'Add at least one hold' : 'Add at least one set'); return; }
       // T46.1 — Capture equipment variant. Defaults to 'free' when the select
       // is missing (e.g. older code paths that push to workoutLog).
+      // T68.2 — Held mode doesn't get a variant (Equipment is hidden).
       const variantSel = document.getElementById('log-ex-variant');
-      const variant = (variantSel && variantSel.value) || 'free';
+      const variant = isHeld ? 'bw' : ((variantSel && variantSel.value) || 'free');
       const entry = {
         id: Date.now(),
         date: entryDate,
@@ -16104,6 +16185,7 @@ create trigger trg_user_state_updated_at
         totalMin,
         notes,
       };
+      if (isHeld) entry.kind = 'held';
       if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
       state.workoutLog.push(entry);
       // XP reward scales with volume
@@ -16170,26 +16252,42 @@ create trigger trg_user_state_updated_at
       ${e.notes ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;font-style:italic;">${e.notes}</div>` : ''}
     </div>`;
         }
-        const topSet = (e.sets || []).reduce((m, s) => (s.weight || 0) > (m?.weight || 0) ? s : m, null);
+        // T68.2 — Held entries detected by .kind === 'held' OR any set with
+        // a holdSec value. Rendered with a HELD badge and "3 × 45s" pills.
+        const isHeldEntry = e.kind === 'held' || (e.sets || []).some(s => s && s.holdSec > 0);
+        const topSet = isHeldEntry
+          ? (e.sets || []).reduce((m, s) => (s.holdSec || 0) > (m?.holdSec || 0) ? s : m, null)
+          : (e.sets || []).reduce((m, s) => (s.weight || 0) > (m?.weight || 0) ? s : m, null);
         const volume = (e.sets || []).reduce((a, s) => a + (s.reps * s.weight || 0), 0);
         // T46.1 — Variant tag. Only render when not the default 'free' so legacy
         // entries (no variant field) don't show a noisy "Free" pill everywhere.
         const variantMeta = e.variant ? getVariantMeta(e.variant) : null;
-        const variantBadge = (variantMeta && variantMeta.id !== 'free')
+        const variantBadge = (variantMeta && variantMeta.id !== 'free' && !isHeldEntry)
           ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.06em;background:rgba(127,119,221,0.12);color:var(--accent);border:1px solid var(--accent);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">${variantMeta.short}</span>`
+          : '';
+        const heldBadge = isHeldEntry
+          ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.06em;background:rgba(244,182,63,0.12);color:var(--gold);border:1px solid var(--gold);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">HELD</span>`
           : '';
         // T65.1 — Show total session time if recorded.
         const timeLine = e.totalMin ? ` · ${e.totalMin} min` : '';
+        const summary = isHeldEntry
+          ? `${(e.sets || []).length} sets${topSet && topSet.holdSec ? ' · top ' + topSet.holdSec + 's' : ''}${topSet && topSet.weight ? ' @ ' + topSet.weight + ' lbs' : ''}${timeLine}`
+          : `${(e.sets || []).length} sets · ${volume ? volume.toLocaleString() + ' lb total' : 'bodyweight'}${topSet && topSet.weight ? ' · top ' + topSet.reps + '×' + topSet.weight + ' lbs' : ''}${timeLine}`;
         return `<div class="card" style="padding:10px;">
       <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
         <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.exercise}${variantBadge}${questBadge}</div>
-          <div style="font-size:11px;color:var(--text3);">${(e.sets || []).length} sets · ${volume ? volume.toLocaleString() + ' lb total' : 'bodyweight'}${topSet && topSet.weight ? ' · top ' + topSet.reps + '×' + topSet.weight + ' lbs' : ''}${timeLine}</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.exercise}${variantBadge}${heldBadge}${questBadge}</div>
+          <div style="font-size:11px;color:var(--text3);">${summary}</div>
         </div>
         <button onclick="deleteWorkoutEntry(${e.id})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;">Delete</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
         ${(e.sets || []).map((s, i) => {
+          // Held pills show "45s @ 25 lbs" or just "45s".
+          if (isHeldEntry) {
+            const wt = s.weight ? ` @ ${s.weight}` : '';
+            return `<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:2px 6px;border-radius:4px;">${s.holdSec || '—'}s${wt}${s.rpe ? ` <span style="color:var(--accent2);">@${s.rpe}</span>` : ''}</span>`;
+          }
           // T46.1 — Cable variants show effective load alongside stack reading.
           const showEff = variantMeta && variantMeta.appliesMath && variantMeta.multiplier !== 1 && s.weight;
           const eff = showEff ? ` <span style="color:var(--gold);font-size:9px;">≈${effectiveLoad(s.weight, e.variant)}</span>` : '';
@@ -17001,9 +17099,11 @@ create trigger trg_user_state_updated_at
       if (!el) return;
       // T54 — Filter out manual-toggle entries; they earn streak/XP only.
       // T65.5 — Cardio entries don't have set-based progression either.
+      // T68.2 — Held entries are time-based; out of scope for this view.
       const log = (state.workoutLog || [])
         .filter(e => e.source !== 'manual-toggle')
-        .filter(e => !e.cardio || !(e.cardio.duration || e.cardio.distance || e.cardio.speed));
+        .filter(e => !e.cardio || !(e.cardio.duration || e.cardio.distance || e.cardio.speed))
+        .filter(e => e.kind !== 'held' && !(e.sets || []).some(s => s && s.holdSec > 0));
       if (!log.length) {
         el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px 12px;font-size:13px;">No exercises logged yet. Use the tracker on the <strong>Log Session</strong> tab — every exercise you log will appear here with its last numbers and a suggested next target.</div>`;
         return;
@@ -17134,10 +17234,12 @@ create trigger trg_user_state_updated_at
       // T54 — Filter out manual-toggle entries (they earn streak/XP only).
       // T62.6 — Progress shows TODAY's exercises only.
       // T65.5 — Skip cardio entries — they don't have set/weight progression.
+      // T68.2 — Skip held entries — time-based, separate progression story.
       const today = todayStr();
       const log = (state.workoutLog || [])
         .filter(e => e.source !== 'manual-toggle')
         .filter(e => !e.cardio || !(e.cardio.duration || e.cardio.distance || e.cardio.speed))
+        .filter(e => e.kind !== 'held' && !(e.sets || []).some(s => s && s.holdSec > 0))
         .filter(e => e.date === today);
       if (!log.length) {
         el.innerHTML = `<div style="text-align:center;color:var(--text3);padding:14px 8px;font-size:12px;line-height:1.5;">Nothing logged today.<br><span style="font-size:11px;">Once you save a session it will show up here with today's top set. Full history lives on <strong>Workouts → History</strong>.</span></div>`;
