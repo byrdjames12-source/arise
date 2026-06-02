@@ -5195,18 +5195,19 @@
           <button type="button" class="tab-btn" id="log-ex-type-cardio" onclick="setLogExerciseType('cardio')">Cardio</button>
         </div>
       </div>
-      <!-- T64.1 / T65.1 / T68.1 — Date + Total time row. Uses grid (not flex)
-           so the iOS native date control can't break out of its 50% column.
-           Grid columns are strict 1fr 1fr regardless of intrinsic content
-           width, and the input gets appearance:none to strip the iOS
-           Safari calendar chrome that fights every width override. -->
+      <!-- T64.1 / T65.1 / T68.1 / T69 — Date + Total time row. Uses grid (not
+           flex) so the iOS native date control can't break out of its 50%
+           column. CRITICAL: the backdated hint USED TO live inside the Date
+           label's flex container; when the hint text wrapped (which it
+           always did because the text is long), it pushed into the Total
+           time column. The hint now lives BELOW the date input on its own
+           row, contained inside the Date grid cell — it can't visually leak
+           into the right column. -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
         <div class="form-group" style="min-width:0;">
-          <label style="display:flex;justify-content:space-between;align-items:center;">
-            <span>Date</span>
-            <span id="log-ex-date-hint" style="font-size:10px;color:var(--text3);"></span>
-          </label>
+          <label>Date</label>
           <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" class="log-ex-datetime">
+          <div id="log-ex-date-hint" style="font-size:10px;color:var(--gold);line-height:1.35;margin-top:4px;display:none;"></div>
         </div>
         <div class="form-group" style="min-width:0;">
           <label>Total time (min)</label>
@@ -15929,17 +15930,20 @@ create trigger trg_user_state_updated_at
       wrap.innerHTML = '';
       existing.forEach(s => addSetRow(s));
     }
-    // T64.1 — Surface a "backdated" hint when the date is not today, so the
-    // user is aware the session won't count for today's quests/streak.
+    // T64.1 / T69 — Surface a "backdated" hint when the date is not today.
+    // Hint lives in its own row BELOW the date input so it can't push into
+    // the Total time column. We toggle display:none too (not just text) so
+    // the row collapses entirely when there's nothing to show.
     function onLogExerciseDateChange() {
       const el = document.getElementById('log-ex-date');
       const hint = document.getElementById('log-ex-date-hint');
       if (!el || !hint) return;
       if (el.value && el.value !== todayStr()) {
-        hint.textContent = '📅 backdated — won\'t count for today\'s streak';
-        hint.style.color = 'var(--gold)';
+        hint.textContent = '📅 Backdated — no streak credit';
+        hint.style.display = '';
       } else {
         hint.textContent = '';
+        hint.style.display = 'none';
       }
     }
     // T46.1 — Show a short helper line under the variant select. For cable
