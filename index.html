@@ -9669,7 +9669,8 @@ create trigger trg_user_state_updated_at
         selectorFn: () => document.getElementById('fab-menu') || document.getElementById('fab-coach'),
         title: 'Quick Actions',
         body: 'This floating menu has eight quick actions: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help. It\'s how you record almost everything in the app — one tap away on every screen.',
-        placement: 'left',
+        placement: 'auto',
+        waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
@@ -9714,7 +9715,8 @@ create trigger trg_user_state_updated_at
         selectorFn: () => document.getElementById('fab-menu') || document.getElementById('fab-coach'),
         title: 'The Quick Actions Menu',
         body: 'Eight one-tap actions live here: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help & Support. It\'s on every screen and replaces the topbar icons you might see in other apps.',
-        placement: 'left',
+        placement: 'auto',
+        waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
@@ -9722,7 +9724,8 @@ create trigger trg_user_state_updated_at
         selectorFn: () => document.getElementById('fab-pill-aria'),
         title: 'Ask ARIA',
         body: 'The Ask ARIA pill opens your AI coach. Ask for form tips, a plan tweak, macro math, or training advice — ARIA reads your profile and recent training for context. When the orb glows gold, a reply is waiting.',
-        placement: 'left',
+        placement: 'auto',
+        waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
@@ -9795,7 +9798,8 @@ create trigger trg_user_state_updated_at
         selectorFn: () => document.getElementById('fab-pill-workout'),
         title: 'Log Workout (Quick)',
         body: 'The Log Workout pill is for one-off entries (cardio rides, planks, a single lift). Three Types at the top: Resistance (reps × weight), Held (timed planks, hangs, wall sits), and Cardio (distance + pace + duration). You can backdate via the Date field, too.',
-        placement: 'left',
+        placement: 'auto',
+        waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
@@ -9849,7 +9853,8 @@ create trigger trg_user_state_updated_at
         selectorFn: () => document.getElementById('fab-pill-shop'),
         title: 'The Shop',
         body: 'Open it any time from the FAB menu\'s Shop pill. Spend the coins you earn from quests on card frames that customize your hunter card, plus consumable buffs like 2× XP and Streak Shields. Titles are earned by hitting milestones.',
-        placement: 'left',
+        placement: 'auto',
+        waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
@@ -9956,9 +9961,18 @@ create trigger trg_user_state_updated_at
       if (skipBtn) skipBtn.style.display = (idx === _activeTourSteps.length - 1) ? 'none' : '';
       // T34.12 — Back button only makes sense from step 1 onward
       if (backBtn) backBtn.style.display = (idx > 0) ? '' : 'none';
-      // Wait two animation frames — first for the screen-switch to apply,
-      // second for layout to settle — then measure and position.
-      requestAnimationFrame(() => requestAnimationFrame(() => _tutorialPositionForStep(step)));
+      // T74.1 — Steps that trigger an animation (e.g. openFabMenu) can opt
+      // into a longer wait via step.waitMs so measurement happens AFTER the
+      // animation finishes. Without this the highlight ring catches the FAB
+      // pill mid-stagger and renders off-center.
+      const waitMs = (typeof step.waitMs === 'number') ? step.waitMs : 0;
+      if (waitMs > 0) {
+        setTimeout(() => _tutorialPositionForStep(step), waitMs);
+      } else {
+        // Wait two animation frames — first for the screen-switch to apply,
+        // second for layout to settle — then measure and position.
+        requestAnimationFrame(() => requestAnimationFrame(() => _tutorialPositionForStep(step)));
+      }
     }
     function _tutorialPositionForStep(step) {
       const ring = document.getElementById('tutorial-ring');
