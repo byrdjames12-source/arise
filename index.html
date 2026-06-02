@@ -5195,24 +5195,26 @@
           <button type="button" class="tab-btn" id="log-ex-type-cardio" onclick="setLogExerciseType('cardio')">Cardio</button>
         </div>
       </div>
-      <!-- T64.1 / T65.1 / T68.1 / T69 — Date + Total time row. Uses grid (not
-           flex) so the iOS native date control can't break out of its 50%
-           column. CRITICAL: the backdated hint USED TO live inside the Date
-           label's flex container; when the hint text wrapped (which it
-           always did because the text is long), it pushed into the Total
-           time column. The hint now lives BELOW the date input on its own
-           row, contained inside the Date grid cell — it can't visually leak
-           into the right column. -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="form-group" style="min-width:0;">
-          <label>Date</label>
-          <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()" class="log-ex-datetime">
-          <div id="log-ex-date-hint" style="font-size:10px;color:var(--gold);line-height:1.35;margin-top:4px;display:none;"></div>
+      <!-- T71 — Side-by-side restored using the SAME proven recipe as the
+           tracker sheet (which renders Date + Total Workout Time without
+           overlap): grid-template-columns:1fr 1.2fr (Time gets more space
+           to compensate for iOS's calendar indicator), inline styles with
+           width:100%;min-width:0;box-sizing:border-box;appearance:none;
+           font-size:12px;padding:5px 6px — none of which the iOS UA can
+           override. The hint sits BELOW the inputs spanning both columns
+           so it can never push into either cell. -->
+      <div style="display:grid;grid-template-columns:1fr 1.2fr;grid-column-gap:10px;margin-bottom:10px;">
+        <div style="min-width:0;">
+          <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:5px;">Date</label>
+          <input type="date" id="log-ex-date" oninput="onLogExerciseDateChange()"
+            style="width:100%;min-width:0;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;box-sizing:border-box;-webkit-appearance:none;appearance:none;font-family:inherit;height:36px;">
         </div>
-        <div class="form-group" style="min-width:0;">
-          <label>Total time (min)</label>
-          <input type="number" id="log-ex-total-min" placeholder="e.g. 60" inputmode="numeric" step="1" class="log-ex-datetime">
+        <div style="min-width:0;">
+          <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:5px;">Total time (min)</label>
+          <input type="number" id="log-ex-total-min" placeholder="e.g. 60" inputmode="numeric" step="1"
+            style="width:100%;min-width:0;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;box-sizing:border-box;font-family:inherit;height:36px;">
         </div>
+        <div id="log-ex-date-hint" style="grid-column:1 / -1;font-size:10px;color:var(--gold);line-height:1.35;margin-top:4px;display:none;"></div>
       </div>
       <div class="form-group" style="margin-bottom:10px;">
         <label>Exercise</label>
