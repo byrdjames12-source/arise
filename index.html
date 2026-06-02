@@ -511,6 +511,12 @@
       -webkit-tap-highlight-color: transparent;
       overflow: hidden;
     }
+    /* T75.1 — Light-theme override. The light SVG variant uses dark-blue text
+       that disappears on the default #0D0630 navy background. Swap to white
+       so the ARISE wordmark reads on light theme. */
+    [data-theme="light"] #splash-screen {
+      background: #ffffff;
+    }
 
     #splash-screen.fading {
       opacity: 0;
@@ -1222,9 +1228,18 @@
       font-weight: 700;
     }
 
+    /* T75.2 — Explicit centering. The previous `inset: -4px` rule didn't
+       account for the SVG's intrinsic 34×34 size vs the 26×26 d-node, which
+       offset the gold progress ring to the upper-left of the flame. The
+       new rule uses absolute centering inside the d-node (which is already
+       position:relative) so the ring is exactly concentric with the icon. */
     .streak-day .d-ring {
       position: absolute;
-      inset: -4px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 34px;
+      height: 34px;
       pointer-events: none;
     }
 
