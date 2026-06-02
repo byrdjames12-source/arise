@@ -3555,7 +3555,8 @@
                    tap to mute mid-intro if it's not wanted. Preference
                    persists across sessions via localStorage. The label is
                    re-rendered by toggleAriaVoice() to reflect state. -->
-              <button id="aria-voice-toggle" class="btn btn-sm" onclick="toggleAriaVoice()" aria-pressed="true" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">🔊 Voice on</button>
+              <!-- T76.5 — Voice button uses volume line icon (was the 🔊 emoji); script syncs the icon on toggle. -->
+              <button id="aria-voice-toggle" class="btn btn-sm" onclick="toggleAriaVoice()" aria-pressed="true" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);display:inline-flex;align-items:center;gap:6px;"><span class="icon-title-slot" data-icon="volume" data-icon-size="14"></span>Voice on</button>
               <button id="aria-intro-skip" class="btn btn-sm" onclick="skipAriaIntro()" style="font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);">Skip Intro</button>
             </div>
           </div>
@@ -4080,7 +4081,8 @@
                    Creates a synthetic workoutLog entry flagged
                    source:'manual-toggle' so streak/XP credit, but it never
                    appears in progression charts. -->
-              <button class="btn btn-sm" id="quick-workout-toggle" onclick="quickLogWorkout()" style="padding:3px 8px;font-size:11px;color:var(--green);border-color:var(--green);">✓ Worked out</button>
+              <!-- T76.8 — Worked-out toggle uses check line icon, not ✓ glyph. -->
+              <button class="btn btn-sm" id="quick-workout-toggle" onclick="quickLogWorkout()" style="padding:3px 8px;font-size:11px;color:var(--green);border-color:var(--green);display:inline-flex;align-items:center;gap:4px;"><span class="icon-title-slot" data-icon="check" data-icon-size="12"></span>Worked out</button>
               <button class="btn btn-sm" onclick="openLogExerciseModal()" style="padding:3px 8px;font-size:11px;">+ Log Workout</button>
             </div>
           </div>
@@ -4145,6 +4147,10 @@
         <div id="prog-pane-stats" class="scroll">
           <!-- T51.1 — Day-1 welcome card. -->
           <div id="progress-welcome-slot"></div>
+          <!-- T77.3 — ARIA proactive check-in card. Populated by
+               renderAriaReviewSlot() when state.ariaReview.insights has
+               un-dismissed entries. Empty (display:none) otherwise. -->
+          <div id="aria-review-slot"></div>
           <!-- T62.5 — Inline Daily Check-in card removed; the full Log Today
                modal is now the only entry point (accessible from the FAB
                menu's Daily Check-in pill or the +Daily Check-in button below). -->
@@ -4902,7 +4908,8 @@
     <div class="rt-time" id="rt-time">1:30</div>
     <div class="rt-controls">
       <button onclick="addRestTime(-15)" title="Take 15s off">−15</button>
-      <button onclick="toggleRestTimerPause()" id="rt-pause-btn" title="Pause/resume">❚❚</button>
+      <!-- T76.9 — Pause/resume button uses pause line icon (was ❚❚); innerHTML toggled in toggleRestTimerPause. -->
+      <button onclick="toggleRestTimerPause()" id="rt-pause-btn" title="Pause/resume" style="display:inline-flex;align-items:center;justify-content:center;"></button>
       <button onclick="addRestTime(15)" title="Add 15s">+15</button>
     </div>
   </div>
@@ -5024,10 +5031,11 @@
           </button>
           <!-- T32.3 — Barcode scanner. Uses native BarcodeDetector when available,
                graceful fallback to manual UPC entry otherwise. -->
+          <!-- T76.6 — Barcode button uses camera line icon, not 📷 emoji. -->
           <button type="button" class="btn" onclick="openBarcodeScanner()"
             title="Scan a barcode to look up packaged food"
             style="font-size:12px;padding:8px 12px;display:flex;align-items:center;justify-content:center;gap:6px;">
-            <span style="font-size:14px;">📷</span>
+            <span class="icon-title-slot" data-icon="camera" data-icon-size="14"></span>
             <span>Scan</span>
           </button>
         </div>
@@ -5583,7 +5591,8 @@
   <div class="modal-overlay" id="modal-barcode">
     <div class="modal" style="max-width:480px;display:flex;flex-direction:column;">
       <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <span>📷 Scan barcode</span>
+        <!-- T76.6 — Modal title uses camera icon, not 📷 emoji. -->
+        <span style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-title-slot" data-icon="camera" data-icon-size="18"></span>Scan barcode</span>
         <button onclick="closeBarcodeScanner()" style="background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;">Close</button>
       </div>
       <div id="barcode-status" style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">
@@ -5726,6 +5735,24 @@
       refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
       swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
       chevron: '<polyline points="6 9 12 15 18 9"/>',
+      // T76.1 — Emoji cleanse: line-vector glyphs for every literal emoji we
+      // were still rendering inline (streak 🔥, protractor 📐, ✓ checkmarks,
+      // ❚❚ pause, ☆/★ stars, 🔊/🔇 voice, 📷 camera, 📋 clipboard, 🔔 bell,
+      // 🩹 bandage, 🪶 feather, 🏝 palm, 📅 calendar). Stroke-only Lucide
+      // style so they pick up currentColor like the rest of the icon set.
+      ruler: '<path d="M21.3 8.7L8.7 21.3a1 1 0 0 1-1.4 0L2.7 16.7a1 1 0 0 1 0-1.4L15.3 2.7a1 1 0 0 1 1.4 0l4.6 4.6a1 1 0 0 1 0 1.4z"/><path d="m7 17 2-2"/><path d="m11 13 2-2"/><path d="m15 9 2-2"/>',
+      pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+      play: '<polygon points="6 4 20 12 6 20 6 4"/>',
+      star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+      'star-fill': '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="currentColor"/>',
+      volume: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+      'volume-mute': '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>',
+      camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+      clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
+      bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+      bandage: '<path d="m10 2 12 12-8 8L2 10z"/><line x1="8" y1="12" x2="12" y2="16"/><line x1="12" y1="8" x2="16" y2="12"/><line x1="10" y1="14" x2="14" y2="10"/>',
+      feather: '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>',
+      palm: '<path d="M11 22V12"/><path d="M11 12c-2 0-5 1-5 4"/><path d="M11 12c2 0 5 1 5 4"/><path d="M11 12c-3-2-7-2-7-5 0-2 2-3 4-3"/><path d="M11 12c3-2 7-2 7-5 0-2-2-3-4-3"/><path d="M11 12c0-3 1-5 3-7"/>',
     };
     function iconSvg(name, size = 18) {
       const p = ICONS[name];
@@ -5837,7 +5864,26 @@
         mealReminders: { enabled: false, times: ['08:00', '12:30', '18:30'] },
         waterReminders: { enabled: false, intervalMinutes: 120, lastFiredAt: null }
       },
-      schemaVersion: 2
+      // T77 — ARIA proactive review. ARIA periodically re-evaluates goals,
+      // training load, and wellness from the recent logs and surfaces an
+      // insight card at the top of Progress. Cadence: every `cadenceDays`
+      // OR when any milestone counter has grown since the last review
+      // (workouts, check-ins, rank changes, training-mode toggles). Insights
+      // the user dismisses are remembered so we don't bring the same one back.
+      ariaReview: {
+        lastReviewDate: null,    // 'YYYY-MM-DD' of the last completed review
+        nextReviewDate: null,    // 'YYYY-MM-DD' when the next review is due
+        cadenceDays: 14,
+        insights: [],            // active insight cards: { id, severity, title, body, suggestion, generatedAt }
+        dismissed: [],           // insight IDs the user has dismissed
+        milestoneCounters: {
+          workoutsAtLastReview: 0,
+          checkinsAtLastReview: 0,
+          rankAtLastReview: 'E',
+          trainingModeAtLastReview: 'off',
+        },
+      },
+      schemaVersion: 3
     };
     let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
     // ===== STORAGE =====
@@ -6588,11 +6634,13 @@ create trigger trg_user_state_updated_at
       const pendingPush = (typeof _pendingPush !== 'undefined') && _pendingPush;
       let statusBadge;
       if (!online) {
-        statusBadge = `<span style="font-size:10px;color:var(--gold);background:rgba(244,182,63,0.10);border:1px solid var(--gold);border-radius:4px;padding:2px 6px;">⚠ Offline · ${pendingPush ? 'changes queued' : 'will sync when online'}</span>`;
+        // T76.7 — Offline badge uses alert icon, not ⚠ emoji.
+        statusBadge = `<span style="font-size:10px;color:var(--gold);background:rgba(244,182,63,0.10);border:1px solid var(--gold);border-radius:4px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px;">${iconSvg('alert', 11)}Offline · ${pendingPush ? 'changes queued' : 'will sync when online'}</span>`;
       } else if (pendingPush) {
         statusBadge = `<span style="font-size:10px;color:var(--accent2);background:rgba(79,142,255,0.10);border:1px solid var(--accent2);border-radius:4px;padding:2px 6px;">⟳ Syncing…</span>`;
       } else {
-        statusBadge = `<span style="font-size:10px;color:var(--green2);background:rgba(34,197,94,0.10);border:1px solid var(--green2);border-radius:4px;padding:2px 6px;">✓ Synced · ${lastSyncStr}</span>`;
+        // T76.8 — Sync badge uses check icon, not ✓ glyph.
+        statusBadge = `<span style="font-size:10px;color:var(--green2);background:rgba(34,197,94,0.10);border:1px solid var(--green2);border-radius:4px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px;">${iconSvg('check', 11)}Synced · ${lastSyncStr}</span>`;
       }
       // T16.2 — Local-vs-cloud diagnostic counts. Helps user spot at a glance whether
       // local has more entries than cloud (sync issue) or matches.
@@ -7436,7 +7484,8 @@ create trigger trg_user_state_updated_at
         : '';
       return `
         <div class="card" style="border:1px solid var(--gold);background:linear-gradient(135deg, rgba(244,182,63,0.08), rgba(244,182,63,0.02));padding:12px;margin-top:4px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;color:var(--gold);text-transform:uppercase;margin-bottom:8px;">📋 Recommended Plan</div>
+          <!-- T76.10 — Plan badge uses clipboard line icon, not 📋 emoji. -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;color:var(--gold);text-transform:uppercase;margin-bottom:8px;display:inline-flex;align-items:center;gap:6px;">${iconSvg('clipboard', 12)}Recommended Plan</div>
           ${plan.summary ? `<div style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:10px;">${escapeHtml(plan.summary)}</div>` : ''}
           ${splitRows ? `
             <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--text2);margin-bottom:4px;">SPLIT</div>
@@ -7647,6 +7696,30 @@ create trigger trg_user_state_updated_at
           if (state.aiCoach && Array.isArray(state.aiCoach.messages)
               && typeof state.aiCoach.seenCount !== 'number') {
             state.aiCoach.seenCount = state.aiCoach.messages.length;
+          }
+          // T77.1 — Backfill ariaReview for pre-v3 saves so the proactive
+          // check-in feature works for existing users.
+          if (!state.ariaReview || typeof state.ariaReview !== 'object') {
+            state.ariaReview = {
+              lastReviewDate: null, nextReviewDate: null, cadenceDays: 14,
+              insights: [], dismissed: [],
+              milestoneCounters: {
+                workoutsAtLastReview: (state.workoutLog || []).length,
+                checkinsAtLastReview: (state.logs || []).length,
+                rankAtLastReview: state.rank || 'E',
+                trainingModeAtLastReview: 'off',
+              },
+            };
+          } else {
+            if (!Array.isArray(state.ariaReview.insights)) state.ariaReview.insights = [];
+            if (!Array.isArray(state.ariaReview.dismissed)) state.ariaReview.dismissed = [];
+            if (typeof state.ariaReview.cadenceDays !== 'number') state.ariaReview.cadenceDays = 14;
+            if (!state.ariaReview.milestoneCounters) {
+              state.ariaReview.milestoneCounters = {
+                workoutsAtLastReview: 0, checkinsAtLastReview: 0,
+                rankAtLastReview: 'E', trainingModeAtLastReview: 'off',
+              };
+            }
           }
         }
       } catch (e) { }
@@ -7997,7 +8070,8 @@ create trigger trg_user_state_updated_at
         if (btn) {
           const on = ariaVoiceEnabled();
           btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-          btn.textContent = on ? '🔊 Voice on' : '🔇 Voice off';
+          // T76.5 — Render volume icon + label as inline SVG (no 🔊/🔇 emoji).
+          btn.innerHTML = `${iconSvg(on ? 'volume' : 'volume-mute', 14)}${on ? 'Voice on' : 'Voice off'}`;
           btn.style.opacity = on ? '1' : '0.65';
         }
       } catch (e) {}
@@ -8037,7 +8111,8 @@ create trigger trg_user_state_updated_at
       const btn = document.getElementById('aria-voice-toggle');
       if (btn) {
         btn.setAttribute('aria-pressed', next ? 'true' : 'false');
-        btn.textContent = next ? '🔊 Voice on' : '🔇 Voice off';
+        // T76.5 — Render volume icon + label as inline SVG (no 🔊/🔇 emoji).
+        btn.innerHTML = `${iconSvg(next ? 'volume' : 'volume-mute', 14)}${next ? 'Voice on' : 'Voice off'}`;
         btn.style.opacity = next ? '1' : '0.65';
       }
     }
@@ -8708,9 +8783,10 @@ create trigger trg_user_state_updated_at
         slot.innerHTML = '';
         return;
       }
+      // T76.8 — Checklist bullet uses check line icon, not ✓ glyph.
       const mk = (done, label, action) => `
         <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${done ? 'opacity:0.55;' : ''}">
-          <span style="width:18px;height:18px;border-radius:50%;border:2px solid ${done ? 'var(--green)' : 'var(--text3)'};display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:${done ? 'var(--green)' : 'var(--text3)'};flex-shrink:0;">${done ? '✓' : ''}</span>
+          <span style="width:18px;height:18px;border-radius:50%;border:2px solid ${done ? 'var(--green)' : 'var(--text3)'};display:inline-flex;align-items:center;justify-content:center;color:${done ? 'var(--green)' : 'var(--text3)'};flex-shrink:0;">${done ? iconSvg('check', 11) : ''}</span>
           <span style="flex:1;font-size:12px;${done ? 'text-decoration:line-through;color:var(--text3);' : 'color:var(--text2);'}">${label}</span>
           ${done ? '' : `<button class="btn btn-sm btn-primary" onclick="${action}" style="font-size:10px;padding:3px 8px;">Do it</button>`}
         </div>`;
@@ -9123,8 +9199,9 @@ create trigger trg_user_state_updated_at
           new Notification(title, { body, icon: undefined, silent: false });
         } catch (e) { /* some browsers throw on background tabs — ignore */ }
       }
-      // Always toast so the user sees it when the tab is foregrounded
-      showNotif(`🔔 ${title} — ${body}`);
+      // Always toast so the user sees it when the tab is foregrounded.
+      // T76.11 — Drop the 🔔 prefix; the notif chip itself is the visual cue.
+      showNotif(`${title} — ${body}`);
     }
     // Compare clock-time strings like "08:00" to the current local time. Returns
     // true if `hhmm` is within the same minute as now (or at most 1 min stale,
@@ -9804,7 +9881,7 @@ create trigger trg_user_state_updated_at
           ? document.getElementById('work-pane-log')
           : document.getElementById('work-tab-log'),
         title: 'The Workout Tracker',
-        body: 'A printable-style sheet for live sessions. Each row gets weight × reps × RPE per set. Tap the 📐 icon next to an exercise to tag the equipment variant — Cable 2-pulley, Smith, Free Weight — so swapping setups week to week never reads as regression. Sheet-level rest timers (60s / 90s / 3min) sit at the top.',
+        body: 'A printable-style sheet for live sessions. Each row gets weight × reps × RPE per set. Tap the ruler icon next to an exercise to tag the equipment variant — Cable 2-pulley, Smith, Free Weight — so swapping setups week to week never reads as regression. Sheet-level rest timers (60s / 90s / 3min) sit at the top.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('workouts'); switchWorkoutTab('log'); } catch(e){} },
       },
@@ -9851,7 +9928,7 @@ create trigger trg_user_state_updated_at
           ? document.getElementById('nut-prep')
           : document.getElementById('nut-tab-prep'),
         title: 'Meal Prep & Fasting',
-        body: 'Save reusable meals, plan the week, and manage your avoid list — tap the ☆ star on any meal prep card to save it as a recipe. This is also where Fasting lives: water-only, liquid, Daniel, intermittent, or custom. Active fasts pause macros and quests automatically.',
+        body: 'Save reusable meals, plan the week, and manage your avoid list — tap the star on any meal prep card to save it as a recipe. This is also where Fasting lives: water-only, liquid, Daniel, intermittent, or custom. Active fasts pause macros and quests automatically.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('nutrition'); switchNutTab('prep'); } catch(e){} },
       },
@@ -10584,6 +10661,11 @@ create trigger trg_user_state_updated_at
       try { organizeProfileColumns(); } catch (e) { console.warn('organizeProfileColumns', e); }
       // T26.1 — Restore the user's "collapsed history/library" preference
       try { applyWorkoutPanesCollapsed(); } catch (e) { }
+      // T77.4 — Run an ARIA proactive review on app boot. Cadence + milestone
+      // gating inside maybeRunAriaReview keeps it from firing every load —
+      // it only runs once per cadence window OR after a meaningful event
+      // (10 new workouts / 30 new check-ins / rank-up / training-mode toggle).
+      try { maybeRunAriaReview(); } catch (e) { console.warn('ARIA review boot:', e); }
       renderStats(); renderGoals(); renderQuests(); renderNutrition(); renderProfile(); renderShop();
       renderTrainingLog();
       renderExerciseProgression();
@@ -11416,9 +11498,10 @@ create trigger trg_user_state_updated_at
         if (!def) return '';
         return `<span style="color:var(--gold);font-weight:600;">${def.label}</span> <span style="color:var(--text3);font-size:11px;">(${r.severity})</span>`;
       }).filter(Boolean).join(' · ');
+      // T76.12 — Recovery banner uses bandage line icon, not 🩹 emoji.
       slot.innerHTML = `
         <div onclick="openInjuryModal()" style="background:rgba(244,182,63,0.10);border:1px solid var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;flex-shrink:0;">🩹</span>
+          <span style="flex-shrink:0;color:var(--gold);display:inline-flex;align-items:center;justify-content:center;">${iconSvg('bandage', 18)}</span>
           <div style="flex:1;min-width:0;">
             <div style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:1px;font-size:10px;color:var(--gold);margin-bottom:2px;">RECOVERY ACTIVE</div>
             <div style="font-size:12px;line-height:1.4;">${summary}</div>
@@ -11449,7 +11532,8 @@ create trigger trg_user_state_updated_at
           <div style="margin-bottom:8px;border-radius:10px;${headerStyle}padding:10px 12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
               <div style="flex:1;">
-                <div style="font-weight:600;font-size:13px;color:${on ? 'var(--gold)' : 'var(--text)'};">${on ? '✓ ' : ''}${def.label}</div>
+                <!-- T76.8 — Active-region label uses inline check icon, not ✓ glyph. -->
+                <div style="font-weight:600;font-size:13px;color:${on ? 'var(--gold)' : 'var(--text)'};display:inline-flex;align-items:center;gap:4px;">${on ? iconSvg('check', 13) : ''}${def.label}</div>
                 ${on ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;">${def.cue}</div>` : ''}
               </div>
               ${on
@@ -11491,7 +11575,8 @@ create trigger trg_user_state_updated_at
       const groups = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core'];
       slot.innerHTML = groups.map(g => {
         const on = active.includes(g);
-        return `<button onclick="toggleInjuryArea('${g}')" style="background:${on ? 'rgba(244,182,63,0.18)' : 'var(--bg2)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};color:${on ? 'var(--gold)' : 'var(--text2)'};padding:6px 12px;border-radius:14px;font-size:12px;font-weight:${on ? '600' : '400'};cursor:pointer;">${on ? '✓ ' : ''}${g}</button>`;
+        // T76.8 — Injury chip uses inline check icon, not ✓ glyph.
+        return `<button onclick="toggleInjuryArea('${g}')" style="background:${on ? 'rgba(244,182,63,0.18)' : 'var(--bg2)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};color:${on ? 'var(--gold)' : 'var(--text2)'};padding:6px 12px;border-radius:14px;font-size:12px;font-weight:${on ? '600' : '400'};cursor:pointer;display:inline-flex;align-items:center;gap:4px;">${on ? iconSvg('check', 12) : ''}${g}</button>`;
       }).join('');
       // Impact summary — show which workout types will get substituted
       if (note) {
@@ -11875,6 +11960,9 @@ create trigger trg_user_state_updated_at
         widget.style.display = 'block';
         widget.classList.remove('rt-done');
       }
+      // T76.9 — Prime the pause button with the pause icon (was ❚❚ glyph).
+      const pauseBtn = document.getElementById('rt-pause-btn');
+      if (pauseBtn) pauseBtn.innerHTML = iconSvg('pause', 14);
       _tickRestTimer();
       _restTimer.intervalId = setInterval(_tickRestTimer, 250);
     }
@@ -11937,10 +12025,12 @@ create trigger trg_user_state_updated_at
         _restTimer.startedAt = Date.now();
         _restTimer.duration = _restTimer.remaining;
         _restTimer.paused = false;
-        if (btn) btn.textContent = '❚❚';
+        // T76.9 — Toggle to pause icon (was ❚❚ glyph).
+        if (btn) btn.innerHTML = iconSvg('pause', 14);
       } else {
         _restTimer.paused = true;
-        if (btn) btn.textContent = '▶';
+        // T76.9 — Toggle to play icon (was ▶ glyph).
+        if (btn) btn.innerHTML = iconSvg('play', 14);
       }
     }
 
@@ -13176,11 +13266,14 @@ create trigger trg_user_state_updated_at
         const inDeload = (typeof isInActiveDeload === 'function') && isInActiveDeload();
         const quests = templates.map((t, i) => {
           let enrichedDesc = t.desc;
+          // T76.13–14 — Quest desc is persisted to state, so we use plain text
+          // prefixes instead of embedding SVG markup or emojis. The renderer
+          // could promote these to icon chips later by parsing the prefix.
           if (i === 0 && t.type === 'strength' && continuityHint) {
-            enrichedDesc = `${enrichedDesc}\n📈 ${continuityHint}`;
+            enrichedDesc = `${enrichedDesc}\nProgression: ${continuityHint}`;
           }
           if (t.type === 'strength' && inDeload) {
-            enrichedDesc = `${enrichedDesc}\n🪶 Deload week — ~60% of usual load, RPE 5-6.`;
+            enrichedDesc = `${enrichedDesc}\nDeload week — ~60% of usual load, RPE 5-6.`;
           }
           return { id: Date.now() + i, ...t, desc: enrichedDesc, done: oldDone.includes(t.name), date: today };
         });
@@ -13197,7 +13290,11 @@ create trigger trg_user_state_updated_at
               if (!q.done) {
                 q.done = true;
                 q.autoCompletedByFast = true;
-                q.desc = (q.desc || '') + ' · ✓ auto-completed (fasting)';
+                // T76.8 — Drop the ✓ glyph; the text is clear on its own and we
+                // don't want SVG markup persisted into q.desc state. The
+                // q.autoCompletedByFast flag above is what the badge should key
+                // off if we ever want to render a chip at display time.
+                q.desc = (q.desc || '') + ' · auto-completed (fasting)';
               }
             }
           });
@@ -13214,7 +13311,10 @@ create trigger trg_user_state_updated_at
       try { renderFirstSessionCard(); } catch (e) {}
       const doneCount = state.quests.filter(q => q.done).length;
       const totalXP = state.quests.reduce((a, q) => a + (q.done ? q.xp : 0), 0);
-      document.getElementById('quest-date-label').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + (state.workoutSplit[dayOfWeek()] || 'Rest') + (vacationMode ? ' · 🏝 Vacation' : '');
+      // T76.15 — Drop 🏝 emoji; the "Vacation" word carries the meaning and
+      // textContent can't render SVG anyway. The vacation banner card below
+      // is the visual cue.
+      document.getElementById('quest-date-label').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + (state.workoutSplit[dayOfWeek()] || 'Rest') + (vacationMode ? ' · Vacation' : '');
       { const v = document.getElementById('streak-display-value'); if (v) v.textContent = state.streak; }
       document.getElementById('quest-summary').textContent = `${doneCount} of ${state.quests.length} complete · ${totalXP} XP earned today`;
       renderStreakRow();
@@ -13330,7 +13430,8 @@ create trigger trg_user_state_updated_at
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
               <div style="font-size:11px;color:var(--text3);">${state.xp || 0} XP</div>
-              <div style="font-size:11px;color:var(--text3);">🔥 ${state.streak || 0}-day streak</div>
+              <!-- T76.2 — Streak label uses inline flame icon, not the 🔥 emoji. -->
+              <div style="font-size:11px;color:var(--text3);display:inline-flex;align-items:center;gap:4px;">${iconSvg('flame', 12)}${state.streak || 0}-day streak</div>
             </div>
           </div>
         `;
@@ -13687,6 +13788,272 @@ create trigger trg_user_state_updated_at
         document.getElementById('penalty-bar').style.display = 'flex';
       }
     }
+    // ===== T77 — ARIA PROACTIVE REVIEW =====
+    // ARIA periodically re-evaluates the user's recent training, body-stat
+    // trend, sleep, and macro adherence and surfaces an insight card on the
+    // Progress tab. The review fires when:
+    //   - It's been `cadenceDays` since the last review, OR
+    //   - A milestone counter has grown since the last review (+10 workouts,
+    //     +30 check-ins, rank-up, training-mode toggle).
+    // Insights the user dismisses are remembered in state.ariaReview.dismissed
+    // so we don't repeat them. The "Discuss with ARIA" button seeds an ARIA
+    // chat turn with the insight as opening context.
+    function _ariaReviewState() {
+      // Self-heal: older states (pre-T77) won't have ariaReview yet.
+      if (!state.ariaReview) {
+        state.ariaReview = {
+          lastReviewDate: null, nextReviewDate: null, cadenceDays: 14,
+          insights: [], dismissed: [],
+          milestoneCounters: {
+            workoutsAtLastReview: 0, checkinsAtLastReview: 0,
+            rankAtLastReview: 'E', trainingModeAtLastReview: 'off',
+          },
+        };
+      }
+      return state.ariaReview;
+    }
+    function _currentTrainingMode() {
+      const s = state.settings || {};
+      if (s.vacationMode) return 'vacation';
+      if (s.injuries && s.injuries.active) return 'recovery';
+      if (typeof isInActiveDeload === 'function' && isInActiveDeload()) return 'deload';
+      return 'off';
+    }
+    function _ariaMilestoneCounters() {
+      const workouts = (state.workoutLog || []).length;
+      const checkins = (state.logs || []).length;
+      return {
+        workouts, checkins,
+        rank: state.rank || 'E',
+        trainingMode: _currentTrainingMode(),
+      };
+    }
+    function shouldRunAriaReview(now) {
+      const r = _ariaReviewState();
+      const today = (now || new Date()).toISOString().slice(0, 10);
+      // First-run: only fire if the user already has enough logged history
+      // for the analyzer to say something useful. Otherwise wait.
+      if (!r.lastReviewDate) {
+        const cnt = _ariaMilestoneCounters();
+        return cnt.checkins >= 3 || cnt.workouts >= 5;
+      }
+      // Cadence check.
+      if (r.nextReviewDate && today >= r.nextReviewDate) return true;
+      // Milestone check — any counter grew enough since the last review.
+      const cnt = _ariaMilestoneCounters();
+      const m = r.milestoneCounters;
+      if (cnt.workouts - (m.workoutsAtLastReview || 0) >= 10) return true;
+      if (cnt.checkins - (m.checkinsAtLastReview || 0) >= 30) return true;
+      if (cnt.rank !== m.rankAtLastReview) return true;
+      if (cnt.trainingMode !== m.trainingModeAtLastReview) return true;
+      return false;
+    }
+    // Internal: linear-fit slope (units per day) for weight logs over the
+    // last `days` window. Returns null when fewer than 3 datapoints exist.
+    function _weightSlopePerDay(days) {
+      const logs = (state.logs || []).filter(l => l && l.date && isFinite(l.weight));
+      if (logs.length < 3) return null;
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (days || 21));
+      const recent = logs.filter(l => new Date(l.date) >= cutoff);
+      if (recent.length < 3) return null;
+      const t0 = new Date(recent[0].date).getTime();
+      const xs = recent.map(l => (new Date(l.date).getTime() - t0) / 86400000);
+      const ys = recent.map(l => l.weight);
+      const n = xs.length;
+      const mx = xs.reduce((a, b) => a + b, 0) / n;
+      const my = ys.reduce((a, b) => a + b, 0) / n;
+      let num = 0, den = 0;
+      for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+      return den === 0 ? 0 : num / den;
+    }
+    function _avgRpeRecent(days) {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (days || 14));
+      const sets = [];
+      (state.workoutLog || []).forEach(w => {
+        if (!w || !w.date) return;
+        if (new Date(w.date) < cutoff) return;
+        (w.sets || []).forEach(s => { if (s && isFinite(s.rpe) && s.rpe > 0) sets.push(s.rpe); });
+      });
+      if (sets.length === 0) return null;
+      return sets.reduce((a, b) => a + b, 0) / sets.length;
+    }
+    function _avgSleepRecent(days) {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (days || 7));
+      const nights = (state.logs || []).filter(l => l && l.date && new Date(l.date) >= cutoff && isFinite(l.sleep) && l.sleep > 0).map(l => l.sleep);
+      if (nights.length === 0) return null;
+      return nights.reduce((a, b) => a + b, 0) / nights.length;
+    }
+    function _workoutsPerWeek(days) {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (days || 21));
+      const dates = new Set();
+      (state.workoutLog || []).forEach(w => {
+        if (w && w.date && new Date(w.date) >= cutoff) dates.add(w.date);
+      });
+      return dates.size / ((days || 21) / 7);
+    }
+    // Build the ranked list of insights from the current state. Each insight
+    // has a stable `id` so we can dedupe against the dismissed list.
+    function buildAriaReviewInsights() {
+      const out = [];
+      const goalType = (state.profile && state.profile.goalType) || 'maintain';
+      const slope = _weightSlopePerDay(21); // lbs/day over the last 21 days
+      const slopePerWeek = slope == null ? null : slope * 7;
+      // Weight trend vs goal.
+      if (slopePerWeek != null) {
+        if (goalType === 'cut' && slopePerWeek > -0.1) {
+          out.push({
+            id: 'weight-stall-cut', severity: 'high',
+            title: 'Weight trend has flattened',
+            body: `Your 3-week weight slope is ${slopePerWeek.toFixed(2)} lb/wk. On a cut, ARIA looks for roughly −0.5 lb/wk. The deficit may have eroded as your body adapted.`,
+            suggestion: 'Tighten calories by ~100 kcal/day OR add one cardio session per week, then reassess in 2 weeks.',
+          });
+        } else if (goalType === 'bulk' && slopePerWeek < 0.1) {
+          out.push({
+            id: 'weight-stall-bulk', severity: 'high',
+            title: 'Bulk has stalled out',
+            body: `Your 3-week weight slope is ${slopePerWeek.toFixed(2)} lb/wk. On a bulk, ARIA looks for roughly +0.3 lb/wk.`,
+            suggestion: 'Add ~150 kcal/day — easiest spot is +1 protein/carb meal or +30g carbs around training.',
+          });
+        } else if (goalType === 'recomp' && Math.abs(slopePerWeek) > 0.4) {
+          out.push({
+            id: 'recomp-drift', severity: 'medium',
+            title: 'Recomp is drifting',
+            body: `Recomp targets ±0.2 lb/wk; you're at ${slopePerWeek.toFixed(2)} lb/wk. ARIA can re-anchor your macros.`,
+            suggestion: slopePerWeek > 0 ? 'Trim ~100 kcal/day and keep protein flat.' : 'Add ~100 kcal/day and keep protein flat.',
+          });
+        }
+      }
+      // Training frequency.
+      const wkPerWk = _workoutsPerWeek(21);
+      if (wkPerWk != null && wkPerWk < 2) {
+        out.push({
+          id: 'frequency-dip', severity: 'medium',
+          title: 'Training frequency dipped',
+          body: `You're averaging ${wkPerWk.toFixed(1)} sessions/wk over the last 3 weeks. Most plans assume 3+.`,
+          suggestion: 'Pick two anchor days you can defend and put them in your split. Even 2 consistent days beats 4 missed.',
+        });
+      }
+      // RPE fatigue / deload check.
+      const avgRpe = _avgRpeRecent(14);
+      if (avgRpe != null && avgRpe >= 8.5) {
+        out.push({
+          id: 'fatigue-deload', severity: 'high',
+          title: 'High fatigue showing in your RPE',
+          body: `Avg RPE over the last 2 weeks is ${avgRpe.toFixed(1)}. That's at the edge — fatigue accumulates faster than progress here.`,
+          suggestion: 'Run a deload week: ~60% of usual load, RPE 5–6, same exercise selection. Profile → Modes → Deload turns it on.',
+        });
+      }
+      // Sleep.
+      const avgSleep = _avgSleepRecent(7);
+      if (avgSleep != null && avgSleep < 6.5) {
+        out.push({
+          id: 'sleep-low', severity: 'medium',
+          title: 'Sleep is running low',
+          body: `Last 7 nights average ${avgSleep.toFixed(1)} hours. Below 6.5h regularly blunts recovery, strength gains, and appetite control.`,
+          suggestion: 'Try moving lights-out 30 minutes earlier for the next 10 days and re-check.',
+        });
+      }
+      // Rank-up positive nudge — surfaces only when it just happened.
+      const m = _ariaReviewState().milestoneCounters;
+      const cur = _ariaMilestoneCounters();
+      if (cur.rank !== m.rankAtLastReview && m.rankAtLastReview && cur.rank > m.rankAtLastReview) {
+        out.push({
+          id: 'rank-up-' + cur.rank, severity: 'celebrate',
+          title: `Rank-up to ${cur.rank} — quick re-anchor`,
+          body: 'A new rank usually means strength, stamina, or volume just jumped. Old prescriptions get conservative.',
+          suggestion: 'Spend 5 minutes in Profile → Goals confirming targets still match the new baseline.',
+        });
+      }
+      // Default insight when we have no signals worth surfacing but cadence
+      // still hit — a soft check-in that says "things look on track".
+      if (out.length === 0) {
+        out.push({
+          id: 'all-good-' + new Date().toISOString().slice(0, 7), severity: 'low',
+          title: 'Quick check-in with ARIA',
+          body: 'Numbers look stable across weight, training, and sleep — no flags this cycle. Worth a 2-minute pulse on whether the current targets still match what you actually want.',
+          suggestion: 'Open ARIA and tell her one thing you want to change this month — she\'ll rework the plan around it.',
+        });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      return out.map(i => ({ ...i, generatedAt: today }));
+    }
+    function runAriaReview(now) {
+      const r = _ariaReviewState();
+      const today = (now || new Date()).toISOString().slice(0, 10);
+      const dismissed = new Set(r.dismissed || []);
+      // Filter dismissed-yet-still-valid insights so the user doesn't see
+      // the same banner twice in a year.
+      const fresh = buildAriaReviewInsights().filter(i => !dismissed.has(i.id));
+      r.insights = fresh;
+      r.lastReviewDate = today;
+      const next = new Date(today + 'T00:00:00');
+      next.setDate(next.getDate() + (r.cadenceDays || 14));
+      r.nextReviewDate = next.toISOString().slice(0, 10);
+      const cnt = _ariaMilestoneCounters();
+      r.milestoneCounters = {
+        workoutsAtLastReview: cnt.workouts,
+        checkinsAtLastReview: cnt.checkins,
+        rankAtLastReview: cnt.rank,
+        trainingModeAtLastReview: cnt.trainingMode,
+      };
+      try { save(); } catch (e) {}
+      return fresh;
+    }
+    function maybeRunAriaReview() {
+      if (shouldRunAriaReview()) {
+        try { runAriaReview(); } catch (e) { console.warn('ARIA review failed:', e); }
+      }
+    }
+    function dismissAriaInsight(id) {
+      const r = _ariaReviewState();
+      if (!r.dismissed.includes(id)) r.dismissed.push(id);
+      r.insights = (r.insights || []).filter(i => i.id !== id);
+      try { save(); } catch (e) {}
+      try { renderAriaReviewSlot(); } catch (e) {}
+    }
+    function discussAriaInsight(id) {
+      const r = _ariaReviewState();
+      const insight = (r.insights || []).find(i => i.id === id);
+      if (!insight) return;
+      // Seed an ARIA assistant message that frames the review for the user,
+      // then open the chat so they can respond naturally.
+      state.aiCoach = state.aiCoach || { messages: [] };
+      const seedContent = `Hey${state.profile?.name ? ' ' + state.profile.name : ''}, this is your auto check-in. ${insight.body}\n\nMy suggestion: ${insight.suggestion}\n\nWant to try it, tweak it, or talk through something else first?`;
+      state.aiCoach.messages.push({ role: 'assistant', content: seedContent, ts: Date.now(), isReview: true, insightId: id });
+      // Dismiss the card now — the conversation is the follow-through.
+      dismissAriaInsight(id);
+      try { openAICoachModal(); } catch (e) { showNotif('ARIA chat unavailable here.', 'var(--red2)'); }
+    }
+    function renderAriaReviewSlot() {
+      const slot = document.getElementById('aria-review-slot');
+      if (!slot) return;
+      const r = _ariaReviewState();
+      const active = (r.insights || []).filter(i => !(r.dismissed || []).includes(i.id));
+      if (active.length === 0) { slot.innerHTML = ''; return; }
+      // Show the highest-severity insight first; the rest stay in state for
+      // when this one is dismissed.
+      const order = { high: 0, medium: 1, celebrate: 1, low: 2 };
+      const top = [...active].sort((a, b) => (order[a.severity] || 9) - (order[b.severity] || 9))[0];
+      const severityColor = top.severity === 'high' ? 'var(--gold)'
+        : top.severity === 'celebrate' ? 'var(--green2)'
+        : top.severity === 'medium' ? 'var(--accent2)' : 'var(--text2)';
+      const idx = active.findIndex(i => i.id === top.id) + 1;
+      const counter = active.length > 1 ? `<span style="font-size:10px;color:var(--text3);margin-left:6px;">(${idx} of ${active.length})</span>` : '';
+      slot.innerHTML = `
+        <div class="card" style="padding:14px;background:linear-gradient(135deg, rgba(244,182,63,0.10), rgba(127,119,221,0.06));border:1px solid ${severityColor};margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="display:inline-flex;align-items:center;color:${severityColor};">${iconSvg('sparkles', 16)}</span>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.2px;color:${severityColor};text-transform:uppercase;">ARIA Check-in${counter}</div>
+          </div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;">${escapeHtml(top.title)}</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${escapeHtml(top.body)}</div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-bottom:10px;"><strong style="color:var(--gold);">Suggestion:</strong> ${escapeHtml(top.suggestion)}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-primary" onclick="discussAriaInsight('${top.id}')" style="font-size:11px;">Discuss with ARIA</button>
+            <button class="btn btn-sm" onclick="dismissAriaInsight('${top.id}')" style="font-size:11px;">Dismiss</button>
+          </div>
+        </div>`;
+    }
     // ===== STATS =====
     function renderStats() {
       // T51.1 — Day-1 welcome card. Show only when the user hasn't logged
@@ -13710,6 +14077,8 @@ create trigger trg_user_state_updated_at
           }
         }
       } catch (e) {}
+      // T77.3 — Surface the ARIA proactive review card (when active).
+      try { renderAriaReviewSlot(); } catch (e) {}
       const r = state.rank;
       const color = RANK_COLORS[r];
       const rankBadge = document.getElementById('rank-badge');
@@ -14533,7 +14902,8 @@ create trigger trg_user_state_updated_at
             ${variantTag}
             <!-- T63.2 — Per-row rest-timer button removed; the sheet-level
                  "Rest: 60s / 90s / 3min" buttons cover this concern. -->
-            <button onclick="openTrackerVariantPicker(${r})" title="Equipment variant (Cable / Smith / Free / etc.)" style="background:transparent;border:1px solid var(--border);color:var(--accent);font-size:10px;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;">📐</button>
+            <!-- T76.3 — Equipment-variant button uses ruler line icon, not the 📐 emoji. -->
+            <button onclick="openTrackerVariantPicker(${r})" title="Equipment variant (Cable / Smith / Free / etc.)" style="background:transparent;border:1px solid var(--border);color:var(--accent);padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;">${iconSvg('ruler', 14)}</button>
           </div>
         </td>
         ${setCells}
@@ -14584,7 +14954,8 @@ create trigger trg_user_state_updated_at
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <div>
         <div style="font-size:18px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1.5px;">EXERCISE TRACKER</div>
-        <div style="font-size:11px;color:${isBackdated ? 'var(--gold)' : 'var(--text3)'};">${headerDateLabel} · ${split}${isBackdated ? ' · 📅 backdated' : ''}</div>
+        <!-- T76.16 — Backdated indicator uses calendar line icon, not 📅 emoji. -->
+        <div style="font-size:11px;color:${isBackdated ? 'var(--gold)' : 'var(--text3)'};display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;">${headerDateLabel} · ${split}${isBackdated ? ` · <span style="display:inline-flex;align-items:center;gap:3px;">${iconSvg('calendar', 11)}backdated</span>` : ''}</div>
       </div>
       <button class="btn btn-sm" onclick="resetTrackerSheet()" title="Wipe this date's sheet and re-prefill from your split" style="font-size:10px;">Reset</button>
     </div>
@@ -14717,7 +15088,9 @@ create trigger trg_user_state_updated_at
           // T68.3 — Use single-quoted onclick attribute so the double
           // quotes JSON.stringify emits don't collide and break the HTML
           // (which was silently swallowing the click before).
-          return `<button onclick='selectTrackerVariant(${JSON.stringify(v.id)})' class="btn btn-full" style="text-align:left;padding:10px 12px;margin-bottom:6px;${isCurrent ? 'border-color:var(--accent);color:var(--accent);' : ''}">${v.label}${mathHint}${isCurrent ? ' ✓' : ''}</button>`;
+          // T76.8 — Selected-row indicator uses inline check icon, not ✓ glyph.
+          const checkBadge = isCurrent ? ` <span style="display:inline-flex;vertical-align:middle;">${iconSvg('check', 14)}</span>` : '';
+          return `<button onclick='selectTrackerVariant(${JSON.stringify(v.id)})' class="btn btn-full" style="text-align:left;padding:10px 12px;margin-bottom:6px;${isCurrent ? 'border-color:var(--accent);color:var(--accent);' : ''}">${v.label}${mathHint}${checkBadge}</button>`;
         }).join('');
       }
       openModal('modal-tracker-variant');
@@ -15031,7 +15404,8 @@ create trigger trg_user_state_updated_at
       }
       list.innerHTML = recipes.map(r => {
         const blocked = recipeBlockedBy(r);
-        const warn = blocked ? `<span style="font-size:10px;color:var(--red2);padding:1px 6px;background:rgba(239,68,68,0.1);border-radius:4px;margin-left:6px;" title="Contains ${blocked.matched}">⚠ ${blocked.block}</span>` : '';
+        // T76.7 — Blocked-food warn badge uses alert icon, not ⚠ emoji.
+        const warn = blocked ? `<span style="font-size:10px;color:var(--red2);padding:1px 6px;background:rgba(239,68,68,0.1);border-radius:4px;margin-left:6px;display:inline-flex;align-items:center;gap:4px;" title="Contains ${blocked.matched}">${iconSvg('alert', 11)}${blocked.block}</span>` : '';
         const ings = r.ingredients || [];
         const ingList = ings.length
           ? `<ul style="margin:6px 0 4px 0;padding-left:14px;font-size:11px;color:var(--text2);line-height:1.45;">${ings.map(i => `<li>${i}</li>`).join('')}</ul>`
@@ -15101,7 +15475,8 @@ create trigger trg_user_state_updated_at
           <div class="meal-entry-cal">${r.cals}</div>
           <div style="display:flex;gap:6px;">
             <button onclick="logSuggestion(${i})" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">Log</button>
-            <button onclick="saveSuggestionToLibrary(${i})" class="btn btn-sm" style="font-size:10px;padding:3px 6px;" title="Save to My Recipes">☆</button>
+            <!-- T76.4 — Save-to-Recipes star uses line icon, not ☆ emoji. -->
+            <button onclick="saveSuggestionToLibrary(${i})" class="btn btn-sm" style="padding:3px 6px;display:inline-flex;align-items:center;justify-content:center;" title="Save to My Recipes">${iconSvg('star', 14)}</button>
           </div>
         </div>
       </div>
@@ -15339,7 +15714,7 @@ create trigger trg_user_state_updated_at
         // Extra logged meals
         meals.forEach(m => allMeals.push(m));
         if (allMeals.length === 0) {
-          mealList.innerHTML = '<div style="text-align:center;padding:20px 14px;color:var(--text3);font-size:13px;line-height:1.5;">No meals logged today yet.<br><span style="font-size:11px;">Tap <strong>+ Log Meal</strong> below to add food. Scan a barcode 📷 or search the library to fill macros instantly.</span></div>';
+          mealList.innerHTML = '<div style="text-align:center;padding:20px 14px;color:var(--text3);font-size:13px;line-height:1.5;">No meals logged today yet.<br><span style="font-size:11px;">Tap <strong>+ Log Meal</strong> below to add food. Scan a barcode or search the library to fill macros instantly.</span></div>';
         } else {
           mealList.innerHTML = allMeals.map((m, i) => {
             // T44.1 — Logged meals (not meal-prep templates) are tappable to
@@ -15551,16 +15926,18 @@ create trigger trg_user_state_updated_at
         return;
       }
       // T45.2 / T49.3 — Each meal prep entry exposes Edit, a prominent
-      // ★/☆ Save-as-Recipe star (filled gold when already in My Recipes,
-      // hollow when not), and Remove. The star is the clearest affordance
+      // Save-as-Recipe star (gold filled when already in My Recipes,
+      // outline when not), and Remove. The star is the clearest affordance
       // for "save this to my reusable recipes" — text buttons were getting
       // missed.
+      // T76.4 — Star glyphs are now SVG line icons (star-fill / star),
+      // not the ★/☆ Unicode characters.
       const savedNames = new Set((state.savedRecipes || []).map(r => (r.label || '').toLowerCase()));
       list.innerHTML = state.mealPrep.map((m, i) => {
         const alreadySaved = savedNames.has((m.name || '').toLowerCase());
         const starBtn = alreadySaved
-          ? `<button disabled title="Already in My Recipes" style="background:none;border:none;color:var(--gold);font-size:18px;cursor:default;line-height:1;padding:0 2px;">★</button>`
-          : `<button onclick="saveMealPrepAsRecipe(${i})" title="Save to My Recipes" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1;padding:0 2px;">☆</button>`;
+          ? `<button disabled title="Already in My Recipes" style="background:none;border:none;color:var(--gold);cursor:default;line-height:1;padding:0 2px;display:inline-flex;align-items:center;justify-content:center;">${iconSvg('star-fill', 18)}</button>`
+          : `<button onclick="saveMealPrepAsRecipe(${i})" title="Save to My Recipes" style="background:none;border:none;color:var(--text3);cursor:pointer;line-height:1;padding:0 2px;display:inline-flex;align-items:center;justify-content:center;">${iconSvg('star', 18)}</button>`;
         return `
     <div class="meal-entry">
       <div style="flex:1;min-width:0;">
@@ -16070,7 +16447,9 @@ create trigger trg_user_state_updated_at
       const hint = document.getElementById('log-ex-date-hint');
       if (!el || !hint) return;
       if (el.value && el.value !== todayStr()) {
-        hint.textContent = '📅 Backdated — no streak credit';
+        // T76.16 — Use calendar SVG line icon instead of 📅 emoji.
+        // textContent can't carry HTML, so we swap to innerHTML for this case.
+        hint.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('calendar', 11)}Backdated — no streak credit</span>`;
         hint.style.display = '';
       } else {
         hint.textContent = '';
@@ -16869,7 +17248,8 @@ create trigger trg_user_state_updated_at
             ${r.tip ? `<div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:4px;line-height:1.5;">${escapeHtml(r.tip)}</div>` : ''}
             ${lastLine}
             <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-              <a href="${ytUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="font-size:10px;padding:3px 9px;text-decoration:none;color:var(--red2);border-color:var(--red2);">▶ Watch demo on YouTube</a>
+              <!-- T76.9 — YouTube link uses play line icon, not ▶ glyph. -->
+              <a href="${ytUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="font-size:10px;padding:3px 9px;text-decoration:none;color:var(--red2);border-color:var(--red2);display:inline-flex;align-items:center;gap:4px;">${iconSvg('play', 11)}Watch demo on YouTube</a>
               <button onclick="event.stopPropagation();openSubstituteModal(${escapeHtml(JSON.stringify(r.name))})" class="btn btn-sm" style="font-size:10px;padding:3px 9px;color:var(--text3);">Find substitute</button>
             </div>
           </div>
@@ -17547,7 +17927,8 @@ create trigger trg_user_state_updated_at
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
           <div style="font-size:11px;color:var(--text3);">${state.xp || 0} XP</div>
-          <div style="font-size:11px;color:var(--text3);">🔥 ${state.streak || 0}-day streak</div>
+          <!-- T76.2 — Profile streak label uses inline flame icon, not 🔥. -->
+          <div style="font-size:11px;color:var(--text3);display:inline-flex;align-items:center;gap:4px;">${iconSvg('flame', 12)}${state.streak || 0}-day streak</div>
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
@@ -19686,7 +20067,7 @@ create trigger trg_user_state_updated_at
           : false;
         const cls = equipped ? 'shop-item equipped' : owned ? 'shop-item owned' : 'shop-item';
         const priceNode = equipped
-          ? `<div style="display:flex;flex-direction:column;gap:6px;width:100%;align-items:flex-start;"><span class="shop-item-tag equipped">✓ EQUIPPED</span><button class="btn btn-sm" onclick="unequipFrame()">Unequip</button></div>`
+          ? `<div style="display:flex;flex-direction:column;gap:6px;width:100%;align-items:flex-start;"><span class="shop-item-tag equipped" style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('check', 11)}EQUIPPED</span><button class="btn btn-sm" onclick="unequipFrame()">Unequip</button></div>`
           : owned && kind !== 'buff'
             ? `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`
             : owned && kind === 'buff'
@@ -19780,7 +20161,7 @@ create trigger trg_user_state_updated_at
         <div class="shop-item-name">${it.name}</div>
         <div class="shop-item-desc">${it.desc}</div>
         ${equipped
-          ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;"><span class="shop-item-tag equipped">✓ EQUIPPED</span><button class="btn btn-sm" onclick="${it.kind === 'frame' ? 'unequipFrame()' : 'unequipTitle()'}">Unequip</button></div>`
+          ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;"><span class="shop-item-tag equipped" style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('check', 11)}EQUIPPED</span><button class="btn btn-sm" onclick="${it.kind === 'frame' ? 'unequipFrame()' : 'unequipTitle()'}">Unequip</button></div>`
           : `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`}
       </div>`;
       }).join('')}</div>`}
