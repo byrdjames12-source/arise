@@ -4147,8 +4147,8 @@
             </div>
           </div>
           <!-- Body stats -->
-          <div class="section-label">BODY STATS</div>
-          <div class="stat-grid" id="body-stats-grid">
+          <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;"><span>BODY STATS</span><span style="font-size:9px;color:var(--text3);font-weight:400;letter-spacing:0.4px;">Tap for 4-week review</span></div>
+          <div class="stat-grid" id="body-stats-grid" onclick="open4WeekReview()" style="cursor:pointer;" role="button" tabindex="0">
             <div class="stat-box">
               <div class="stat-val" id="s-weight">—</div>
               <div class="stat-lbl">lbs</div>
@@ -4801,14 +4801,14 @@
            Ask ARIA, Shop (no count), Search, Help & Support. Each icon is
            rendered via the standard data-icon system so it's centered in
            its circle (was misaligned before). -->
-      <button class="fab-menu-item" onclick="fabAction('checkin')"><span class="fab-menu-label">Daily Check-in</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="trending"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('workout')"><span class="fab-menu-label">Log Workout</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="dumbbell"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('meal')"><span class="fab-menu-label">Log Meal</span><span class="fab-menu-icon" style="background:var(--green2);"><span class="icon-title-slot" data-icon="utensils"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('water')"><span class="fab-menu-label">+ 8 oz Water</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="water"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('aria')"><span class="fab-menu-label">Ask ARIA</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="sparkles"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('shop')"><span class="fab-menu-label">Shop</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);"><span class="icon-title-slot" data-icon="search"></span></span></button>
-      <button class="fab-menu-item" onclick="fabAction('help')"><span class="fab-menu-label">Help & Support</span><span class="fab-menu-icon" style="background:var(--red2);font-size:16px;font-weight:700;">?</span></button>
+      <button class="fab-menu-item" id="fab-pill-checkin" onclick="fabAction('checkin')"><span class="fab-menu-label">Daily Check-in</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="trending"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-workout" onclick="fabAction('workout')"><span class="fab-menu-label">Log Workout</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="dumbbell"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-meal" onclick="fabAction('meal')"><span class="fab-menu-label">Log Meal</span><span class="fab-menu-icon" style="background:var(--green2);"><span class="icon-title-slot" data-icon="utensils"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-water" onclick="fabAction('water')"><span class="fab-menu-label">+ 8 oz Water</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="water"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-aria" onclick="fabAction('aria')"><span class="fab-menu-label">Ask ARIA</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="sparkles"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-shop" onclick="fabAction('shop')"><span class="fab-menu-label">Shop</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-search" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);"><span class="icon-title-slot" data-icon="search"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-help" onclick="fabAction('help')"><span class="fab-menu-label">Help & Support</span><span class="fab-menu-icon" style="background:var(--red2);font-size:16px;font-weight:700;">?</span></button>
     </div>
     <button class="fab-coach" id="fab-coach" onclick="toggleFabMenu(event)" aria-label="Quick actions" title="Quick actions">
       <span class="fab-coach-default"><span class="icon-title-slot" data-icon="sparkles"></span></span>
@@ -5314,6 +5314,14 @@
       </div>
       <div id="ex-history-body" style="max-height:50vh;overflow-y:auto;font-size:12px;margin-bottom:12px;"></div>
       <button class="btn btn-full" onclick="closeModal('modal-exercise-history')">Close</button>
+    </div>
+  </div>
+  <!-- T73.2 — 4-week review modal. Opened from the body stats grid on Progress. -->
+  <div class="modal-overlay" id="modal-4week-review">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-title"><span class="icon-title-slot" data-icon="trending"></span>4-Week Review</div>
+      <div id="four-week-review-body" style="font-size:12px;color:var(--text2);line-height:1.5;"></div>
+      <button class="btn btn-full" onclick="closeModal('modal-4week-review')" style="margin-top:12px;">Close</button>
     </div>
   </div>
   <!-- T49.2 — Per-row equipment variant picker for the Tracker sheet. -->
@@ -8935,6 +8943,79 @@ create trigger trg_user_state_updated_at
       menu.classList.remove('open');
       document.body.classList.remove('fab-menu-open');
     }
+    // T73.2 — Open the 4-week review modal. Summarizes the last 28 days of
+    // logged check-ins: deltas on weight / BF% / waist, average sleep, count
+    // of logged days, and a compact bullet per metric so users can see at a
+    // glance whether the plan is moving them.
+    function open4WeekReview() {
+      const body = document.getElementById('four-week-review-body');
+      if (!body) return;
+      const logs = (state.logs || []).filter(l => l && l.date)
+        .slice()
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      // 28-day window ending today
+      const today = new Date();
+      const cutoff = new Date(today); cutoff.setDate(today.getDate() - 28);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const recent = logs.filter(l => (l.date || '') >= cutoffStr);
+      if (!recent.length) {
+        body.innerHTML = `
+          <div style="text-align:center;color:var(--text3);padding:20px 0;line-height:1.6;">
+            No check-ins logged in the last 4 weeks yet.<br>
+            <span style="font-size:11px;">Open the FAB → Daily Check-in to log weight, sleep, and mood. Once you have a few entries this card surfaces your trend.</span>
+          </div>`;
+        openModal('modal-4week-review');
+        try { hydrateIcons(document.getElementById('modal-4week-review')); } catch (e) {}
+        return;
+      }
+      const first = recent[0];
+      const last = recent[recent.length - 1];
+      const fmtDelta = (cur, prev, unit, betterDown) => {
+        if (!isFinite(cur) || !isFinite(prev)) return '';
+        const d = cur - prev;
+        const abs = Math.abs(d).toFixed(1);
+        if (d === 0) return ` <span style="color:var(--text3);">no change</span>`;
+        const good = betterDown ? d < 0 : d > 0;
+        const color = good ? 'var(--green2)' : 'var(--red2)';
+        const arrow = d > 0 ? '↑' : '↓';
+        return ` <span style="color:${color};">${arrow} ${abs} ${unit}</span>`;
+      };
+      const avg = (arr) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+      const sleeps = recent.map(l => parseFloat(l.sleep)).filter(isFinite);
+      const moods = recent.map(l => parseFloat(l.mood)).filter(isFinite);
+      const energies = recent.map(l => parseFloat(l.energy)).filter(isFinite);
+      const startW = parseFloat(first.weight), endW = parseFloat(last.weight);
+      const startBF = parseFloat(first.bf), endBF = parseFloat(last.bf);
+      const startWaist = parseFloat(first.waist), endWaist = parseFloat(last.waist);
+      const lines = [];
+      if (isFinite(endW) && isFinite(startW)) lines.push(`<div><strong>Weight</strong>: ${startW.toFixed(1)} → ${endW.toFixed(1)} lb${fmtDelta(endW, startW, 'lb', true)}</div>`);
+      if (isFinite(endBF) && isFinite(startBF)) lines.push(`<div><strong>Body fat</strong>: ${startBF.toFixed(1)}% → ${endBF.toFixed(1)}%${fmtDelta(endBF, startBF, '%', true)}</div>`);
+      if (isFinite(endWaist) && isFinite(startWaist)) lines.push(`<div><strong>Waist</strong>: ${startWaist.toFixed(1)}" → ${endWaist.toFixed(1)}"${fmtDelta(endWaist, startWaist, 'in', true)}</div>`);
+      if (sleeps.length) lines.push(`<div><strong>Sleep</strong>: avg ${avg(sleeps).toFixed(1)} h (${sleeps.length} nights)</div>`);
+      if (moods.length) lines.push(`<div><strong>Mood</strong>: avg ${avg(moods).toFixed(1)} / 5</div>`);
+      if (energies.length) lines.push(`<div><strong>Energy</strong>: avg ${avg(energies).toFixed(1)} / 5</div>`);
+      body.innerHTML = `
+        <div style="font-size:11px;color:var(--text3);margin-bottom:10px;letter-spacing:0.5px;text-transform:uppercase;">
+          ${first.date} → ${last.date} · ${recent.length} check-in${recent.length === 1 ? '' : 's'}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${lines.join('') || '<div style="color:var(--text3);">No numeric data in this window yet.</div>'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:14px;line-height:1.5;border-top:1px solid var(--border);padding-top:10px;">
+          The arrow shows the direction of change vs. the start of the window. Green = trend you'd usually want; red = worth a closer look in context.
+        </div>`;
+      openModal('modal-4week-review');
+      try { hydrateIcons(document.getElementById('modal-4week-review')); } catch (e) {}
+    }
+    // T73.1 — Force-open the FAB menu (idempotent). Used by tour stops that
+    // need to spotlight a specific pill inside the menu.
+    function openFabMenu() {
+      const menu = document.getElementById('fab-menu');
+      if (!menu) return;
+      if (!menu.classList.contains('open')) {
+        menu.classList.add('open');
+        document.body.classList.add('fab-menu-open');
+        try { hydrateIcons(menu); } catch (e) {}
+      }
+    }
     // T62.1 — Route each FAB menu pill to its action. Always closes the menu
     // first so the destination UI isn't covered.
     function fabAction(kind) {
@@ -9585,11 +9666,11 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'fab',
-        selectorFn: () => document.getElementById('fab-coach'),
+        selectorFn: () => document.getElementById('fab-menu') || document.getElementById('fab-coach'),
         title: 'Quick Actions',
-        body: 'Tap the floating button to open a menu with eight quick actions: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help. It\'s how you record almost everything in the app — one tap away on every screen.',
+        body: 'This floating menu has eight quick actions: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help. It\'s how you record almost everything in the app — one tap away on every screen.',
         placement: 'left',
-        beforeShow: () => { try { switchTab('quests'); } catch(e){} },
+        beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
         id: 'replay',
@@ -9630,19 +9711,19 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-fab',
-        selectorFn: () => document.getElementById('fab-coach'),
+        selectorFn: () => document.getElementById('fab-menu') || document.getElementById('fab-coach'),
         title: 'The Quick Actions Menu',
-        body: 'Tap this floating button to expand a menu with eight one-tap actions: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help & Support. It\'s on every screen and replaces the topbar icons you might see in other apps.',
+        body: 'Eight one-tap actions live here: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help & Support. It\'s on every screen and replaces the topbar icons you might see in other apps.',
         placement: 'left',
-        beforeShow: () => { try { switchTab('quests'); closeFabMenu(); } catch(e){} },
+        beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
         id: 'ct-aria',
-        selectorFn: () => document.getElementById('fab-coach'),
+        selectorFn: () => document.getElementById('fab-pill-aria'),
         title: 'Ask ARIA',
-        body: 'Inside the Quick Actions menu, the Ask ARIA pill opens your AI coach. Ask for form tips, a plan tweak, macro math, or training advice — ARIA reads your profile and recent training for context. When the orb glows gold, a reply is waiting.',
+        body: 'The Ask ARIA pill opens your AI coach. Ask for form tips, a plan tweak, macro math, or training advice — ARIA reads your profile and recent training for context. When the orb glows gold, a reply is waiting.',
         placement: 'left',
-        beforeShow: () => { try { switchTab('quests'); closeFabMenu(); } catch(e){} },
+        beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
         id: 'ct-progress',
@@ -9664,7 +9745,7 @@ create trigger trg_user_state_updated_at
         id: 'ct-stats',
         selectorFn: () => document.getElementById('body-stats-grid'),
         title: 'Body Stats & Trends',
-        body: 'Log weight, body fat, and measurements over time. ARISE charts the trend so you can see whether the plan is working — open this for your 4-week review.',
+        body: 'Log weight, body fat, and measurements over time. Tap this grid to open a 4-Week Review — start vs. current, deltas, and a quick read on sleep, mood, and energy across the window.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('progress'); switchProgressTab('stats'); } catch(e){} },
       },
@@ -9711,11 +9792,11 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-logworkout',
-        selectorFn: () => document.getElementById('fab-coach'),
+        selectorFn: () => document.getElementById('fab-pill-workout'),
         title: 'Log Workout (Quick)',
-        body: 'For one-off entries (cardio rides, planks, a single lift), use Log Workout from the FAB menu. Three Types at the top: Resistance (reps × weight), Held (timed planks, hangs, wall sits), and Cardio (distance + pace + duration). You can backdate via the Date field, too.',
+        body: 'The Log Workout pill is for one-off entries (cardio rides, planks, a single lift). Three Types at the top: Resistance (reps × weight), Held (timed planks, hangs, wall sits), and Cardio (distance + pace + duration). You can backdate via the Date field, too.',
         placement: 'left',
-        beforeShow: () => { try { switchTab('quests'); closeFabMenu(); } catch(e){} },
+        beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
         id: 'ct-plans',
@@ -9765,11 +9846,11 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-shop',
-        selectorFn: null,
+        selectorFn: () => document.getElementById('fab-pill-shop'),
         title: 'The Shop',
         body: 'Open it any time from the FAB menu\'s Shop pill. Spend the coins you earn from quests on card frames that customize your hunter card, plus consumable buffs like 2× XP and Streak Shields. Titles are earned by hitting milestones.',
-        placement: 'center',
-        beforeShow: () => { try { switchTab('shop'); } catch(e){} },
+        placement: 'left',
+        beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
       },
       {
         id: 'ct-done',
@@ -9848,6 +9929,9 @@ create trigger trg_user_state_updated_at
       // T43.2 — The comprehensive tour may have force-expanded the Plans pane
       // on desktop; restore the user's saved collapse preferences.
       try { applyWorkoutPanesCollapsed(); } catch (e) { }
+      // T73.1 — Any tour stop may have opened the FAB menu to spotlight a
+      // pill; collapse it when the tour ends.
+      try { closeFabMenu(); } catch (e) { }
     }
     function _tutorialShowStep(idx) {
       _tutorialIdx = idx;
