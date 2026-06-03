@@ -2871,6 +2871,23 @@
       70%  { box-shadow: 0 0 0 16px rgba(244, 182, 63, 0), 0 0 20px 3px rgba(244, 182, 63, 0.32), 0 4px 12px rgba(0, 0, 0, 0.4); }
       100% { box-shadow: 0 0 0 0 rgba(244, 182, 63, 0), 0 0 20px 3px rgba(244, 182, 63, 0.32), 0 4px 12px rgba(0, 0, 0, 0.4); }
     }
+    /* T78.1 — When ARIA has an unread reply waiting, the Ask ARIA pill in the
+       FAB menu picks up a matching gold glow. Mirrors the orb so the user
+       knows where the message lives once the menu is open. */
+    .fab-menu-item.has-unread .fab-menu-label {
+      color: var(--gold);
+      border-color: var(--gold);
+      box-shadow: 0 0 12px rgba(244, 182, 63, 0.45);
+    }
+    .fab-menu-item.has-unread .fab-menu-icon {
+      box-shadow: 0 0 0 2px var(--gold), 0 0 14px rgba(244, 182, 63, 0.55);
+      animation: fab-pill-pulse-gold 1.9s ease-out infinite;
+    }
+    @keyframes fab-pill-pulse-gold {
+      0%   { box-shadow: 0 0 0 0 rgba(244, 182, 63, 0.7), 0 0 14px rgba(244, 182, 63, 0.55); }
+      70%  { box-shadow: 0 0 0 10px rgba(244, 182, 63, 0), 0 0 14px rgba(244, 182, 63, 0.32); }
+      100% { box-shadow: 0 0 0 0 rgba(244, 182, 63, 0), 0 0 14px rgba(244, 182, 63, 0.32); }
+    }
 
     @media (min-width: 1024px) {
       .app {
@@ -7175,6 +7192,23 @@ create trigger trg_user_state_updated_at
     function buildCoachUserContext() {
       const p = state.profile || {};
       const lines = [];
+      // T78.2 — ARIA's coaching voice. The Edge Function combines this
+      // userContext with its own system prompt before forwarding to the
+      // model; putting the style guide here ensures it reaches the model
+      // regardless of which prompt the proxy uses. The user explicitly
+      // requested a direct coach — encouraging, but no coddling, no empty
+      // praise, fact-checking, calling out blind spots, giving rationale.
+      lines.push(
+        'COACHING STYLE — FOLLOW STRICTLY ON EVERY REPLY:\n' +
+        '- Be a direct, evidence-based coach. Encouraging, never coddling. Treat the user like a serious adult who wants to improve.\n' +
+        '- Refuse empty praise. Do NOT say "great question" / "good thinking" / "I love that" unless you can immediately back it with a concrete reason WHY the choice is sound for THIS user\'s goal, training history, equipment, or constraints.\n' +
+        '- Fact-check the user. If a claim is wrong, overstated, or based on a myth (e.g. "fasted cardio burns more fat", "high reps tone", "you need 1g of protein per lb"), say so clearly, then give the corrected fact with one short rationale.\n' +
+        '- Call out blind spots. If the user\'s plan is missing recovery, protein, progressive overload, sleep, or a deload — name it explicitly. Don\'t bury the issue inside a compliment.\n' +
+        '- Give rationale every time. When you agree with the user, say WHY (mechanism, evidence, or their own data shows X). When you push back, do the same. Never just say "yes" or "no".\n' +
+        '- Anchor in citations / mechanisms when you have them. Use phrases like "the evidence on this is mixed" or "no controlled trial supports that" when accurate. Avoid hedging language ("might", "could be") when the science is clear.\n' +
+        '- Stay warm. Direct ≠ harsh. A good coach is honest first, supportive second. Always end with the next concrete step the user can take.'
+      );
+      lines.push(''); // blank line separating style from data
       if (p.name) lines.push(`Name: ${p.name}`);
       if (p.age) lines.push(`Age: ${p.age}`);
       if (p.sex) lines.push(`Sex: ${p.sex}`);
@@ -7315,10 +7349,19 @@ create trigger trg_user_state_updated_at
     }
     function updateCoachOrb() {
       const fab = document.getElementById('fab-coach');
-      if (!fab) return;
       const unread = ariaUnreadCount() > 0;
-      fab.classList.toggle('has-unread', unread);
-      fab.title = unread ? 'ARIA has a new message' : 'Ask ARIA';
+      if (fab) {
+        fab.classList.toggle('has-unread', unread);
+        fab.title = unread ? 'ARIA has a new message' : 'Quick actions';
+      }
+      // T78.1 — Keep the Ask ARIA pill in the FAB menu in sync. When ARIA has
+      // an unread reply, the pill picks up the same gold glow so the user
+      // can see where to go once the menu opens.
+      const pill = document.getElementById('fab-pill-aria');
+      if (pill) {
+        pill.classList.toggle('has-unread', unread);
+        pill.title = unread ? 'ARIA has a new message' : 'Ask ARIA';
+      }
     }
     // Mark the whole conversation as seen and clear the gold glow. Called when
     // the user opens the chat (or has it open when a reply arrives).
@@ -7415,9 +7458,12 @@ create trigger trg_user_state_updated_at
       // Initialize history if empty with a friendly opening message
       state.aiCoach = state.aiCoach || { messages: [] };
       if (state.aiCoach.messages.length === 0) {
+        // T78.2 — Greeting reframed to match the new coaching voice: direct,
+        // evidence-based, no flattery. Sets expectations up front so the user
+        // knows ARIA will push back when the data warrants it.
         state.aiCoach.messages.push({
           role: 'assistant',
-          content: `Hey${state.profile?.name ? ' ' + state.profile.name : ''}! I'm ARIA, your AI fitness coach. Tell me about your goals, schedule, experience, and any constraints (equipment, injuries, dietary stuff). The more I know, the better the plan I can build for you.`,
+          content: `Hey${state.profile?.name ? ' ' + state.profile.name : ''}. I'm ARIA. I'll coach you straight — encouragement when you've earned it, pushback when you haven't, and the reasoning behind both. Give me your goal, current training, food situation, equipment, and anything you're working around (injury, schedule, prefs). The more concrete you are, the better I can find what's actually slowing you down.`,
           ts: Date.now(),
         });
         save();
@@ -9105,6 +9151,9 @@ create trigger trg_user_state_updated_at
         menu.classList.add('open');
         document.body.classList.add('fab-menu-open');
         try { hydrateIcons(menu); } catch (e) {}
+        // T78.1 — Re-sync the unread glow on every open so the Ask ARIA pill
+        // never misses an update that landed while the menu was closed.
+        try { updateCoachOrb(); } catch (e) {}
       }
     }
     // T62.1 — Route each FAB menu pill to its action. Always closes the menu
@@ -14016,9 +14065,12 @@ create trigger trg_user_state_updated_at
       const insight = (r.insights || []).find(i => i.id === id);
       if (!insight) return;
       // Seed an ARIA assistant message that frames the review for the user,
-      // then open the chat so they can respond naturally.
+      // then open the chat so they can respond naturally. T78.2 — phrasing
+      // matches the new coaching voice: states what the data shows, what the
+      // suggestion is and WHY, then asks the user to defend, accept, or
+      // reframe — no soft opener, no "you're doing great".
       state.aiCoach = state.aiCoach || { messages: [] };
-      const seedContent = `Hey${state.profile?.name ? ' ' + state.profile.name : ''}, this is your auto check-in. ${insight.body}\n\nMy suggestion: ${insight.suggestion}\n\nWant to try it, tweak it, or talk through something else first?`;
+      const seedContent = `${state.profile?.name ? state.profile.name + ', ' : ''}auto check-in based on what your last few weeks of data actually show.\n\n${insight.body}\n\nRecommendation: ${insight.suggestion}\n\nIf you disagree, tell me what I'm missing — context I don't have, a constraint, or a reason this suggestion is wrong for you — and I'll re-evaluate. If you agree, tell me which part you want to start with this week.`;
       state.aiCoach.messages.push({ role: 'assistant', content: seedContent, ts: Date.now(), isReview: true, insightId: id });
       // Dismiss the card now — the conversation is the follow-through.
       dismissAriaInsight(id);
