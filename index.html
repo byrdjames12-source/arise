@@ -16769,12 +16769,18 @@ create trigger trg_user_state_updated_at
           const noRecipes = !Array.isArray(state.savedRecipes) || state.savedRecipes.length === 0;
           const noBlocklist = !Array.isArray(state.blocklist) || state.blocklist.length === 0;
           if (noPrep && noRecipes && noBlocklist) {
+            // T85 — Welcome card surfaces all three first-step options
+            // (meal prep, build recipe, avoid list) so a brand-new user can
+            // discover the Recipe Builder without first having to add a
+            // meal prep entry. Without this, the Build Recipe button stays
+            // hidden inside the collapsed sections div below.
             welcome.innerHTML = `
               <div class="card" style="padding:16px;background:linear-gradient(135deg, rgba(127,119,221,0.08), rgba(244,182,63,0.06));border:1px solid var(--accent);text-align:center;">
                 <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--accent2);margin-bottom:6px;">Start meal prepping</div>
-                <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px;">Add a recipe, plan weekly meals, or tell ARIA what to avoid. The sections below unlock once you start.</div>
+                <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px;">Plan weekly meals, build a reusable recipe, or tell ARIA what to avoid. The sections below unlock once you start.</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
                   <button class="btn btn-sm btn-primary" onclick="openMealPrepModal()" style="font-size:11px;">+ Add meal prep</button>
+                  <button class="btn btn-sm" onclick="openRecipeBuilder()" style="font-size:11px;color:var(--gold);border-color:var(--gold);">+ Build Recipe</button>
                   <button class="btn btn-sm" onclick="document.getElementById('blocklist-input')?.focus()" style="font-size:11px;color:var(--accent2);border-color:var(--accent2);">Set avoid list</button>
                 </div>
               </div>`;
