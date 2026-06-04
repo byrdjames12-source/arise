@@ -5889,6 +5889,19 @@
         mealReminders: { enabled: false, times: ['08:00', '12:30', '18:30'] },
         waterReminders: { enabled: false, intervalMinutes: 120, lastFiredAt: null }
       },
+      // T80 — Tombstones for cloud-sync deletions. Without these, deleting an
+      // item locally and then syncing with a device whose state still has the
+      // item would resurrect it via the union-by-composite-key merge. Each
+      // entry maps a stable key → ISO timestamp of deletion; mergeStates
+      // unions the tombstones across devices and filters the merged
+      // collections so deletions outlive a single sync. GC'd at 30 days.
+      tombstones: {
+        mealPrep: {},
+        savedRecipes: {},
+        blocklist: {},
+        workoutLog: {},
+        aiCoachMessages: {},
+      },
       // T77 — ARIA proactive review. ARIA periodically re-evaluates goals,
       // training load, and wellness from the recent logs and surfaces an
       // insight card at the top of Progress. Cadence: every `cadenceDays`
@@ -5976,12 +5989,69 @@
       });
     }
 
+    // ===== T80 — Tombstones for soft-deletes across cloud sync =====
+    // _tombstoneKey() builds a stable identity for an item in a tombstone-
+    // tracked collection. It MUST match the compositeKey() inside mergeStates
+    // for collections that already use composite keys, so the merge can
+    // filter out tombstoned items the moment they reappear from a stale
+    // device. New collections can extend this switch as we add them.
+    function _tombstoneKey(collection, item) {
+      if (!item) return null;
+      switch (collection) {
+        case 'mealPrep':
+          return `${item.name || ''}|${item.cals || 0}|${item.prot || 0}|${item.days || ''}`;
+        case 'savedRecipes':
+          return item.id != null ? String(item.id) : `${item.label || ''}|${item.cals || 0}`;
+        case 'blocklist':
+          return String(item || '').toLowerCase();
+        case 'workoutLog':
+          return item.id != null ? String(item.id) : `${item.date || ''}|${item.exercise || ''}`;
+        case 'aiCoachMessages':
+          // Per-message identity for soft-deleting an individual chat reply.
+          // Not currently wired to any UI but kept for forward-compat.
+          return item.ts != null ? `${item.role || ''}|${item.ts}` : null;
+        default:
+          return null;
+      }
+    }
+    function recordTombstone(collection, keyOrItem) {
+      state.tombstones = state.tombstones || { mealPrep: {}, savedRecipes: {}, blocklist: {}, workoutLog: {}, aiCoachMessages: {} };
+      state.tombstones[collection] = state.tombstones[collection] || {};
+      const key = (typeof keyOrItem === 'string')
+        ? keyOrItem
+        : _tombstoneKey(collection, keyOrItem);
+      if (key) state.tombstones[collection][key] = new Date().toISOString();
+    }
+    function _gcTombstones(t) {
+      // Drop tombstones older than 30 days. That window is long enough for a
+      // device that's been offline for a few weeks to come back and have the
+      // deletion respected; beyond a month, we'd rather let normal merge win.
+      if (!t || typeof t !== 'object') return;
+      const cutoff = Date.now() - 30 * 86400000;
+      Object.keys(t).forEach(coll => {
+        const m = t[coll];
+        if (!m || typeof m !== 'object') return;
+        Object.keys(m).forEach(k => {
+          const ts = m[k] ? new Date(m[k]).getTime() : 0;
+          if (!ts || ts < cutoff) delete m[k];
+        });
+      });
+    }
+
     function mergeStates(local, remote) {
       // Defensive — either side may be missing entirely on first cloud sync
       if (!local || typeof local !== 'object') return remote;
       if (!remote || typeof remote !== 'object') return local;
-      const localTime = (local.settings && local.settings.lastSync) ? new Date(local.settings.lastSync).getTime() : 0;
-      const remoteTime = (remote.settings && remote.settings.lastSync) ? new Date(remote.settings.lastSync).getTime() : 0;
+      // T80 — Arbitrate on lastCloudSync (only updated on actual successful
+      // sync), not lastSync (which bumps on every local save and would let a
+      // stale-but-actively-saving device beat a fresh-but-idle one). Fall
+      // back to lastSync if neither side has lastCloudSync yet (legacy data).
+      const ls = (local.settings || {});
+      const rs = (remote.settings || {});
+      const localCloud = ls.lastCloudSync ? new Date(ls.lastCloudSync).getTime() : 0;
+      const remoteCloud = rs.lastCloudSync ? new Date(rs.lastCloudSync).getTime() : 0;
+      const localTime = localCloud || (ls.lastSync ? new Date(ls.lastSync).getTime() : 0);
+      const remoteTime = remoteCloud || (rs.lastSync ? new Date(rs.lastSync).getTime() : 0);
       // localNewer: which side wins LWW conflicts. Tie-break favors local because the
       // caller usually just saved on this device — local is the "source of truth right now."
       const localNewer = localTime >= remoteTime;
@@ -6204,6 +6274,99 @@
           result.profile.recoveryRegions = JSON.parse(JSON.stringify(winnerProf.recoveryRegions || []));
           result.profile.recoveryRegionsUpdatedAt = winnerProf.recoveryRegionsUpdatedAt;
         }
+      }
+      // ----- T80 — aiCoach.messages: union by (role + ts) so a device with
+      // an empty conversation can never clobber the populated history on the
+      // other side. seenCount picks the max so neither device shows ghost
+      // unread when the user has read the conversation on at least one. -----
+      {
+        const la = (local.aiCoach && Array.isArray(local.aiCoach.messages)) ? local.aiCoach.messages : [];
+        const ra = (remote.aiCoach && Array.isArray(remote.aiCoach.messages)) ? remote.aiCoach.messages : [];
+        if (la.length || ra.length) {
+          const map = new Map();
+          // Identity: prefer ts, fall back to a content hash for legacy
+          // entries that pre-date timestamping.
+          const idFor = (m) => {
+            if (!m) return null;
+            if (m.ts != null) return `${m.role || ''}|${m.ts}`;
+            const c = (m.content || '').slice(0, 40);
+            return `${m.role || ''}|nots|${c}`;
+          };
+          // Loser side first, winner overrides on collision.
+          const losers = localNewer ? ra : la;
+          const winners = localNewer ? la : ra;
+          losers.forEach(m => { const id = idFor(m); if (id) map.set(id, m); });
+          winners.forEach(m => { const id = idFor(m); if (id) map.set(id, m); });
+          const merged = [...map.values()].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+          const localSeen = (local.aiCoach && typeof local.aiCoach.seenCount === 'number') ? local.aiCoach.seenCount : 0;
+          const remoteSeen = (remote.aiCoach && typeof remote.aiCoach.seenCount === 'number') ? remote.aiCoach.seenCount : 0;
+          result.aiCoach = {
+            ...(result.aiCoach || {}),
+            messages: merged,
+            // Clamp seenCount to the merged length so it never points past the array.
+            seenCount: Math.min(merged.length, Math.max(localSeen, remoteSeen)),
+          };
+        }
+      }
+      // ----- T80 — Tombstones: union both sides, GC expired, then filter
+      // every tombstone-tracked collection so deletions outlive a single
+      // sync. Without this, a device that still has the deleted item would
+      // resurrect it via the union-by-key path above. -----
+      {
+        const lt = (local.tombstones && typeof local.tombstones === 'object') ? local.tombstones : {};
+        const rt = (remote.tombstones && typeof remote.tombstones === 'object') ? remote.tombstones : {};
+        const merged = {};
+        const collections = new Set([...Object.keys(lt), ...Object.keys(rt), 'mealPrep', 'savedRecipes', 'blocklist', 'workoutLog', 'aiCoachMessages']);
+        collections.forEach(coll => {
+          const lm = lt[coll] || {};
+          const rm = rt[coll] || {};
+          const out = {};
+          // Take the LATEST deletion timestamp per key — a re-add followed
+          // by a re-delete would have a newer ts, which is what we want.
+          new Set([...Object.keys(lm), ...Object.keys(rm)]).forEach(k => {
+            const a = lm[k] ? new Date(lm[k]).getTime() : 0;
+            const b = rm[k] ? new Date(rm[k]).getTime() : 0;
+            out[k] = new Date(Math.max(a, b)).toISOString();
+          });
+          merged[coll] = out;
+        });
+        _gcTombstones(merged);
+        result.tombstones = merged;
+        // Drop tombstoned items from the merged collections.
+        const filterColl = (collName, getKey) => {
+          const t = merged[collName];
+          if (!t || !Object.keys(t).length) return;
+          if (collName === 'aiCoachMessages') {
+            if (result.aiCoach && Array.isArray(result.aiCoach.messages)) {
+              const before = result.aiCoach.messages.length;
+              result.aiCoach.messages = result.aiCoach.messages.filter(m => {
+                const k = getKey(m);
+                return !(k && t[k]);
+              });
+              if (result.aiCoach.messages.length !== before && typeof result.aiCoach.seenCount === 'number') {
+                result.aiCoach.seenCount = Math.min(result.aiCoach.seenCount, result.aiCoach.messages.length);
+              }
+            }
+            return;
+          }
+          if (collName === 'blocklist') {
+            if (Array.isArray(result.blocklist)) {
+              result.blocklist = result.blocklist.filter(b => !t[String(b || '').toLowerCase()]);
+            }
+            return;
+          }
+          if (Array.isArray(result[collName])) {
+            result[collName] = result[collName].filter(item => {
+              const k = getKey(item);
+              return !(k && t[k]);
+            });
+          }
+        };
+        filterColl('mealPrep',     (x) => _tombstoneKey('mealPrep', x));
+        filterColl('savedRecipes', (x) => _tombstoneKey('savedRecipes', x));
+        filterColl('workoutLog',   (x) => _tombstoneKey('workoutLog', x));
+        filterColl('blocklist',    null);
+        filterColl('aiCoachMessages', (m) => _tombstoneKey('aiCoachMessages', m));
       }
       return result;
     }
@@ -7804,6 +7967,18 @@ create trigger trg_user_state_updated_at
           if (state.aiCoach && Array.isArray(state.aiCoach.messages)
               && typeof state.aiCoach.seenCount !== 'number') {
             state.aiCoach.seenCount = state.aiCoach.messages.length;
+          }
+          // T80 — Backfill tombstones map for pre-T80 saves + GC any expired
+          // entries. The structure has one bucket per soft-deletable
+          // collection; missing buckets are added so callers can record
+          // without null-checking each time.
+          if (!state.tombstones || typeof state.tombstones !== 'object') {
+            state.tombstones = { mealPrep: {}, savedRecipes: {}, blocklist: {}, workoutLog: {}, aiCoachMessages: {} };
+          } else {
+            ['mealPrep', 'savedRecipes', 'blocklist', 'workoutLog', 'aiCoachMessages'].forEach(k => {
+              if (!state.tombstones[k] || typeof state.tombstones[k] !== 'object') state.tombstones[k] = {};
+            });
+            try { _gcTombstones(state.tombstones); } catch (e) {}
           }
           // T77.1 — Backfill ariaReview for pre-v3 saves so the proactive
           // check-in feature works for existing users.
@@ -15458,6 +15633,9 @@ create trigger trg_user_state_updated_at
       if (input && valArg == null) input.value = '';
     }
     function removeFromBlocklist(entry) {
+      // T80 — Record a tombstone before the filter so the entry doesn't
+      // come back from a stale device's blocklist on the next sync.
+      try { recordTombstone('blocklist', entry); } catch (e) {}
       state.blocklist = (state.blocklist || []).filter(b => b !== entry);
       save(); renderBlocklist(); renderSavedRecipes(); renderRecipeSuggestions();
     }
@@ -15509,6 +15687,12 @@ create trigger trg_user_state_updated_at
     }
     function deleteSavedRecipe(id) {
       if (!confirm('Remove this recipe from My Recipes?')) return;
+      // T80 — Tombstone the recipe before filtering it out so the merge can
+      // suppress it if another device pushes the same id back.
+      try {
+        const item = (state.savedRecipes || []).find(x => x.id == id);
+        if (item) recordTombstone('savedRecipes', item);
+      } catch (e) {}
       state.savedRecipes = (state.savedRecipes || []).filter(x => x.id != id);
       save(); renderSavedRecipes(); showNotif('Recipe removed');
     }
@@ -16404,7 +16588,18 @@ create trigger trg_user_state_updated_at
       });
       save(); closeModal('modal-meal-prep'); renderMealPrep(); renderDailyNutrition(); showNotif('Meal prep saved!');
     }
-    function removeMealPrep(idx) { state.mealPrep.splice(idx, 1); save(); renderMealPrep(); renderDailyNutrition(); }
+    function removeMealPrep(idx) {
+      // T80 — Record a tombstone BEFORE the splice so a stale device can't
+      // resurrect this entry on the next sync.
+      try {
+        const item = state.mealPrep[idx];
+        if (item) recordTombstone('mealPrep', item);
+      } catch (e) {}
+      state.mealPrep.splice(idx, 1);
+      save();
+      renderMealPrep();
+      renderDailyNutrition();
+    }
     // ===== TRAINING LOG =====
     // Common lifts — seeded in the datalist so users aren't staring at an empty suggest
     // box. Duplicates with their past exercises are deduped in buildExerciseSuggestList().
