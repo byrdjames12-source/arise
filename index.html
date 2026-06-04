@@ -4650,8 +4650,10 @@
           <div id="recipe-suggestions-list" style="display:flex;flex-direction:column;gap:6px;"></div>
           <div class="section-label" style="margin-top:12px;">WEEKLY MEAL PREP</div>
           <div id="meal-prep-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-          <button class="btn btn-full" onclick="openMealPrepModal()" style="border-style:dashed;margin-top:4px;">+ Add
-            meal prep item</button>
+          <!-- T93.7 — Routes to the unified Recipe Builder in meal-prep mode
+               so adding a new prep item uses the same ingredient + macro
+               editor as Build Recipe. -->
+          <button class="btn btn-full" onclick="openNewMealPrepBuilder()" style="border-style:dashed;margin-top:4px;">+ Add new meal prep item</button>
           <div class="section-label" style="margin-top:8px;">UPLOAD PREP</div>
           <label class="upload-area" for="prep-upload">
             <div style="margin-bottom:4px;color:var(--accent2);"><span class="icon-lg" data-icon="barchart"></span>
@@ -5185,10 +5187,13 @@
         </div>
         <div id="food-picker-panel"
           style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;flex-direction:column;gap:8px;">
-          <!-- Library / Web Search tabs — Library is the curated list, Web Search hits Open Food Facts -->
-          <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);padding-bottom:6px;">
+          <!-- Library / My Recipes / Web Search tabs — Library is the curated list,
+               My Recipes is your saved recipes (T92), Web Search hits Open Food Facts. -->
+          <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);padding-bottom:6px;flex-wrap:wrap;">
             <button type="button" class="tab-btn active" id="food-tab-library" onclick="setFoodSourceTab('library')"
               style="font-size:11px;padding:4px 10px;">Library</button>
+            <button type="button" class="tab-btn" id="food-tab-recipes" onclick="setFoodSourceTab('recipes')"
+              style="font-size:11px;padding:4px 10px;">My Recipes</button>
             <button type="button" class="tab-btn" id="food-tab-web" onclick="setFoodSourceTab('web')"
               style="font-size:11px;padding:4px 10px;">Web Search <span style="font-size:9px;color:var(--text3);">· any
                 food</span></button>
@@ -5279,12 +5284,29 @@
        saved foods. -->
   <div class="modal-overlay" id="modal-recipe-builder">
     <div class="modal" style="max-width:560px;">
-      <div class="modal-title">Build Recipe</div>
+      <div class="modal-title" id="recipe-builder-title">Build Recipe</div>
       <input type="hidden" id="recipe-builder-edit-id" value="">
+      <!-- T93.4 — Builder mode: 'recipe' (default) saves to state.savedRecipes;
+           'mealPrep' saves to state.mealPrep so the same modal serves both
+           "Build Recipe" and "+ Add new meal prep item" entry points. -->
+      <input type="hidden" id="recipe-builder-mode" value="recipe">
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="form-group">
-          <label>Recipe name</label>
+          <label id="recipe-builder-name-label">Recipe name</label>
           <input type="text" id="recipe-builder-name" placeholder="e.g. Morning Oatmeal">
+        </div>
+        <!-- T93.2 — Optional meal type. Surfaces on the recipe / meal-prep
+             card as a small tag so the user can scan the list by time of day. -->
+        <div class="form-group">
+          <label>Meal type <span style="color:var(--text3);font-size:10px;font-weight:400;">(optional)</span></label>
+          <select id="recipe-builder-meal-type">
+            <option value="">— none —</option>
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snack">Snack</option>
+            <option value="dessert">Dessert</option>
+          </select>
         </div>
         <div class="section-label" style="margin:0;">INGREDIENTS</div>
         <div id="recipe-builder-rows" style="display:flex;flex-direction:column;gap:10px;"></div>
@@ -5300,13 +5322,23 @@
             <span id="rb-total-fat">0</span>g F
           </div>
         </div>
+        <!-- T93.3 — Days picker. Visible always (recipes can advertise "good
+             on these days" too) but functionally required in meal-prep mode.
+             Persisted as an array of full day names so the renderer can show
+             compact chips. -->
+        <div class="form-group" id="recipe-builder-days-group">
+          <label>Days <span style="color:var(--text3);font-size:10px;font-weight:400;" id="recipe-builder-days-hint">(optional — pick the days you'll have this)</span></label>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;" id="recipe-builder-days-row">
+            <!-- Populated by renderRecipeBuilderDays() -->
+          </div>
+        </div>
         <div class="form-group">
           <label>Notes (optional)</label>
           <textarea id="recipe-builder-notes" rows="2" style="resize:vertical;" placeholder="Prep steps, swaps, anything that helps future-you."></textarea>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-full" onclick="closeModal('modal-recipe-builder')">Cancel</button>
-          <button class="btn btn-primary btn-full" onclick="saveRecipeFromBuilder()">Save Recipe</button>
+          <button class="btn btn-primary btn-full" id="recipe-builder-save-btn" onclick="saveRecipeFromBuilder()">Save Recipe</button>
         </div>
       </div>
     </div>
@@ -8362,6 +8394,25 @@ create trigger trg_user_state_updated_at
               if (seen.has(k)) return false;
               seen.add(k); return true;
             });
+            // T93.3 — Backfill the new shape on legacy entries: days as an
+            // array of full names, mealType field, and a `label` mirror of
+            // `name` so post-T93 renderers can read either field. Also
+            // promote `type` → `mealType` for entries created with the old
+            // simple meal prep modal that used `type` for meal class.
+            state.mealPrep.forEach(mp => {
+              if (!mp) return;
+              if (!Array.isArray(mp.days)) {
+                try {
+                  mp.days = (typeof _parseLegacyDays === 'function') ? _parseLegacyDays(mp.days) : [];
+                } catch (e) { mp.days = []; }
+              }
+              if (!mp.label && mp.name) mp.label = mp.name;
+              if (!mp.name && mp.label) mp.name = mp.label;
+              if (!mp.mealType && mp.type && /^(breakfast|lunch|dinner|snack|dessert)$/i.test(String(mp.type))) {
+                mp.mealType = String(mp.type).toLowerCase();
+              }
+              if (!Array.isArray(mp.ingredients)) mp.ingredients = [];
+            });
           }
           // T21.3 cleanup: pre-fix saves duplicated daily quests on every cloud sync
           // because each device generated its own Date.now() id. Dedup by composite
@@ -10159,8 +10210,12 @@ create trigger trg_user_state_updated_at
       _foodSourceTab = 'library';
       const libBtn = document.getElementById('food-tab-library');
       const webBtn = document.getElementById('food-tab-web');
+      // T92 — also reset the new My Recipes tab so it doesn't stay active
+      // across modal opens.
+      const recBtn = document.getElementById('food-tab-recipes');
       if (libBtn) libBtn.classList.add('active');
       if (webBtn) webBtn.classList.remove('active');
+      if (recBtn) recBtn.classList.remove('active');
       _lastWebResults = [];
       const search = document.getElementById('food-picker-search');
       if (search) search.value = '';
@@ -10302,33 +10357,102 @@ create trigger trg_user_state_updated_at
     function setFoodSourceTab(tab) {
       _foodSourceTab = tab;
       const libBtn = document.getElementById('food-tab-library');
+      const recBtn = document.getElementById('food-tab-recipes');
       const webBtn = document.getElementById('food-tab-web');
       const search = document.getElementById('food-picker-search');
       const cat = document.getElementById('food-picker-cat');
       const hint = document.getElementById('food-picker-hint');
       if (libBtn) libBtn.classList.toggle('active', tab === 'library');
+      if (recBtn) recBtn.classList.toggle('active', tab === 'recipes');
       if (webBtn) webBtn.classList.toggle('active', tab === 'web');
-      // Category dropdown is library-only — disable when in web mode (OFF doesn't expose
-      // these categories cleanly enough to be worth wiring through).
+      // Category dropdown is library-only — recipes have their own labels and
+      // Open Food Facts doesn't expose these categories cleanly enough.
       if (cat) cat.style.display = tab === 'library' ? '' : 'none';
-      if (search) search.placeholder = tab === 'library' ? 'Search foods...' : 'Search any brand or food (e.g. "chobani strawberry yogurt")';
+      if (search) {
+        search.placeholder = tab === 'library' ? 'Search foods...'
+          : tab === 'recipes' ? 'Search My Recipes...'
+          : 'Search any brand or food (e.g. "chobani strawberry yogurt")';
+      }
       if (hint) {
         hint.textContent = tab === 'library'
           ? 'Tip: picking a food fills macros + micros. You can still edit any field after.'
+          : tab === 'recipes'
+          ? 'Tap Use on a saved recipe to log it as one meal. Build new recipes in Fuel → Meal Prep → + Build Recipe.'
           : 'Search any food in the global Open Food Facts database. Per-serving values shown when available; otherwise per-100g.';
       }
       // Re-render with the active source
       if (tab === 'library') renderFoodPicker();
+      else if (tab === 'recipes') renderRecipePicker();
       else triggerWebSearch();
     }
     function onFoodPickerSearchInput() {
       if (_foodSourceTab === 'library') {
         renderFoodPicker();
+      } else if (_foodSourceTab === 'recipes') {
+        // T92 — Recipes are local; no debounce needed.
+        renderRecipePicker();
       } else {
         // Debounce so we don't hammer the API on every keystroke
         if (_webSearchDebounce) clearTimeout(_webSearchDebounce);
         _webSearchDebounce = setTimeout(triggerWebSearch, 380);
       }
+    }
+    // T92 — Render saved recipes inside the food picker. Same row shape as
+    // renderFoodPicker so the UI stays consistent. Empty state points the
+    // user to the Recipe Builder so they know where to make more.
+    function renderRecipePicker() {
+      const out = document.getElementById('food-picker-results');
+      if (!out) return;
+      const q = (document.getElementById('food-picker-search') || {}).value || '';
+      const ql = q.trim().toLowerCase();
+      const all = state.savedRecipes || [];
+      const list = all.filter(r => !ql || (r.label || '').toLowerCase().includes(ql));
+      if (!list.length) {
+        out.innerHTML = `<div style="font-size:11px;color:var(--text3);text-align:center;padding:12px;line-height:1.5;">${
+          all.length === 0
+            ? 'No recipes saved yet.<br>Build one in <strong>Fuel → Meal Prep → + Build Recipe</strong>, then they\'ll show up here.'
+            : 'No recipes match. Try a different search.'
+        }</div>`;
+        return;
+      }
+      out.innerHTML = list.map(r => {
+        const ingCount = Array.isArray(r.ingredients) ? r.ingredients.length : 0;
+        const ingHint = ingCount > 0 ? ` · ${ingCount} ingredient${ingCount === 1 ? '' : 's'}` : '';
+        return `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;color:var(--text);font-weight:600;">${escapeHtml(r.label || 'Recipe')}</div>
+        <div style="font-size:10px;color:var(--text3);">${r.cals || 0} cal · P${r.prot || 0} / C${r.carbs || 0} / F${r.fat || 0}${ingHint}</div>
+      </div>
+      <button type="button" class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="useRecipeFromPicker('${r.id}')">Use</button>
+    </div>
+  `;
+      }).join('');
+    }
+    // T92 — Prefill the open Add Meal modal from a saved recipe. Mirrors
+    // useFoodFromLibrary so the serving multiplier and form state stay
+    // consistent. Doesn't reopen the modal (unlike openAddMealFromRecipe);
+    // the modal is already open since this is invoked from inside the picker.
+    function useRecipeFromPicker(id) {
+      const r = (state.savedRecipes || []).find(x => String(x.id) === String(id));
+      if (!r) return;
+      const nameEl = document.getElementById('add-meal-name');
+      if (nameEl && !nameEl.value.trim()) nameEl.value = r.label || '';
+      _setAddMealBase(r.cals, r.prot, r.carbs, r.fat, true);
+      // Carry through any micros captured when the recipe was originally
+      // logged so the macro reasoning panel still has data to show.
+      if (r.micros && typeof r.micros === 'object') {
+        const hidden = document.getElementById('add-meal-micros-data');
+        if (hidden) hidden.value = JSON.stringify(r.micros);
+        try { renderMealMicroSummary(r.micros); } catch (e) {}
+      }
+      // Mirror useFoodFromLibrary's UX — collapse the picker so the user
+      // sees the prefilled macros and the Log It button right away.
+      const panel = document.getElementById('food-picker-panel');
+      if (panel) panel.style.display = 'none';
+      const lbl = document.getElementById('food-picker-toggle-label');
+      if (lbl) lbl.textContent = 'Pick from food library';
+      showNotif(`Picked ${r.label || 'recipe'}`, 'var(--green2)');
     }
     // Map an Open Food Facts product into our local food shape so the rest of the UI
     // (renderer, useFoodFromLibrary, micros summary) doesn't have to special-case it.
@@ -11143,52 +11267,131 @@ create trigger trg_user_state_updated_at
     // builder is open AND a row is "awaiting" a fill, the food data flows
     // into that row instead of the Add Meal modal. Cleared after one use.
     let _foodPickTarget = null; // null | { kind:'builder-row', idx:number }
-    function openRecipeBuilder(recipeId) {
+    // T93 — Day list constants. Stored as full names so the JSON is
+    // self-explanatory; rendered as short chips in the UI.
+    const _RB_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const _RB_DAY_SHORT = { Monday: 'M', Tuesday: 'T', Wednesday: 'W', Thursday: 'Th', Friday: 'F', Saturday: 'Sa', Sunday: 'Su' };
+    // Active picker state — refreshed on every openRecipeBuilder call.
+    let _recipeBuilderDays = [];
+    // T93.3 — Parse the legacy free-text "days" field into the new array shape.
+    // Accepts things like "M,W,F", "Mon Wed Fri", "Weekdays", "Daily", etc.
+    function _parseLegacyDays(s) {
+      if (Array.isArray(s)) return s.filter(d => _RB_DAYS.includes(d));
+      if (!s || typeof s !== 'string') return [];
+      const lower = s.toLowerCase().trim();
+      if (!lower || lower === 'none') return [];
+      if (lower === 'daily' || lower === 'every day' || lower === 'all') return [..._RB_DAYS];
+      if (lower === 'weekdays') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+      if (lower === 'weekends' || lower === 'weekend') return ['Saturday', 'Sunday'];
+      const map = {
+        'mon': 'Monday', 'monday': 'Monday', 'm': 'Monday',
+        'tue': 'Tuesday', 'tues': 'Tuesday', 'tuesday': 'Tuesday', 't': 'Tuesday',
+        'wed': 'Wednesday', 'wednesday': 'Wednesday', 'w': 'Wednesday',
+        'thu': 'Thursday', 'thur': 'Thursday', 'thurs': 'Thursday', 'thursday': 'Thursday', 'th': 'Thursday',
+        'fri': 'Friday', 'friday': 'Friday', 'f': 'Friday',
+        'sat': 'Saturday', 'saturday': 'Saturday', 'sa': 'Saturday',
+        'sun': 'Sunday', 'sunday': 'Sunday', 'su': 'Sunday',
+      };
+      const out = new Set();
+      lower.split(/[\s,/&-]+/).forEach(tok => {
+        const v = map[tok.trim()];
+        if (v) out.add(v);
+      });
+      return _RB_DAYS.filter(d => out.has(d));
+    }
+    function renderRecipeBuilderDays() {
+      const row = document.getElementById('recipe-builder-days-row');
+      if (!row) return;
+      row.innerHTML = _RB_DAYS.map(d => {
+        const on = _recipeBuilderDays.includes(d);
+        return `<button type="button" onclick="toggleRecipeBuilderDay('${d}')" style="background:${on ? 'rgba(127,119,221,0.18)' : 'var(--bg2)'};border:1px solid ${on ? 'var(--accent)' : 'var(--border)'};color:${on ? 'var(--accent)' : 'var(--text2)'};padding:6px 10px;border-radius:14px;font-size:12px;font-weight:${on ? '600' : '400'};cursor:pointer;min-width:38px;">${_RB_DAY_SHORT[d]}</button>`;
+      }).join('');
+    }
+    function toggleRecipeBuilderDay(day) {
+      if (!_RB_DAYS.includes(day)) return;
+      if (_recipeBuilderDays.includes(day)) _recipeBuilderDays = _recipeBuilderDays.filter(d => d !== day);
+      else _recipeBuilderDays = _RB_DAYS.filter(d => _recipeBuilderDays.includes(d) || d === day);
+      renderRecipeBuilderDays();
+    }
+
+    // T93.4 — openRecipeBuilder now supports a mode flag plus an optional
+    // pre-fill payload. Modes:
+    //   'recipe'   — load/edit a state.savedRecipes entry (default)
+    //   'mealPrep' — load/edit a state.mealPrep entry; Save writes there
+    // The opts.prefill case is used by "Add to Meal Prep" on a recipe card:
+    // open the builder in meal-prep mode pre-loaded with that recipe's data.
+    function openRecipeBuilder(entryId, opts) {
+      opts = opts || {};
+      const mode = opts.mode === 'mealPrep' ? 'mealPrep' : 'recipe';
+      const prefill = opts.prefill || null;
       _recipeBuilderRows = [];
-      const titleEl = document.querySelector('#modal-recipe-builder .modal-title');
+      _recipeBuilderDays = [];
+      const titleEl = document.getElementById('recipe-builder-title');
+      const modeEl = document.getElementById('recipe-builder-mode');
       const editEl = document.getElementById('recipe-builder-edit-id');
       const nameEl = document.getElementById('recipe-builder-name');
+      const nameLabelEl = document.getElementById('recipe-builder-name-label');
       const notesEl = document.getElementById('recipe-builder-notes');
-      if (recipeId != null) {
-        const r = (state.savedRecipes || []).find(x => String(x.id) === String(recipeId));
-        if (r) {
-          if (titleEl) titleEl.textContent = 'Edit Recipe';
-          if (editEl) editEl.value = String(r.id);
-          if (nameEl) nameEl.value = r.label || '';
-          if (notesEl) notesEl.value = r.notes || '';
-          // Structured ingredients (post-T84): each is { name, servings,
-          // cal, prot, carbs, fat }. Legacy entries store ingredients as
-          // strings + a single set of macros on the recipe itself — we
-          // fold those into a single-row builder so the user can take
-          // them apart from there.
-          if (Array.isArray(r.ingredients) && r.ingredients.length && typeof r.ingredients[0] === 'object') {
-            _recipeBuilderRows = r.ingredients.map(i => ({
-              name: String(i.name || ''),
-              servings: parseFloat(i.servings) || 1,
-              cal: parseFloat(i.cal) || 0,
-              prot: parseFloat(i.prot) || 0,
-              carbs: parseFloat(i.carbs) || 0,
-              fat: parseFloat(i.fat) || 0,
-            }));
-          } else {
-            _recipeBuilderRows = [{
-              name: r.label || 'Recipe',
-              servings: 1,
-              cal: parseFloat(r.cals) || 0,
-              prot: parseFloat(r.prot) || 0,
-              carbs: parseFloat(r.carbs) || 0,
-              fat: parseFloat(r.fat) || 0,
-            }];
-          }
+      const mealTypeEl = document.getElementById('recipe-builder-meal-type');
+      const saveBtn = document.getElementById('recipe-builder-save-btn');
+      const daysHint = document.getElementById('recipe-builder-days-hint');
+      if (modeEl) modeEl.value = mode;
+      // Mode-driven labels.
+      if (mode === 'mealPrep') {
+        if (titleEl) titleEl.textContent = entryId ? 'Edit Meal Prep Item' : 'Add New Meal Prep Item';
+        if (nameLabelEl) nameLabelEl.textContent = 'Meal name';
+        if (nameEl) nameEl.placeholder = 'e.g. Tuesday lunch — chicken bowl';
+        if (saveBtn) saveBtn.textContent = entryId ? 'Save Changes' : 'Add Meal Prep';
+        if (daysHint) daysHint.textContent = '(pick at least one day this meal is in your prep)';
+      } else {
+        if (titleEl) titleEl.textContent = entryId ? 'Edit Recipe' : 'Build Recipe';
+        if (nameLabelEl) nameLabelEl.textContent = 'Recipe name';
+        if (nameEl) nameEl.placeholder = 'e.g. Morning Oatmeal';
+        if (saveBtn) saveBtn.textContent = entryId ? 'Save Changes' : 'Save Recipe';
+        if (daysHint) daysHint.textContent = "(optional — pick the days you'll have this)";
+      }
+      // Pre-fill from existing entry if editing, or from opts.prefill if we
+      // were handed a payload (Add to Meal Prep flow).
+      const collection = mode === 'mealPrep' ? (state.mealPrep || []) : (state.savedRecipes || []);
+      const r = entryId != null ? collection.find(x => String(x.id) === String(entryId)) : null;
+      const src = r || prefill;
+      if (src) {
+        if (editEl) editEl.value = r ? String(r.id) : '';
+        if (nameEl) nameEl.value = src.label || src.name || '';
+        if (notesEl) notesEl.value = src.notes || '';
+        if (mealTypeEl) mealTypeEl.value = src.mealType || src.type || '';
+        // Days: structured array first, then legacy free-text fallback.
+        if (Array.isArray(src.days)) _recipeBuilderDays = src.days.filter(d => _RB_DAYS.includes(d));
+        else _recipeBuilderDays = _parseLegacyDays(src.days);
+        // Ingredients: structured rows first, then legacy single-row fallback.
+        if (Array.isArray(src.ingredients) && src.ingredients.length && typeof src.ingredients[0] === 'object') {
+          _recipeBuilderRows = src.ingredients.map(i => ({
+            name: String(i.name || ''),
+            servings: parseFloat(i.servings) || 1,
+            cal: parseFloat(i.cal) || 0,
+            prot: parseFloat(i.prot) || 0,
+            carbs: parseFloat(i.carbs) || 0,
+            fat: parseFloat(i.fat) || 0,
+          }));
+        } else {
+          _recipeBuilderRows = [{
+            name: src.label || src.name || 'Item',
+            servings: 1,
+            cal: parseFloat(src.cals) || 0,
+            prot: parseFloat(src.prot) || 0,
+            carbs: parseFloat(src.carbs) || 0,
+            fat: parseFloat(src.fat) || 0,
+          }];
         }
       } else {
-        if (titleEl) titleEl.textContent = 'Build Recipe';
         if (editEl) editEl.value = '';
         if (nameEl) nameEl.value = '';
         if (notesEl) notesEl.value = '';
+        if (mealTypeEl) mealTypeEl.value = '';
       }
       if (_recipeBuilderRows.length === 0) addIngredientRow(true);
       renderRecipeBuilderRows();
+      renderRecipeBuilderDays();
       openModal('modal-recipe-builder');
     }
     function addIngredientRow(skipRender) {
@@ -11377,17 +11580,30 @@ create trigger trg_user_state_updated_at
     }
     function saveRecipeFromBuilder() {
       _readRecipeBuilderInputs();
+      const mode = document.getElementById('recipe-builder-mode')?.value === 'mealPrep' ? 'mealPrep' : 'recipe';
+      const noun = mode === 'mealPrep' ? 'meal prep item' : 'recipe';
       const name = (document.getElementById('recipe-builder-name')?.value || '').trim();
-      if (!name) { showNotif('Give the recipe a name first.', 'var(--red2)'); return; }
+      if (!name) { showNotif(`Give the ${noun} a name first.`, 'var(--red2)'); return; }
       const rows = _recipeBuilderRows.filter(r => r && ((r.name || '').trim() || r.cal || r.prot || r.carbs || r.fat));
       if (rows.length === 0) { showNotif('Add at least one ingredient.', 'var(--red2)'); return; }
+      // T93.4 — Meal-prep mode requires at least one day selected so the
+      // entry actually shows up on the schedule.
+      if (mode === 'mealPrep' && _recipeBuilderDays.length === 0) {
+        showNotif('Pick at least one day for this meal prep item.', 'var(--red2)');
+        return;
+      }
       const totals = _recipeBuilderTotals();
       const round = (n) => Math.round(n * 10) / 10;
       const notes = (document.getElementById('recipe-builder-notes')?.value || '').trim();
       const editId = document.getElementById('recipe-builder-edit-id')?.value || '';
+      const mealType = (document.getElementById('recipe-builder-meal-type')?.value || '').trim() || null;
+      const days = _RB_DAYS.filter(d => _recipeBuilderDays.includes(d));
       const payload = {
         id: editId ? (isNaN(Number(editId)) ? editId : Number(editId)) : (Date.now() + Math.floor(Math.random() * 1000)),
         label: name,
+        // T93.4 — Meal-prep entries also carry `name` so legacy renderers
+        // that read `name` (rather than `label`) keep rendering correctly.
+        name: name,
         ingredients: rows.map(r => ({
           name: r.name || '',
           servings: parseFloat(r.servings) || 1,
@@ -11401,26 +11617,47 @@ create trigger trg_user_state_updated_at
         carbs: round(totals.carbs),
         fat: round(totals.fat),
         notes,
+        mealType,
+        days,
         createdAt: new Date().toISOString(),
       };
-      state.savedRecipes = state.savedRecipes || [];
+      // T93.4 — Route into the right collection based on mode.
+      const collKey = mode === 'mealPrep' ? 'mealPrep' : 'savedRecipes';
+      state[collKey] = state[collKey] || [];
+      const coll = state[collKey];
       if (editId) {
-        const i = state.savedRecipes.findIndex(x => String(x.id) === String(editId));
+        const i = coll.findIndex(x => String(x.id) === String(editId));
         if (i >= 0) {
           // Preserve original createdAt on edit so sorting stays stable.
-          payload.createdAt = state.savedRecipes[i].createdAt || payload.createdAt;
-          state.savedRecipes[i] = payload;
+          payload.createdAt = coll[i].createdAt || payload.createdAt;
+          coll[i] = payload;
         } else {
-          state.savedRecipes.push(payload);
+          coll.push(payload);
         }
       } else {
-        state.savedRecipes.push(payload);
+        coll.push(payload);
       }
       save();
       try { renderSavedRecipes(); } catch (e) {}
+      try { renderMealPrep(); } catch (e) {}
       try { renderRecipeSuggestions(); } catch (e) {}
+      try { renderDailyNutrition(); } catch (e) {}
       closeModal('modal-recipe-builder');
-      showNotif(editId ? 'Recipe updated' : 'Recipe saved');
+      showNotif(editId ? `${noun.charAt(0).toUpperCase() + noun.slice(1)} updated` : `${noun.charAt(0).toUpperCase() + noun.slice(1)} saved`);
+    }
+    // T93.4 / T93.5 — Entry points that open the builder in meal-prep mode.
+    function openNewMealPrepBuilder() {
+      openRecipeBuilder(null, { mode: 'mealPrep' });
+    }
+    function openMealPrepEditor(id) {
+      openRecipeBuilder(id, { mode: 'mealPrep' });
+    }
+    function addRecipeToMealPrep(recipeId) {
+      const r = (state.savedRecipes || []).find(x => String(x.id) === String(recipeId));
+      if (!r) return;
+      // Pre-fill the builder with this recipe's data + open in meal-prep
+      // mode so the user can pick days + meal type before saving.
+      openRecipeBuilder(null, { mode: 'mealPrep', prefill: r });
     }
 
     // ===== T83 — Serving multiplier helpers =====
@@ -16682,17 +16919,24 @@ create trigger trg_user_state_updated_at
               return `<li>${escapeHtml(String(i || ''))}</li>`;
             }).join('')}</ul>`
           : '<div style="font-size:11px;color:var(--text3);margin-top:2px;">no ingredients listed</div>';
+        // T93.2 — Meal type chip surfaces as a tag near the name when set.
+        const mealTypeChip = r.mealType
+          ? ` <span style="font-size:10px;color:var(--accent2);background:rgba(79,142,255,0.10);border:1px solid var(--accent2);padding:1px 6px;border-radius:10px;margin-left:6px;text-transform:capitalize;">${escapeHtml(r.mealType)}</span>`
+          : '';
+        // T93.1 — Calories moved inline with P/C/F instead of the big
+        // top-right number, per user request.
         return `
       <div class="meal-entry" style="align-items:flex-start;">
         <div style="flex:1;min-width:0;">
-          <div class="meal-entry-name" style="display:flex;align-items:center;flex-wrap:wrap;">${escapeHtml(r.label || '')}${warn}</div>
+          <div class="meal-entry-name" style="display:flex;align-items:center;flex-wrap:wrap;">${escapeHtml(r.label || '')}${mealTypeChip}${warn}</div>
           ${ingList}
-          <div class="meal-entry-macros">P:${r.prot || 0}g · C:${r.carbs || 0}g · F:${r.fat || 0}g</div>
+          <div class="meal-entry-macros"><strong style="color:var(--gold);">${r.cals || 0}</strong> cal · P:${r.prot || 0}g · C:${r.carbs || 0}g · F:${r.fat || 0}g</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-          <div class="meal-entry-cal">${r.cals || 0}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
             <button onclick="logSavedRecipe(${JSON.stringify(r.id)})" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">Log</button>
+            <!-- T93.5 — Copies this recipe into the meal prep schedule. -->
+            <button onclick="addRecipeToMealPrep(${JSON.stringify(r.id)})" class="btn btn-sm" style="font-size:10px;padding:3px 8px;color:var(--accent2);border-color:var(--accent2);">+ Meal Prep</button>
             <!-- T84.5 — Edit reopens the recipe inside the Recipe Builder. -->
             <button onclick="openRecipeBuilder(${JSON.stringify(r.id)})" class="btn btn-sm" style="font-size:10px;padding:3px 8px;">Edit</button>
             <button onclick="deleteSavedRecipe(${JSON.stringify(r.id)})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">×</button>
@@ -17186,7 +17430,9 @@ create trigger trg_user_state_updated_at
                 <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--accent2);margin-bottom:6px;">Start meal prepping</div>
                 <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px;">Plan weekly meals, build a reusable recipe, or tell ARIA what to avoid. The sections below unlock once you start.</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-                  <button class="btn btn-sm btn-primary" onclick="openMealPrepModal()" style="font-size:11px;">+ Add meal prep</button>
+                  <!-- T93.7 — Welcome card button also routes through the
+                       unified Recipe Builder in meal-prep mode. -->
+                  <button class="btn btn-sm btn-primary" onclick="openNewMealPrepBuilder()" style="font-size:11px;">+ Add new meal prep item</button>
                   <button class="btn btn-sm" onclick="openRecipeBuilder()" style="font-size:11px;color:var(--gold);border-color:var(--gold);">+ Build Recipe</button>
                   <button class="btn btn-sm" onclick="document.getElementById('blocklist-input')?.focus()" style="font-size:11px;color:var(--accent2);border-color:var(--accent2);">Set avoid list</button>
                 </div>
@@ -17214,30 +17460,54 @@ create trigger trg_user_state_updated_at
       // not the ★/☆ Unicode characters.
       const savedNames = new Set((state.savedRecipes || []).map(r => (r.label || '').toLowerCase()));
       list.innerHTML = state.mealPrep.map((m, i) => {
-        const alreadySaved = savedNames.has((m.name || '').toLowerCase());
+        const alreadySaved = savedNames.has(((m.label || m.name) || '').toLowerCase());
         const starBtn = alreadySaved
           ? `<button disabled title="Already in My Recipes" style="background:none;border:none;color:var(--gold);cursor:default;line-height:1;padding:0 2px;display:inline-flex;align-items:center;justify-content:center;">${iconSvg('star-fill', 18)}</button>`
           : `<button onclick="saveMealPrepAsRecipe(${i})" title="Save to My Recipes" style="background:none;border:none;color:var(--text3);cursor:pointer;line-height:1;padding:0 2px;display:inline-flex;align-items:center;justify-content:center;">${iconSvg('star', 18)}</button>`;
+        // T93.6 — Day chips replace the free-text "days" string. Normalize
+        // legacy entries (which stored a comma-separated string) on the fly.
+        const days = Array.isArray(m.days) ? m.days.filter(d => _RB_DAYS.includes(d)) : _parseLegacyDays(m.days);
+        const dayChips = _RB_DAYS.map(d => {
+          const on = days.includes(d);
+          return `<span style="background:${on ? 'rgba(127,119,221,0.18)' : 'transparent'};border:1px solid ${on ? 'var(--accent)' : 'var(--border)'};color:${on ? 'var(--accent)' : 'var(--text3)'};padding:2px 6px;border-radius:8px;font-size:10px;font-weight:${on ? '600' : '400'};">${_RB_DAY_SHORT[d]}</span>`;
+        }).join(' ');
+        // T93.2 — Meal type tag.
+        const mealTypeChip = (m.mealType || m.type)
+          ? ` <span style="font-size:10px;color:var(--accent2);background:rgba(79,142,255,0.10);border:1px solid var(--accent2);padding:1px 6px;border-radius:10px;text-transform:capitalize;">${escapeHtml(m.mealType || m.type)}</span>`
+          : '';
+        const name = m.label || m.name || 'Meal';
         return `
-    <div class="meal-entry">
+    <div class="meal-entry" style="align-items:flex-start;">
       <div style="flex:1;min-width:0;">
-        <div class="meal-entry-name">${escapeHtml(m.name || 'Meal')} <span style="font-size:10px;color:var(--text3);">${escapeHtml(m.type || '')}</span></div>
-        <div class="meal-entry-macros">P:${m.prot || 0}g · C:${m.carbs || 0}g · F:${m.fat || 0}g · ${escapeHtml(m.days || '—')}</div>
-        <div style="font-size:11px;color:var(--text3);">${escapeHtml(m.portion || '')}</div>
+        <div class="meal-entry-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">${escapeHtml(name)}${mealTypeChip}</div>
+        <!-- T93.1 — Calories inline with the other macros. -->
+        <div class="meal-entry-macros"><strong style="color:var(--gold);">${m.cals || 0}</strong> cal · P:${m.prot || 0}g · C:${m.carbs || 0}g · F:${m.fat || 0}g</div>
+        <!-- T93.6 — Day chips so the user can see at a glance which days
+             this is on, without having to read a comma-separated string. -->
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:6px;">${dayChips}</div>
+        ${m.portion ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;">${escapeHtml(m.portion)}</div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <div style="display:flex;align-items:center;gap:4px;">
-          ${starBtn}
-          <div class="meal-entry-cal">${m.cals || 0}</div>
-        </div>
+        ${starBtn}
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-          <button onclick="openEditMealPrepModal(${i})" title="Edit this meal prep" style="background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;">Edit</button>
-          <button onclick="removeMealPrep(${i})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">Remove</button>
+          <button onclick="logMealPrepItem(${i})" title="Log this meal prep item now" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">Log</button>
+          <button onclick="openMealPrepEditor(${JSON.stringify(m.id)})" title="Edit this meal prep" class="btn btn-sm" style="font-size:10px;padding:3px 8px;">Edit</button>
+          <button onclick="removeMealPrep(${i})" title="Remove" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">×</button>
         </div>
       </div>
     </div>
   `;
       }).join('');
+    }
+    // T93.6 — Log a meal prep item into today's food log using the same path
+    // recipes use. Same prefill flow as the My Recipes Log button.
+    function logMealPrepItem(idx) {
+      const mp = (state.mealPrep || [])[idx];
+      if (!mp) return;
+      // Reuse openAddMealFromRecipe so the serving multiplier and micros
+      // wiring stays consistent across the two paths.
+      try { openAddMealFromRecipe({ label: mp.label || mp.name, cals: mp.cals, prot: mp.prot, carbs: mp.carbs, fat: mp.fat, ingredients: mp.ingredients }, 'extra'); }
+      catch (e) { showNotif('Could not open the log meal modal.', 'var(--red2)'); }
     }
     // T45.2 — Save a meal prep entry to My Recipes so it can be re-used
     // without re-entering. Skips if the label already exists. Ingredients
