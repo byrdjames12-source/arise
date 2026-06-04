@@ -12769,7 +12769,28 @@ create trigger trg_user_state_updated_at
       inj.areas.forEach(a => (INJURY_BLOCKS_WORKOUT[a] || []).forEach(t => blocked.add(t)));
       return blocked.has(workoutType) ? 'Mobility' : workoutType;
     }
+    // T91 — Reset transient per-tab state so each bottom-nav tap opens its
+    // page fresh: first subtab, cleared search inputs, no leftover filters.
+    // Without this, leaving Progress on the Goals subtab would mean the next
+    // visit also lands on Goals; the History/Library search fields kept
+    // whatever the user last typed even after leaving the tab.
+    function _resetTransientTabState() {
+      try { _activeProgressTab = 'stats'; } catch (e) {}
+      try { _activeWorkoutTab = 'log'; } catch (e) {}
+      try { _activeProfileTab = 'profile'; } catch (e) {}
+      try { _activeHistSubtab = 'history'; } catch (e) {}
+      try { _historyFilter = ''; } catch (e) {}
+      try { _libSearchQuery = ''; } catch (e) {}
+      const inputs = ['hist-search', 'lib-search'];
+      inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
     function switchTab(tab) {
+      // T91 — Wipe transient state BEFORE the screen switch so the rendered
+      // pane below reflects the reset.
+      _resetTransientTabState();
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       const target = document.getElementById('screen-' + tab);
@@ -12797,9 +12818,12 @@ create trigger trg_user_state_updated_at
         else if (tab === 'progress' || tab === 'stats' || tab === 'goals') {
           // Render both stats + goals contents; subtab decides which is visible
           renderStats(); renderExerciseProgression(); renderWeeklyVolume(); renderGoals();
-          // If caller asked for an old name, switch the appropriate subtab
+          // If caller asked for an old name, switch the appropriate subtab.
+          // T91 — Default branch now unconditionally forces 'stats' (rather
+          // than only-when-undefined) so a fresh bottom-nav tap always lands
+          // on the first subtab.
           if (tab === 'goals') switchProgressTab('goals');
-          else if (typeof _activeProgressTab === 'undefined' || !_activeProgressTab) switchProgressTab('stats');
+          else switchProgressTab('stats');
         }
         else if (tab === 'workouts' || tab === 'tracker') {
           renderTrackerSheet();
@@ -12819,11 +12843,24 @@ create trigger trg_user_state_updated_at
           }
           // T34.1 — refresh recovery banner each time the tracker is shown
           try { renderRecoveryBanner(); } catch (e) { console.warn('renderRecoveryBanner', e); }
-          if (typeof _activeWorkoutTab === 'undefined' || !_activeWorkoutTab) switchWorkoutTab('log');
+          // T91 — Always reset to the Log subtab on bottom-nav tap.
+          switchWorkoutTab('log');
         }
-        else if (tab === 'nutrition') renderNutrition();
-        else if (tab === 'shop') renderShop();
-        else if (tab === 'profile') renderProfile();
+        else if (tab === 'nutrition') {
+          renderNutrition();
+          // T91 — Reset Fuel to the Daily subtab on every nav.
+          try { switchNutTab('daily'); } catch (e) {}
+        }
+        else if (tab === 'shop') {
+          renderShop();
+          // T91 — Reset Shop to the Frames subtab on every nav.
+          try { switchShopTab('frames'); } catch (e) {}
+        }
+        else if (tab === 'profile') {
+          renderProfile();
+          // T91 — Reset Profile to the Profile subtab on every nav.
+          try { switchProfileTab('profile'); } catch (e) {}
+        }
       } catch (e) { console.warn('Render error for tab', tab, e); }
       // T41.1 — Always open a freshly-switched page scrolled to the top
       // rather than restoring wherever the user last left off. Resets every
