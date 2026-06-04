@@ -6678,6 +6678,16 @@ create trigger trg_user_state_updated_at
           if (main) main.style.display = 'flex';
         } catch (e) { }
       }
+      // T82.2 — Whenever cloud sync has produced a profile (whether it
+      // exited onboarding just now or merely confirmed an existing one),
+      // make sure body.app-ready is set. Without this the FAB stays
+      // hidden because the boot-time gate (which runs BEFORE the async
+      // cloud pull resolves) saw an empty state.profile and skipped the
+      // class — leaving someone signing into their account on a fresh
+      // device with no FAB at all.
+      try {
+        if (state.profile) document.body.classList.add('app-ready');
+      } catch (e) {}
       try { initApp(); } catch (e) { console.warn('post-merge re-init failed', e); }
       return true;
     }
@@ -7501,10 +7511,20 @@ create trigger trg_user_state_updated_at
         lines.push('Available equipment: not specified (assume full gym)');
       }
       // Recent activity (last 7 days) — high level
+      // T82.1 — workoutLog stores ONE ENTRY PER EXERCISE per date, so a
+      // .length here would report 37 sessions for what is really 6 days of
+      // training. ARIA's review and plan-building need distinct training
+      // days, not raw entry counts. Same fix applies to the 4-week summary
+      // below.
       const cutoff7 = new Date(); cutoff7.setDate(cutoff7.getDate() - 7);
       const cutoff7Str = cutoff7.toISOString().split('T')[0];
-      const recentSessions = (state.workoutLog || []).filter(e => (e.date || '') >= cutoff7Str).length;
-      if (recentSessions > 0) lines.push(`Recent sessions (last 7 days): ${recentSessions}`);
+      const recentDates = new Set(
+        (state.workoutLog || [])
+          .filter(e => (e.date || '') >= cutoff7Str)
+          .map(e => e.date)
+      );
+      const recentSessions = recentDates.size;
+      if (recentSessions > 0) lines.push(`Training days (last 7): ${recentSessions}`);
       // T27.7 — 4-week workoutLog summary so ARIA can do "review my last month"
       // intelligently. We summarize per exercise (avg top weight, avg top reps,
       // session count, RPE if logged) instead of dumping every set, to stay
@@ -7533,9 +7553,16 @@ create trigger trg_user_state_updated_at
             const wDelta = (lastTop && firstTop && firstTop.weight) ? (lastTop.weight - firstTop.weight) : 0;
             const rpes = sessions.flatMap(s => (s.sets || []).map(x => parseFloat(x.rpe))).filter(x => isFinite(x) && x > 0);
             const avgRpe = rpes.length ? (rpes.reduce((a,b) => a + b, 0) / rpes.length).toFixed(1) : null;
-            return `  - ${last.exercise}: ${sessions.length} sess, last set ${lastTop ? lastTop.reps + '×' + lastTop.weight + 'lb' : 'BW'}, ${wDelta >= 0 ? '+' : ''}${wDelta}lb over ${sessions.length} sessions${avgRpe ? `, avg RPE ${avgRpe}` : ''}`;
+            // T82.1 — Word "sessions" here was conflating per-exercise log
+            // counts with whole-workout sessions; switch to "times" so the
+            // model doesn't confuse the two scopes.
+            return `  - ${last.exercise}: ${sessions.length}× logged, last set ${lastTop ? lastTop.reps + '×' + lastTop.weight + 'lb' : 'BW'}, ${wDelta >= 0 ? '+' : ''}${wDelta}lb over ${sessions.length} logs${avgRpe ? `, avg RPE ${avgRpe}` : ''}`;
           });
-          lines.push(`\nLAST 4 WEEKS (${log4w.length} log entries across ${groups.size} unique exercises):\n${summaries.join('\n')}`);
+          // T82.1 — Report distinct training days alongside the per-exercise
+          // entry count so ARIA can reason about cadence without thinking
+          // "37 sessions/wk." Format: "X training days · Y exercise entries".
+          const trainingDaysLast4w = new Set(log4w.map(e => e.date).filter(Boolean)).size;
+          lines.push(`\nLAST 4 WEEKS (${trainingDaysLast4w} training days · ${log4w.length} exercise entries across ${groups.size} unique exercises):\n${summaries.join('\n')}`);
         }
       } catch (e) { console.warn('coach 4w summary:', e); }
       // T34.1 — Active regional recovery. Surface what's flagged + what's
@@ -14228,7 +14255,11 @@ create trigger trg_user_state_updated_at
       return 'off';
     }
     function _ariaMilestoneCounters() {
-      const workouts = (state.workoutLog || []).length;
+      // T82.1 — Use distinct training days, not raw workoutLog entries
+      // (which store one row per exercise per date). The 10-workout
+      // milestone threshold for triggering a review is intended as 10
+      // sessions, not 10 logged exercises.
+      const workouts = new Set((state.workoutLog || []).map(e => e && e.date).filter(Boolean)).size;
       const checkins = (state.logs || []).length;
       return {
         workouts, checkins,
