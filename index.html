@@ -7559,8 +7559,19 @@ create trigger trg_user_state_updated_at
           .map(d => `${d.slice(0, 3)}: ${state.workoutSplit[d] || 'Rest'}`).join(', ');
         lines.push(`Current split: ${days}`);
       }
-      if (Array.isArray(state.goals) && state.goals.length) {
-        lines.push(`Active goals: ${state.goals.map(g => g.name).join('; ')}`);
+      // T86.3 — Only ACTIVE goals reach ARIA. Archived ones are intentionally
+      // off her radar so she doesn't keep coaching against a goal the user
+      // has paused. activeGoals() is also used by the Goals tab UI so the
+      // two views stay consistent.
+      const activeGs = (typeof activeGoals === 'function')
+        ? activeGoals()
+        : (state.goals || []).filter(g => g && !g.archived);
+      if (activeGs.length) {
+        lines.push(`Active goals: ${activeGs.map(g => g.name).join('; ')}`);
+      }
+      const archivedCount = (state.goals || []).filter(g => g && g.archived).length;
+      if (archivedCount > 0) {
+        lines.push(`(${archivedCount} goal${archivedCount === 1 ? '' : 's'} archived — paused on user's request; do not coach against unless the user brings them back.)`);
       }
       if (state.settings && state.settings.beginnerMode) lines.push('Beginner mode is ON.');
       // T27.6 — share equipment so ARIA respects the user's gym setup
@@ -7742,8 +7753,220 @@ create trigger trg_user_state_updated_at
 
     // Strip the <plan>...</plan> block from a reply so the chat UI shows only the
     // friendly summary text. The structured plan is rendered as its own card.
+    // T87.1 — Also strip <actions>...</actions> blocks so the user doesn't
+    // see raw JSON in chat; those render as action cards (renderCoachActionCards).
     function stripPlanBlock(replyText) {
-      return (replyText || '').replace(/<plan>[\s\S]*?<\/plan>/g, '').trim();
+      return (replyText || '')
+        .replace(/<plan>[\s\S]*?<\/plan>/g, '')
+        .replace(/<actions>[\s\S]*?<\/actions>/g, '')
+        .trim();
+    }
+    // T87.1 — Parse an <actions> JSON block. Returns an array of action
+    // descriptors or [] when the reply has none. Each descriptor has a
+    // `type` field plus type-specific args; see ACTION_HANDLERS below for
+    // the contract. Invalid JSON is logged and ignored — we never want a
+    // malformed reply to crash the chat render.
+    function parseCoachActions(replyText) {
+      if (!replyText) return [];
+      const match = replyText.match(/<actions>([\s\S]*?)<\/actions>/);
+      if (!match) return [];
+      try {
+        const arr = JSON.parse(match[1].trim());
+        if (!Array.isArray(arr)) return [];
+        return arr.filter(a => a && typeof a === 'object' && typeof a.type === 'string');
+      } catch (err) {
+        console.warn('Failed to parse coach actions JSON:', err);
+        return [];
+      }
+    }
+    // T87.2 — Action handlers. Each handler receives the action object plus a
+    // `record` callback used to log what changed (Apply button writes to
+    // state.aiCoach.appliedActions so the user can audit ARIA's edits).
+    // Throw an Error to surface a failure to the UI.
+    const ACTION_HANDLERS = {
+      archive_goal: (a, record) => {
+        const g = (state.goals || []).find(x => x && x.id == a.id);
+        if (!g) throw new Error('Goal not found');
+        g.archived = true;
+        record(`Archived "${g.name}"`);
+      },
+      unarchive_goal: (a, record) => {
+        const g = (state.goals || []).find(x => x && x.id == a.id);
+        if (!g) throw new Error('Goal not found');
+        g.archived = false;
+        record(`Restored "${g.name}"`);
+      },
+      update_goal: (a, record) => {
+        const g = (state.goals || []).find(x => x && x.id == a.id);
+        if (!g) throw new Error('Goal not found');
+        const patch = a.patch || {};
+        const before = { name: g.name, target: g.target, current: g.current, date: g.date };
+        ['name', 'target', 'current', 'date', 'cat', 'desc'].forEach(k => {
+          if (k in patch) g[k] = patch[k];
+        });
+        // If the target shape changed, regenerate auto-milestones so the
+        // progression remains meaningful.
+        try { if (typeof refreshAutoMilestones === 'function') refreshAutoMilestones(g); } catch (e) {}
+        const fields = Object.keys(patch).join(', ');
+        record(`Updated "${before.name}" — fields: ${fields}`);
+      },
+      add_goal: (a, record) => {
+        const id = Date.now() + Math.floor(Math.random() * 1000);
+        const goal = {
+          id,
+          name: String(a.name || 'Goal'),
+          cat: a.cat || 'custom',
+          current: a.current || '',
+          target: a.target || '',
+          date: a.date || (a.deadline_weeks ? (() => {
+            const d = new Date(); d.setDate(d.getDate() + Math.round(a.deadline_weeks * 7));
+            return d.toISOString().slice(0, 10);
+          })() : ''),
+          desc: a.desc || '',
+          progress: 0,
+          milestones: [],
+          archived: false,
+        };
+        try { if (typeof generateMilestonesForGoal === 'function') goal.milestones = generateMilestonesForGoal(goal); } catch (e) {}
+        state.goals = state.goals || [];
+        state.goals.push(goal);
+        record(`Added "${goal.name}"`);
+      },
+      set_macros: (a, record) => {
+        state.macros = state.macros || {};
+        const before = { ...state.macros };
+        if (isFinite(a.calories)) state.macros.calories = parseInt(a.calories, 10);
+        if (isFinite(a.protein))  state.macros.protein  = parseInt(a.protein, 10);
+        if (isFinite(a.carbs))    state.macros.carbs    = parseInt(a.carbs, 10);
+        if (isFinite(a.fat))      state.macros.fat      = parseInt(a.fat, 10);
+        record(`Macros → ${state.macros.calories} kcal · ${state.macros.protein}g P / ${state.macros.carbs}g C / ${state.macros.fat}g F (was ${before.calories || '—'} kcal)`);
+      },
+      set_split: (a, record) => {
+        if (!a.split || typeof a.split !== 'object') throw new Error('No split provided');
+        const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        state.workoutSplit = state.workoutSplit || {};
+        days.forEach(d => { if (a.split[d]) state.workoutSplit[d] = a.split[d]; });
+        record('Updated training split');
+      },
+      regenerate_quests: (a, record) => {
+        // Wipe today's quest cache so generateTodayQuests rebuilds from the
+        // current split + macros + active goals.
+        state.questsDate = '';
+        try { if (typeof generateTodayQuests === 'function') generateTodayQuests(); } catch (e) {}
+        record('Regenerated today\'s quests');
+      },
+    };
+    // T87.2 — Run a single action through its handler. Records to
+    // state.aiCoach.appliedActions for audit + toasts the user.
+    function applyCoachAction(action, msgIdx, actionIdx) {
+      if (!action || !action.type) return;
+      const handler = ACTION_HANDLERS[action.type];
+      if (!handler) { showNotif(`Unknown action type: ${action.type}`, 'var(--red2)'); return; }
+      const logEntry = { type: action.type, args: action, msgIdx, actionIdx, appliedAt: Date.now(), description: '' };
+      try {
+        handler(action, (desc) => { logEntry.description = desc; });
+      } catch (err) {
+        console.warn('applyCoachAction failed:', err);
+        showNotif(`Couldn't apply: ${err.message || 'unknown error'}`, 'var(--red2)');
+        return;
+      }
+      state.aiCoach = state.aiCoach || { messages: [] };
+      state.aiCoach.appliedActions = state.aiCoach.appliedActions || [];
+      state.aiCoach.appliedActions.push(logEntry);
+      // Mark the action as applied on the message itself so re-render shows
+      // it greyed out instead of offering Apply again.
+      try {
+        const m = (state.aiCoach.messages || [])[msgIdx];
+        if (m) {
+          m.appliedActions = m.appliedActions || {};
+          m.appliedActions[actionIdx] = { appliedAt: logEntry.appliedAt, description: logEntry.description };
+        }
+      } catch (e) {}
+      save();
+      // Re-render touched surfaces.
+      try { renderGoals(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
+      try { renderQuests(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
+      try { renderCoachMessages(); } catch (e) {}
+      showNotif(logEntry.description || `Applied ${action.type}`, 'var(--green)');
+    }
+    function skipCoachAction(msgIdx, actionIdx) {
+      // Record the skip too, so a future "What did I skip?" review is
+      // possible. Marks the action card as dismissed in the chat.
+      try {
+        const m = (state.aiCoach.messages || [])[msgIdx];
+        if (m) {
+          m.skippedActions = m.skippedActions || {};
+          m.skippedActions[actionIdx] = { skippedAt: Date.now() };
+        }
+      } catch (e) {}
+      save();
+      try { renderCoachMessages(); } catch (e) {}
+    }
+    // T87.1 — Render the structured action cards under an assistant message.
+    // One card per action with an Apply + Skip button. Applied/skipped
+    // actions render greyed out with a status badge.
+    function renderCoachActionCards(actions, msgIdx) {
+      if (!actions || !actions.length) return '';
+      const m = (state.aiCoach && state.aiCoach.messages && state.aiCoach.messages[msgIdx]) || {};
+      const applied = m.appliedActions || {};
+      const skipped = m.skippedActions || {};
+      const describe = (a) => {
+        switch (a.type) {
+          case 'archive_goal': {
+            const g = (state.goals || []).find(x => x && x.id == a.id);
+            return { title: 'Archive goal', body: g ? `Move "${g.name}" into Inactive goals.` : `Archive goal #${a.id}` };
+          }
+          case 'unarchive_goal': {
+            const g = (state.goals || []).find(x => x && x.id == a.id);
+            return { title: 'Restore goal', body: g ? `Bring "${g.name}" back to active.` : `Restore goal #${a.id}` };
+          }
+          case 'update_goal': {
+            const g = (state.goals || []).find(x => x && x.id == a.id);
+            const fields = Object.keys(a.patch || {}).join(', ');
+            return { title: 'Update goal', body: g ? `Adjust "${g.name}" — ${fields}` : `Update goal #${a.id}` };
+          }
+          case 'add_goal':
+            return { title: 'Add goal', body: `${a.name || 'New goal'}${a.target ? ` → ${a.target}` : ''}${a.deadline_weeks ? ` in ${a.deadline_weeks} wks` : ''}` };
+          case 'set_macros':
+            return { title: 'Set macros', body: `${a.calories || '?'} kcal · ${a.protein || '?'}g P / ${a.carbs || '?'}g C / ${a.fat || '?'}g F` };
+          case 'set_split':
+            return { title: 'Set training split', body: a.split ? Object.entries(a.split).map(([d, v]) => `${d.slice(0,3)}: ${v}`).join(' · ') : 'Apply split' };
+          case 'regenerate_quests':
+            return { title: 'Regenerate today\'s quests', body: 'Wipe today\'s quest list and rebuild from the current split + macros.' };
+          default:
+            return { title: a.type, body: '' };
+        }
+      };
+      return actions.map((a, i) => {
+        const d = describe(a);
+        const reason = a.reason || a.why || '';
+        const isApplied = !!applied[i];
+        const isSkipped = !!skipped[i];
+        if (isApplied) {
+          return `
+            <div style="background:rgba(124,206,151,0.08);border:1px solid var(--green);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text2);margin-top:4px;">
+              <div style="display:flex;align-items:center;gap:6px;color:var(--green);font-weight:500;">${iconSvg('check', 12)}Applied · ${escapeHtml(applied[i].description || d.title)}</div>
+            </div>`;
+        }
+        if (isSkipped) {
+          return `
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text3);margin-top:4px;font-style:italic;">
+              Skipped · ${escapeHtml(d.title)}
+            </div>`;
+        }
+        return `
+          <div style="background:var(--bg);border:1px solid var(--accent2);border-radius:10px;padding:10px 12px;margin-top:6px;">
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:1px;font-size:11px;color:var(--accent2);text-transform:uppercase;margin-bottom:4px;">${escapeHtml(d.title)}</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.45;margin-bottom:${reason ? '6' : '8'}px;">${escapeHtml(d.body)}</div>
+            ${reason ? `<div style="font-size:11px;color:var(--text3);line-height:1.45;margin-bottom:8px;"><strong style="color:var(--text2);">Why:</strong> ${escapeHtml(reason)}</div>` : ''}
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-primary" onclick="applyCoachAction(${JSON.stringify(a)}, ${msgIdx}, ${i})" style="font-size:11px;padding:5px 10px;">Apply</button>
+              <button class="btn btn-sm" onclick="skipCoachAction(${msgIdx}, ${i})" style="font-size:11px;padding:5px 10px;">Skip</button>
+            </div>
+          </div>`;
+      }).join('');
     }
 
     // Apply a parsed plan to state — sets workoutSplit + adds goals. Confirmation
@@ -7849,6 +8072,12 @@ create trigger trg_user_state_updated_at
         const displayText = isUser ? m.content : stripPlanBlock(m.content);
         const plan = isUser ? null : parseCoachPlan(m.content);
         const planCard = plan ? renderCoachPlanCard(plan, i) : '';
+        // T87.1 — Parse + render structured action cards from <actions>
+        // JSON. One card per action with Apply / Skip. Cards persist their
+        // applied/skipped state in the message itself so future renders
+        // show the resolved status.
+        const actions = isUser ? [] : parseCoachActions(m.content);
+        const actionCards = actions.length ? renderCoachActionCards(actions, i) : '';
         // T79.4 — Tap-to-play voice button on every ARIA reply. Each assistant
         // message gets a small icon button under the bubble that reads the
         // text aloud via the existing TTS (Web Speech). Tap again to stop.
@@ -7862,6 +8091,7 @@ create trigger trg_user_state_updated_at
             <div style="max-width:85%;background:${bg};color:${color};border:1px solid ${border};border-radius:12px;padding:8px 12px;font-size:13px;line-height:1.5;white-space:pre-wrap;">${escapeHtml(displayText)}</div>
           </div>
           ${playBtn}
+          ${actionCards}
           ${planCard}
         `;
       }).join('');
@@ -8149,6 +8379,13 @@ create trigger trg_user_state_updated_at
           if (state.aiCoach && Array.isArray(state.aiCoach.messages)
               && typeof state.aiCoach.seenCount !== 'number') {
             state.aiCoach.seenCount = state.aiCoach.messages.length;
+          }
+          // T86.1 — Backfill goal.archived so older saves participate in the
+          // archive UI without needing manual touch-up. Default false.
+          if (Array.isArray(state.goals)) {
+            state.goals.forEach(g => {
+              if (g && typeof g.archived !== 'boolean') g.archived = false;
+            });
           }
           // T80 — Backfill tombstones map for pre-T80 saves + GC any expired
           // entries. The structure has one bucket per soft-deletable
@@ -15427,6 +15664,42 @@ create trigger trg_user_state_updated_at
   `;
     }
     // ===== GOALS =====
+    // T86.1 — Goal archive helpers. archiveGoal flips archived=true so a goal
+    // moves into the "Inactive goals" section without losing its history;
+    // unarchiveGoal brings it back; deleteArchivedGoal is the only path to
+    // permanently drop it from state. activeGoals/archivedGoals are used by
+    // both the UI and buildCoachUserContext so ARIA only sees what the user
+    // is actively focused on.
+    function activeGoals() { return (state.goals || []).filter(g => g && !g.archived); }
+    function archivedGoals() { return (state.goals || []).filter(g => g && g.archived); }
+    function archiveGoal(goalId) {
+      const g = (state.goals || []).find(x => x && x.id == goalId);
+      if (!g) return;
+      g.archived = true;
+      save();
+      try { renderGoals(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
+      showNotif(`Archived "${g.name}"`, 'var(--text2)');
+    }
+    function unarchiveGoal(goalId) {
+      const g = (state.goals || []).find(x => x && x.id == goalId);
+      if (!g) return;
+      g.archived = false;
+      save();
+      try { renderGoals(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
+      showNotif(`Restored "${g.name}"`, 'var(--green)');
+    }
+    function deleteArchivedGoal(goalId) {
+      const g = (state.goals || []).find(x => x && x.id == goalId);
+      if (!g) return;
+      if (!confirm(`Permanently delete "${g.name}"? This can't be undone.`)) return;
+      state.goals = (state.goals || []).filter(x => x && x.id != goalId);
+      save();
+      try { renderGoals(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
+    }
+
     function renderGoals() {
       const list = document.getElementById('goals-list');
       if (!list) return;
@@ -15446,15 +15719,23 @@ create trigger trg_user_state_updated_at
         }
       });
       if (backfilled) save();
-      if (state.goals.length === 0) {
+      const active = activeGoals();
+      const archived = archivedGoals();
+      if (active.length === 0 && archived.length === 0) {
         list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);font-size:14px;">No goals yet.<br>Add your first objective above.</div>';
         return;
       }
-      const cats = [...new Set(state.goals.map(g => g.cat))];
+      const cats = [...new Set(active.map(g => g.cat))];
       const catLabels = { endurance: 'ENDURANCE', strength: 'STRENGTH', body: 'BODY COMPOSITION', habit: 'HABIT / LIFESTYLE', custom: 'CUSTOM' };
       list.innerHTML = '';
+      if (active.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'text-align:center;padding:20px;color:var(--text3);font-size:13px;';
+        empty.textContent = 'No active goals. Restore one below or add a new objective.';
+        list.appendChild(empty);
+      }
       cats.forEach(cat => {
-        const catGoals = state.goals.filter(g => g.cat === cat);
+        const catGoals = active.filter(g => g.cat === cat);
         const label = document.createElement('div');
         label.className = 'section-label';
         label.textContent = catLabels[cat] || cat.toUpperCase();
@@ -15476,9 +15757,12 @@ create trigger trg_user_state_updated_at
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
             <div class="goal-pct" style="color:${color};">${pct}%</div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
               <button onclick="event.stopPropagation();editGoalProgress(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;" title="Quick progress update">Progress</button>
               <button onclick="event.stopPropagation();openAddGoalModal(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;" title="Edit goal details">Edit</button>
+              <!-- T86.1 — Archive moves a goal into "Inactive goals" without
+                   losing its history; the same goal can be unarchived later. -->
+              <button onclick="event.stopPropagation();archiveGoal(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;" title="Move to Inactive goals — restore later without losing progress">Archive</button>
             </div>
           </div>
         </div>
@@ -15509,6 +15793,35 @@ create trigger trg_user_state_updated_at
           list.appendChild(div);
         });
       });
+      // T86.2 — "Inactive goals" collapsible section. Renders only when at
+      // least one goal is archived. Collapsed by default so it doesn't add
+      // noise; expand to see + restore + permanently delete.
+      if (archived.length > 0) {
+        const wrap = document.createElement('details');
+        wrap.style.cssText = 'margin-top:18px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;';
+        wrap.innerHTML = `
+          <summary style="cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:1.2px;font-size:12px;color:var(--text2);text-transform:uppercase;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span class="icon-title-slot" data-icon="ghost" data-icon-size="14"></span>
+            Inactive goals
+            <span style="color:var(--text3);font-weight:400;letter-spacing:0;text-transform:none;">${archived.length}</span>
+          </summary>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+            ${archived.map(g => `
+              <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;color:var(--text);font-weight:500;">${escapeHtml(toTitleCase(g.name))}</div>
+                  <div style="font-size:11px;color:var(--text3);">${g.cat ? (g.cat[0].toUpperCase() + g.cat.slice(1)) : 'Goal'}${g.date ? ` · was due ${g.date}` : ''}</div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-sm" onclick="unarchiveGoal(${JSON.stringify(g.id)})" style="font-size:11px;padding:4px 10px;color:var(--green);border-color:var(--green);">Restore</button>
+                  <button class="btn btn-sm" onclick="deleteArchivedGoal(${JSON.stringify(g.id)})" style="font-size:11px;padding:4px 10px;color:var(--red2);border-color:var(--red2);">Delete</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>`;
+        list.appendChild(wrap);
+        try { hydrateIcons(wrap); } catch (e) {}
+      }
     }
     function toggleMilestones(el) {
       const list = el.nextElementSibling;
