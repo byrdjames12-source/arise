@@ -4609,6 +4609,11 @@
             <span><span class="icon-title-slot" data-icon="salad"></span>MY RECIPES</span>
             <span id="saved-recipes-count" style="font-size:10px;color:var(--text3);"></span>
           </div>
+          <!-- T84.5 — "+ Build Recipe" opens the standalone recipe builder
+               where the user can stack multiple ingredients (each manually
+               entered, scanned, or pulled from the library) and have the
+               macros auto-summed. -->
+          <button class="btn btn-sm" onclick="openRecipeBuilder()" style="margin-bottom:8px;display:inline-flex;align-items:center;gap:6px;font-size:12px;"><span class="icon-title-slot" data-icon="plus" data-icon-size="13"></span>Build Recipe</button>
           <div id="saved-recipes-list" style="display:flex;flex-direction:column;gap:6px;"></div>
           <!-- SUGGESTIONS -->
           <div class="section-label"
@@ -5182,6 +5187,19 @@
           <div id="food-picker-hint" style="font-size:10px;color:var(--text3);">Tip: picking a food fills macros +
             micros. You can still edit any field after.</div>
         </div>
+        <!-- T83 — Serving multiplier. When a barcode scan, library pick, or
+             recipe pick prefills the modal, the macros land here as ONE
+             serving and the modal's dataset remembers them as "base" values.
+             Changing this input multiplies the displayed macros (and what
+             eventually gets saved) by the entered number so you can log half
+             a serving or two servings without doing the math yourself. -->
+        <div class="form-group" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);">
+            <span style="flex:1;">Servings</span>
+            <input type="number" id="add-meal-servings" value="1" min="0" step="0.25" oninput="onAddMealServingsChange()" style="width:90px;text-align:center;">
+          </label>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px;line-height:1.4;">Macros below scale with this. Bumping it to 0.5 logs half a serving; 2 logs two. Direct edits below stay as-typed until the next pick or scan.</div>
+        </div>
         <div class="form-row">
           <div class="form-group"><label>Calories</label><input type="number" id="add-meal-cals" placeholder="0"></div>
           <div class="form-group"><label>Protein (g)</label><input type="number" id="add-meal-prot" placeholder="0">
@@ -5223,6 +5241,47 @@
         <!-- T44.1 — Delete button, shown only when editing an existing entry. -->
         <button class="btn btn-full" id="meal-modal-delete-btn" onclick="deleteMealEntry()"
           style="display:none;color:var(--red2);border-color:var(--red2);margin-top:2px;">Delete This Entry</button>
+      </div>
+    </div>
+  </div>
+  <!-- T84 — Recipe Builder modal. Composes a savedRecipe from multiple
+       ingredient rows. Each row carries its own per-serving macros + a
+       servings multiplier; the modal renders live totals at the bottom so
+       the user sees the combined recipe macros as they type. Each row can
+       be filled by manual entry, by scanning a barcode (routes the existing
+       scanner back into the row), or by picking from the food library /
+       saved foods. -->
+  <div class="modal-overlay" id="modal-recipe-builder">
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-title">Build Recipe</div>
+      <input type="hidden" id="recipe-builder-edit-id" value="">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-group">
+          <label>Recipe name</label>
+          <input type="text" id="recipe-builder-name" placeholder="e.g. Morning Oatmeal">
+        </div>
+        <div class="section-label" style="margin:0;">INGREDIENTS</div>
+        <div id="recipe-builder-rows" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button class="btn btn-sm" onclick="addIngredientRow()" style="align-self:flex-start;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+          <span class="icon-title-slot" data-icon="plus" data-icon-size="12"></span>Add ingredient
+        </button>
+        <div id="recipe-builder-totals" style="background:var(--bg);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;color:var(--accent2);text-transform:uppercase;margin-bottom:4px;">Total per recipe</div>
+          <div style="font-size:14px;color:var(--text);font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:0.5px;">
+            <span id="rb-total-cal">0</span> cal ·
+            <span id="rb-total-prot">0</span>g P ·
+            <span id="rb-total-carbs">0</span>g C ·
+            <span id="rb-total-fat">0</span>g F
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea id="recipe-builder-notes" rows="2" style="resize:vertical;" placeholder="Prep steps, swaps, anything that helps future-you."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-full" onclick="closeModal('modal-recipe-builder')">Cancel</button>
+          <button class="btn btn-primary btn-full" onclick="saveRecipeFromBuilder()">Save Recipe</button>
+        </div>
       </div>
     </div>
   </div>
@@ -9789,6 +9848,17 @@ create trigger trg_user_state_updated_at
       });
       const chk = document.getElementById('add-meal-save-recipe');
       if (chk) chk.checked = false;
+      // T83 — Reset the servings input and clear any prior per-serving base
+      // values so a fresh open starts at 1 with all zeros.
+      const sv = document.getElementById('add-meal-servings');
+      if (sv) sv.value = '1';
+      const modal = document.getElementById('modal-add-meal');
+      if (modal) {
+        delete modal.dataset.baseCals;
+        delete modal.dataset.baseProt;
+        delete modal.dataset.baseCarbs;
+        delete modal.dataset.baseFat;
+      }
       // Reset micros buffer + summary panel + food picker state on every open
       const microHidden = document.getElementById('add-meal-micros-data');
       if (microHidden) microHidden.value = '';
@@ -9815,10 +9885,10 @@ create trigger trg_user_state_updated_at
     function openAddMealFromRecipe(recipe, type = 'extra') {
       openAddMealModal(type);
       document.getElementById('add-meal-name').value = recipe.label || recipe.name || '';
-      document.getElementById('add-meal-cals').value = recipe.cals || 0;
-      document.getElementById('add-meal-prot').value = recipe.prot || 0;
-      document.getElementById('add-meal-carbs').value = recipe.carbs || 0;
-      document.getElementById('add-meal-fat').value = recipe.fat || 0;
+      // T83 — Recipe macros land here as "one serving of this recipe."
+      // The Servings input then lets the user multiply (e.g. half a recipe
+      // for a smaller meal, or two if they ate seconds).
+      _setAddMealBase(recipe.cals, recipe.prot, recipe.carbs, recipe.fat, true);
       const ingrStr = Array.isArray(recipe.ingredients) ? recipe.ingredients.join(', ') : (recipe.ingredients || '');
       document.getElementById('add-meal-ingredients').value = ingrStr;
       // Carry through micro profile if the recipe has one (set by food-library pick at original log time)
@@ -10083,10 +10153,9 @@ create trigger trg_user_state_updated_at
       if (!f) return;
       const nameEl = document.getElementById('add-meal-name');
       if (nameEl && !nameEl.value.trim()) nameEl.value = f.name;
-      document.getElementById('add-meal-cals').value = f.cals;
-      document.getElementById('add-meal-prot').value = f.p;
-      document.getElementById('add-meal-carbs').value = f.c;
-      document.getElementById('add-meal-fat').value = f.f;
+      // T83 — Route through _setAddMealBase so the Servings input scales
+      // these correctly.
+      _setAddMealBase(f.cals, f.p, f.c, f.f, true);
       const hidden = document.getElementById('add-meal-micros-data');
       if (hidden) hidden.value = JSON.stringify(f.m || {});
       if (f.m && Object.keys(f.m).length) renderMealMicroSummary(f.m);
@@ -10747,13 +10816,22 @@ create trigger trg_user_state_updated_at
           if (status) status.innerHTML = `Found the product but it doesn't have macro data. Try a different search.`;
           return;
         }
+        // T84.3 — If the scan was initiated by a Recipe Builder row, route
+        // the food data there instead of the Add Meal modal. _applyFoodToTarget
+        // consumes _foodPickTarget on success and returns true so we early-exit
+        // before the legacy prefill runs.
+        if (typeof _applyFoodToTarget === 'function' && _applyFoodToTarget(food)) {
+          showNotif(`Filled ${food.name || 'ingredient'} into the recipe row`, 'var(--green2)');
+          closeBarcodeScanner();
+          return;
+        }
         // Prefill the Add Meal modal
         const nameEl = document.getElementById('add-meal-name');
         if (nameEl) nameEl.value = food.name || '';
-        document.getElementById('add-meal-cals').value = food.cals || 0;
-        document.getElementById('add-meal-prot').value = food.p || 0;
-        document.getElementById('add-meal-carbs').value = food.c || 0;
-        document.getElementById('add-meal-fat').value = food.f || 0;
+        // T83 — Route the prefill through _setAddMealBase so the servings
+        // multiplier can scale the displayed macros without losing the
+        // per-serving baseline. Resets servings to 1 for the fresh scan.
+        _setAddMealBase(food.cals, food.p, food.c, food.f, true);
         if (food.m) {
           const hidden = document.getElementById('add-meal-micros-data');
           if (hidden) hidden.value = JSON.stringify(food.m);
@@ -10767,6 +10845,333 @@ create trigger trg_user_state_updated_at
       }
     }
 
+    // ===== T84 — Recipe Builder =====
+    // Rows are stored in this array; the modal re-renders from it on every
+    // change. Each row carries per-serving macros plus a servings count, so
+    // the totals always reflect "what this recipe actually adds up to."
+    let _recipeBuilderRows = [];
+    // Context flag — when a barcode scan or library pick fires while the
+    // builder is open AND a row is "awaiting" a fill, the food data flows
+    // into that row instead of the Add Meal modal. Cleared after one use.
+    let _foodPickTarget = null; // null | { kind:'builder-row', idx:number }
+    function openRecipeBuilder(recipeId) {
+      _recipeBuilderRows = [];
+      const titleEl = document.querySelector('#modal-recipe-builder .modal-title');
+      const editEl = document.getElementById('recipe-builder-edit-id');
+      const nameEl = document.getElementById('recipe-builder-name');
+      const notesEl = document.getElementById('recipe-builder-notes');
+      if (recipeId != null) {
+        const r = (state.savedRecipes || []).find(x => String(x.id) === String(recipeId));
+        if (r) {
+          if (titleEl) titleEl.textContent = 'Edit Recipe';
+          if (editEl) editEl.value = String(r.id);
+          if (nameEl) nameEl.value = r.label || '';
+          if (notesEl) notesEl.value = r.notes || '';
+          // Structured ingredients (post-T84): each is { name, servings,
+          // cal, prot, carbs, fat }. Legacy entries store ingredients as
+          // strings + a single set of macros on the recipe itself — we
+          // fold those into a single-row builder so the user can take
+          // them apart from there.
+          if (Array.isArray(r.ingredients) && r.ingredients.length && typeof r.ingredients[0] === 'object') {
+            _recipeBuilderRows = r.ingredients.map(i => ({
+              name: String(i.name || ''),
+              servings: parseFloat(i.servings) || 1,
+              cal: parseFloat(i.cal) || 0,
+              prot: parseFloat(i.prot) || 0,
+              carbs: parseFloat(i.carbs) || 0,
+              fat: parseFloat(i.fat) || 0,
+            }));
+          } else {
+            _recipeBuilderRows = [{
+              name: r.label || 'Recipe',
+              servings: 1,
+              cal: parseFloat(r.cals) || 0,
+              prot: parseFloat(r.prot) || 0,
+              carbs: parseFloat(r.carbs) || 0,
+              fat: parseFloat(r.fat) || 0,
+            }];
+          }
+        }
+      } else {
+        if (titleEl) titleEl.textContent = 'Build Recipe';
+        if (editEl) editEl.value = '';
+        if (nameEl) nameEl.value = '';
+        if (notesEl) notesEl.value = '';
+      }
+      if (_recipeBuilderRows.length === 0) addIngredientRow(true);
+      renderRecipeBuilderRows();
+      openModal('modal-recipe-builder');
+    }
+    function addIngredientRow(skipRender) {
+      _recipeBuilderRows.push({ name: '', servings: 1, cal: 0, prot: 0, carbs: 0, fat: 0 });
+      if (!skipRender) renderRecipeBuilderRows();
+    }
+    function removeIngredientRow(idx) {
+      if (idx < 0 || idx >= _recipeBuilderRows.length) return;
+      _recipeBuilderRows.splice(idx, 1);
+      if (_recipeBuilderRows.length === 0) addIngredientRow(true);
+      renderRecipeBuilderRows();
+    }
+    function _readRecipeBuilderInputs() {
+      // Pull current field values back into the in-memory row array. Called
+      // before render so the user's in-progress typing isn't lost when we
+      // re-render after a structural change (add/remove row, scan landed,
+      // etc.).
+      const wrap = document.getElementById('recipe-builder-rows');
+      if (!wrap) return;
+      Array.from(wrap.children).forEach((rowEl, i) => {
+        if (!_recipeBuilderRows[i]) return;
+        const get = (cls) => {
+          const el = rowEl.querySelector('.' + cls);
+          return el ? el.value : '';
+        };
+        const num = (cls) => {
+          const v = parseFloat(get(cls));
+          return isFinite(v) ? v : 0;
+        };
+        _recipeBuilderRows[i].name = get('rb-name');
+        _recipeBuilderRows[i].servings = parseFloat(get('rb-servings')) || 1;
+        _recipeBuilderRows[i].cal = num('rb-cal');
+        _recipeBuilderRows[i].prot = num('rb-prot');
+        _recipeBuilderRows[i].carbs = num('rb-carbs');
+        _recipeBuilderRows[i].fat = num('rb-fat');
+      });
+    }
+    function onRecipeBuilderInput() {
+      _readRecipeBuilderInputs();
+      _updateRecipeBuilderTotals();
+    }
+    function renderRecipeBuilderRows() {
+      const wrap = document.getElementById('recipe-builder-rows');
+      if (!wrap) return;
+      wrap.innerHTML = _recipeBuilderRows.map((row, i) => `
+        <div class="rb-row" data-row-idx="${i}" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" class="rb-name" value="${escapeHtml(row.name || '')}" placeholder="Ingredient name" oninput="onRecipeBuilderInput()" style="flex:1;font-size:13px;">
+            <button class="btn btn-sm" onclick="removeIngredientRow(${i})" title="Remove" style="padding:4px 8px;color:var(--red2);border-color:var(--red2);display:inline-flex;align-items:center;justify-content:center;">${iconSvg('close', 12)}</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick="scanForIngredient(${i})" style="font-size:11px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px;">${iconSvg('camera', 12)}Scan</button>
+            <button class="btn btn-sm" onclick="pickForIngredient(${i})" style="font-size:11px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px;">${iconSvg('search', 12)}Library</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;">
+            <label style="font-size:10px;color:var(--text3);display:flex;flex-direction:column;gap:2px;">Servings
+              <input type="number" class="rb-servings" value="${row.servings}" step="0.25" min="0" oninput="onRecipeBuilderInput()" style="font-size:13px;">
+            </label>
+            <label style="font-size:10px;color:var(--text3);display:flex;flex-direction:column;gap:2px;">Cal
+              <input type="number" class="rb-cal" value="${row.cal}" oninput="onRecipeBuilderInput()" style="font-size:13px;">
+            </label>
+            <label style="font-size:10px;color:var(--text3);display:flex;flex-direction:column;gap:2px;">P (g)
+              <input type="number" class="rb-prot" value="${row.prot}" oninput="onRecipeBuilderInput()" style="font-size:13px;">
+            </label>
+            <label style="font-size:10px;color:var(--text3);display:flex;flex-direction:column;gap:2px;">C (g)
+              <input type="number" class="rb-carbs" value="${row.carbs}" oninput="onRecipeBuilderInput()" style="font-size:13px;">
+            </label>
+            <label style="font-size:10px;color:var(--text3);display:flex;flex-direction:column;gap:2px;">F (g)
+              <input type="number" class="rb-fat" value="${row.fat}" oninput="onRecipeBuilderInput()" style="font-size:13px;">
+            </label>
+          </div>
+        </div>
+      `).join('');
+      try { hydrateIcons(wrap); } catch (e) {}
+      _updateRecipeBuilderTotals();
+    }
+    function _recipeBuilderTotals() {
+      // Per-serving values × servings, summed across all rows.
+      return _recipeBuilderRows.reduce((acc, r) => {
+        const s = parseFloat(r.servings) || 0;
+        acc.cal   += (parseFloat(r.cal)   || 0) * s;
+        acc.prot  += (parseFloat(r.prot)  || 0) * s;
+        acc.carbs += (parseFloat(r.carbs) || 0) * s;
+        acc.fat   += (parseFloat(r.fat)   || 0) * s;
+        return acc;
+      }, { cal: 0, prot: 0, carbs: 0, fat: 0 });
+    }
+    function _updateRecipeBuilderTotals() {
+      const t = _recipeBuilderTotals();
+      const round = (n) => Math.round(n * 10) / 10;
+      const out = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = round(v); };
+      out('rb-total-cal', t.cal);
+      out('rb-total-prot', t.prot);
+      out('rb-total-carbs', t.carbs);
+      out('rb-total-fat', t.fat);
+    }
+    // ===== T84.3 — Per-row scan + library picker =====
+    // Both reuse the existing scanner / food picker UIs; the only difference
+    // is that _foodPickTarget tells the prefill path to drop into a builder
+    // row instead of the Add Meal modal.
+    function scanForIngredient(idx) {
+      _foodPickTarget = { kind: 'builder-row', idx };
+      try { openBarcodeScanner(); } catch (e) {}
+    }
+    function pickForIngredient(idx) {
+      _foodPickTarget = { kind: 'builder-row', idx };
+      // Reuse the food picker by routing through a tiny picker modal: open
+      // Add Meal modal in a "picker-only" overlay would be heavy, so we
+      // surface a lightweight prompt with the saved-foods names and the
+      // library entries. Tap one → fills the row, closes the popover.
+      _openIngredientPicker(idx);
+    }
+    function _applyFoodToTarget(food) {
+      // Called by the barcode scanner + library/web picker after a successful
+      // food lookup. If _foodPickTarget is set, route to that builder row;
+      // otherwise fall through to the legacy Add Meal flow (callers handle
+      // the latter themselves — we just opt into the row case when present).
+      if (!_foodPickTarget || _foodPickTarget.kind !== 'builder-row') return false;
+      const idx = _foodPickTarget.idx;
+      _foodPickTarget = null;
+      if (!_recipeBuilderRows[idx]) return false;
+      _recipeBuilderRows[idx] = {
+        name: String(food.name || food.label || ''),
+        servings: 1,
+        cal: parseFloat(food.cals != null ? food.cals : food.cal) || 0,
+        prot: parseFloat(food.p != null ? food.p : food.prot) || 0,
+        carbs: parseFloat(food.c != null ? food.c : food.carbs) || 0,
+        fat: parseFloat(food.f != null ? food.f : food.fat) || 0,
+      };
+      renderRecipeBuilderRows();
+      return true;
+    }
+    function _openIngredientPicker(idx) {
+      // Pull the food library + saved recipes for the prompt. Library lives
+      // in FOOD_LIBRARY (global, populated near foodById). Saved recipes
+      // come from state.savedRecipes. We render a small overlay over the
+      // builder modal — same Z layer as a sub-popover.
+      const lib = (typeof FOOD_LIBRARY !== 'undefined' && Array.isArray(FOOD_LIBRARY)) ? FOOD_LIBRARY : [];
+      const recipes = (state.savedRecipes || []).filter(r => r);
+      const id = 'ingredient-picker-popover';
+      let pop = document.getElementById(id);
+      if (!pop) {
+        pop = document.createElement('div');
+        pop.id = id;
+        pop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:18px;';
+        pop.onclick = (e) => { if (e.target === pop) _closeIngredientPicker(); };
+        document.body.appendChild(pop);
+      }
+      const renderList = (q) => {
+        const norm = (s) => String(s || '').toLowerCase();
+        const qq = norm(q);
+        const matchLib = lib.filter(f => !qq || norm(f.name).includes(qq)).slice(0, 50);
+        const matchRcp = recipes.filter(r => !qq || norm(r.label).includes(qq)).slice(0, 20);
+        const rcpRows = matchRcp.map(r => `<button class="btn btn-sm btn-full" style="text-align:left;font-size:12px;padding:8px 10px;display:flex;justify-content:space-between;gap:8px;" onclick="useRecipeAsIngredient('${r.id}')"><span>${escapeHtml(r.label || 'Recipe')}<span style="color:var(--text3);font-size:10px;margin-left:6px;">My recipe</span></span><span style="color:var(--text3);font-size:10px;">${r.cals || 0} cal</span></button>`).join('');
+        const libRows = matchLib.map(f => `<button class="btn btn-sm btn-full" style="text-align:left;font-size:12px;padding:8px 10px;display:flex;justify-content:space-between;gap:8px;" onclick="useLibraryItemAsIngredient('${f.id}')"><span>${escapeHtml(f.name)}<span style="color:var(--text3);font-size:10px;margin-left:6px;">Library</span></span><span style="color:var(--text3);font-size:10px;">${f.cals || 0} cal · ${f.p || 0}g P</span></button>`).join('');
+        return `${rcpRows}${rcpRows && libRows ? '<div style="height:1px;background:var(--border);margin:6px 0;"></div>' : ''}${libRows}` || '<div style="color:var(--text3);font-size:12px;text-align:center;padding:14px;">No matches.</div>';
+      };
+      pop.innerHTML = `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:80vh;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:1.2px;font-size:14px;color:var(--accent2);text-transform:uppercase;">Pick an ingredient</div>
+            <button class="btn btn-sm" onclick="_closeIngredientPicker()" style="font-size:11px;padding:4px 8px;">Close</button>
+          </div>
+          <input type="text" id="ingredient-picker-search" placeholder="Search library or My Recipes…" oninput="document.getElementById('ingredient-picker-results').innerHTML = (window._renderIngredientPickerList||(()=>''))(this.value);" style="font-size:13px;">
+          <div id="ingredient-picker-results" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;max-height:55vh;">${renderList('')}</div>
+        </div>`;
+      window._renderIngredientPickerList = renderList;
+    }
+    function _closeIngredientPicker() {
+      const pop = document.getElementById('ingredient-picker-popover');
+      if (pop) pop.remove();
+      _foodPickTarget = null;
+      window._renderIngredientPickerList = null;
+    }
+    function useLibraryItemAsIngredient(id) {
+      const f = (typeof foodById === 'function') ? foodById(id) : null;
+      if (!f) return;
+      _applyFoodToTarget({ name: f.name, cals: f.cals, p: f.p, c: f.c, f: f.f });
+      _closeIngredientPicker();
+    }
+    function useRecipeAsIngredient(id) {
+      const r = (state.savedRecipes || []).find(x => String(x.id) === String(id));
+      if (!r) return;
+      _applyFoodToTarget({ name: r.label, cals: r.cals, p: r.prot, c: r.carbs, f: r.fat });
+      _closeIngredientPicker();
+    }
+    function saveRecipeFromBuilder() {
+      _readRecipeBuilderInputs();
+      const name = (document.getElementById('recipe-builder-name')?.value || '').trim();
+      if (!name) { showNotif('Give the recipe a name first.', 'var(--red2)'); return; }
+      const rows = _recipeBuilderRows.filter(r => r && ((r.name || '').trim() || r.cal || r.prot || r.carbs || r.fat));
+      if (rows.length === 0) { showNotif('Add at least one ingredient.', 'var(--red2)'); return; }
+      const totals = _recipeBuilderTotals();
+      const round = (n) => Math.round(n * 10) / 10;
+      const notes = (document.getElementById('recipe-builder-notes')?.value || '').trim();
+      const editId = document.getElementById('recipe-builder-edit-id')?.value || '';
+      const payload = {
+        id: editId ? (isNaN(Number(editId)) ? editId : Number(editId)) : (Date.now() + Math.floor(Math.random() * 1000)),
+        label: name,
+        ingredients: rows.map(r => ({
+          name: r.name || '',
+          servings: parseFloat(r.servings) || 1,
+          cal: parseFloat(r.cal) || 0,
+          prot: parseFloat(r.prot) || 0,
+          carbs: parseFloat(r.carbs) || 0,
+          fat: parseFloat(r.fat) || 0,
+        })),
+        cals: round(totals.cal),
+        prot: round(totals.prot),
+        carbs: round(totals.carbs),
+        fat: round(totals.fat),
+        notes,
+        createdAt: new Date().toISOString(),
+      };
+      state.savedRecipes = state.savedRecipes || [];
+      if (editId) {
+        const i = state.savedRecipes.findIndex(x => String(x.id) === String(editId));
+        if (i >= 0) {
+          // Preserve original createdAt on edit so sorting stays stable.
+          payload.createdAt = state.savedRecipes[i].createdAt || payload.createdAt;
+          state.savedRecipes[i] = payload;
+        } else {
+          state.savedRecipes.push(payload);
+        }
+      } else {
+        state.savedRecipes.push(payload);
+      }
+      save();
+      try { renderSavedRecipes(); } catch (e) {}
+      try { renderRecipeSuggestions(); } catch (e) {}
+      closeModal('modal-recipe-builder');
+      showNotif(editId ? 'Recipe updated' : 'Recipe saved');
+    }
+
+    // ===== T83 — Serving multiplier helpers =====
+    // _setAddMealBase records the per-serving macros for a prefilled food.
+    // onAddMealServingsChange reads the current servings input and multiplies
+    // the base values into the displayed macro fields. Any food source
+    // (library, barcode, web search, recipe) routes through _setAddMealBase
+    // so the multiplier behaves identically across all entry paths.
+    function _setAddMealBase(c, p, carbs, f, resetServings) {
+      const modal = document.getElementById('modal-add-meal');
+      if (!modal) return;
+      modal.dataset.baseCals = String(parseFloat(c) || 0);
+      modal.dataset.baseProt = String(parseFloat(p) || 0);
+      modal.dataset.baseCarbs = String(parseFloat(carbs) || 0);
+      modal.dataset.baseFat = String(parseFloat(f) || 0);
+      if (resetServings !== false) {
+        const sv = document.getElementById('add-meal-servings');
+        if (sv) sv.value = '1';
+      }
+      _applyAddMealServings();
+    }
+    function _applyAddMealServings() {
+      const modal = document.getElementById('modal-add-meal');
+      if (!modal) return;
+      const s = parseFloat(document.getElementById('add-meal-servings')?.value);
+      const mult = isFinite(s) && s >= 0 ? s : 1;
+      const round = (n) => Math.round(n * 10) / 10;
+      const out = (id, base) => {
+        const el = document.getElementById(id);
+        if (el) el.value = round((parseFloat(base) || 0) * mult);
+      };
+      out('add-meal-cals', modal.dataset.baseCals);
+      out('add-meal-prot', modal.dataset.baseProt);
+      out('add-meal-carbs', modal.dataset.baseCarbs);
+      out('add-meal-fat', modal.dataset.baseFat);
+    }
+    function onAddMealServingsChange() {
+      _applyAddMealServings();
+    }
+
     // Apply a library pick to the open modal: fill macros, replace micros buffer,
     // and show the summary panel. Name is only auto-filled if the user hasn't typed one.
     function useFoodFromLibrary(id) {
@@ -10774,10 +11179,9 @@ create trigger trg_user_state_updated_at
       if (!f) return;
       const nameEl = document.getElementById('add-meal-name');
       if (nameEl && !nameEl.value.trim()) nameEl.value = f.name;
-      document.getElementById('add-meal-cals').value = f.cals;
-      document.getElementById('add-meal-prot').value = f.p;
-      document.getElementById('add-meal-carbs').value = f.c;
-      document.getElementById('add-meal-fat').value = f.f;
+      // T83 — Record per-serving base + reset servings to 1 so the multiplier
+      // applies cleanly to this fresh pick.
+      _setAddMealBase(f.cals, f.p, f.c, f.f, true);
       const hidden = document.getElementById('add-meal-micros-data');
       if (hidden) hidden.value = JSON.stringify(f.m);
       renderMealMicroSummary(f.m);
@@ -15857,21 +16261,33 @@ create trigger trg_user_state_updated_at
         const blocked = recipeBlockedBy(r);
         // T76.7 — Blocked-food warn badge uses alert icon, not ⚠ emoji.
         const warn = blocked ? `<span style="font-size:10px;color:var(--red2);padding:1px 6px;background:rgba(239,68,68,0.1);border-radius:4px;margin-left:6px;display:inline-flex;align-items:center;gap:4px;" title="Contains ${blocked.matched}">${iconSvg('alert', 11)}${blocked.block}</span>` : '';
+        // T84 — ingredients can be either legacy strings or structured
+        // objects ({ name, servings, cal, prot, carbs, fat }). Render both
+        // shapes; structured rows surface their servings hint inline.
         const ings = r.ingredients || [];
         const ingList = ings.length
-          ? `<ul style="margin:6px 0 4px 0;padding-left:14px;font-size:11px;color:var(--text2);line-height:1.45;">${ings.map(i => `<li>${i}</li>`).join('')}</ul>`
+          ? `<ul style="margin:6px 0 4px 0;padding-left:14px;font-size:11px;color:var(--text2);line-height:1.45;">${ings.map(i => {
+              if (i && typeof i === 'object') {
+                const sv = (parseFloat(i.servings) || 1);
+                const svHint = sv !== 1 ? ` <span style="color:var(--text3);">× ${sv}</span>` : '';
+                return `<li>${escapeHtml(i.name || '')}${svHint}</li>`;
+              }
+              return `<li>${escapeHtml(String(i || ''))}</li>`;
+            }).join('')}</ul>`
           : '<div style="font-size:11px;color:var(--text3);margin-top:2px;">no ingredients listed</div>';
         return `
       <div class="meal-entry" style="align-items:flex-start;">
         <div style="flex:1;min-width:0;">
-          <div class="meal-entry-name" style="display:flex;align-items:center;flex-wrap:wrap;">${r.label}${warn}</div>
+          <div class="meal-entry-name" style="display:flex;align-items:center;flex-wrap:wrap;">${escapeHtml(r.label || '')}${warn}</div>
           ${ingList}
           <div class="meal-entry-macros">P:${r.prot || 0}g · C:${r.carbs || 0}g · F:${r.fat || 0}g</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           <div class="meal-entry-cal">${r.cals || 0}</div>
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
             <button onclick="logSavedRecipe(${JSON.stringify(r.id)})" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">Log</button>
+            <!-- T84.5 — Edit reopens the recipe inside the Recipe Builder. -->
+            <button onclick="openRecipeBuilder(${JSON.stringify(r.id)})" class="btn btn-sm" style="font-size:10px;padding:3px 8px;">Edit</button>
             <button onclick="deleteSavedRecipe(${JSON.stringify(r.id)})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;">×</button>
           </div>
         </div>
