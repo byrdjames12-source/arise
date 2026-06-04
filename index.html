@@ -18554,10 +18554,28 @@ create trigger trg_user_state_updated_at
     // Built from MUSCLE_GROUPS at module load — reverse map from canonical exercise
     // names to their primary muscle group. Free-typed exercises that don't match the
     // canonical list map to "Other" so we don't lose them entirely.
+    // T90.1 — Normalize an exercise name for muscle-group matching: lowercase,
+    // collapse hyphens/underscores into spaces, drop a trailing single 's'
+    // (but not 'ss' — so "press" stays "press", "push-ups" becomes "push up").
+    // Used to bridge typed variants like "pushups" / "push-ups" / "push up"
+    // back to the canonical library entry "Push-Up".
+    function _normMuscleKey(s) {
+      let n = String(s || '').toLowerCase().trim();
+      n = n.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+      n = n.replace(/[.,!?;:]+$/, '');
+      if (n.length > 3 && n.endsWith('s') && !n.endsWith('ss')) n = n.slice(0, -1);
+      return n;
+    }
     const EXERCISE_TO_MUSCLE = (() => {
       const m = {};
       Object.entries(MUSCLE_GROUPS).forEach(([group, list]) => {
-        list.forEach(ex => { m[ex.toLowerCase()] = group; });
+        list.forEach(ex => {
+          m[ex.toLowerCase()] = group;
+          // T90.1 — Also store the normalized key so user-typed variants
+          // ("push-ups", "pushup", "push up") all match the canonical entry.
+          const norm = _normMuscleKey(ex);
+          if (norm && !m[norm]) m[norm] = group;
+        });
       });
       return m;
     })();
@@ -18659,8 +18677,23 @@ create trigger trg_user_state_updated_at
     function muscleGroupForExercise(exerciseName) {
       const key = (exerciseName || '').trim().toLowerCase();
       if (!key) return 'Other';
+      // T90.1 — Try the raw key first (preserves any exact library hits),
+      // then a normalized lookup so plurals / hyphen variants ("push-ups",
+      // "pushup", "push up") also match the library's "Push-Up" entry.
       if (EXERCISE_TO_MUSCLE[key]) return EXERCISE_TO_MUSCLE[key];
-      // Fallback: keyword sniff. Order matters — more specific keywords first.
+      const norm = _normMuscleKey(key);
+      if (norm && EXERCISE_TO_MUSCLE[norm]) return EXERCISE_TO_MUSCLE[norm];
+      // Fallback: keyword sniff. Order matters — more specific keywords
+      // first. T90.1 reordered so:
+      //   - Core-specific raises ("leg raise", "knee raise") come BEFORE
+      //     the broad "leg " → Legs rule that was catching them wrongly.
+      //   - "hamstring" → Legs comes BEFORE "curl" → Arms so "hamstring
+      //     curl" classifies correctly.
+      //   - No-hyphen variants added for push-up / pull-up / chin-up /
+      //     sit-up since the existing sniff required the hyphen and users
+      //     often type without it.
+      // Match against BOTH the raw lowercase key and the hyphens-stripped
+      // normalized key, so a needle like "push up" hits "push-up" too.
       const sniff = [
         // T33.7 — Warm-up keywords go FIRST so e.g. "leg swing" maps to
         // Warm-up rather than Legs, and "shoulder dislocate" beats "shoulder".
@@ -18669,16 +18702,33 @@ create trigger trg_user_state_updated_at
         ['cat-cow', 'Warm-up'], ['inchworm', 'Warm-up'], ['scapular push', 'Warm-up'],
         ['wall slide', 'Warm-up'], ['dislocate', 'Warm-up'], ['pull-apart', 'Warm-up'],
         ['90/90', 'Warm-up'], ['knee hug', 'Warm-up'], ['quad pull', 'Warm-up'],
-        ['squat', 'Legs'], ['lunge', 'Legs'], ['deadlift', 'Legs'], ['leg ', 'Legs'], ['glute', 'Legs'], ['calf', 'Legs'], ['hip thrust', 'Legs'],
-        ['bench', 'Chest'], ['chest', 'Chest'], ['fly', 'Chest'], ['push-up', 'Chest'], ['dip', 'Chest'],
-        ['row', 'Back'], ['pulldown', 'Back'], ['pull-up', 'Back'], ['chin-up', 'Back'], ['lat ', 'Back'], ['back', 'Back'],
+        // T90.1 — Core specifics first so "hanging leg raise", "captain's
+        // chair knee raise", "toes-to-bar" don't get sniped by "leg ".
+        ['leg raise', 'Core'], ['knee raise', 'Core'], ['toes-to-bar', 'Core'],
+        ['toes to bar', 'Core'], ['sit-up', 'Core'], ['sit up', 'Core'],
+        ['situp', 'Core'], ['ab rollout', 'Core'], ['dead bug', 'Core'],
+        ['bird dog', 'Core'], ['mountain climber', 'Core'], ['side bend', 'Core'],
+        ['plank', 'Core'], ['crunch', 'Core'], ['ab ', 'Core'], ['core', 'Core'],
+        ['russian', 'Core'], ['hollow', 'Core'],
+        // T90.1 — Hamstring routes to Legs BEFORE the generic "curl" rule
+        // so "hamstring curl" doesn't fall through to Arms.
+        ['hamstring', 'Legs'], ['quad', 'Legs'],
+        ['squat', 'Legs'], ['lunge', 'Legs'], ['deadlift', 'Legs'],
+        ['leg ', 'Legs'], ['glute', 'Legs'], ['calf', 'Legs'], ['hip thrust', 'Legs'],
+        ['leg press', 'Legs'], ['leg extension', 'Legs'], ['leg curl', 'Legs'],
+        // Chest — added no-hyphen + plural variants
+        ['push-up', 'Chest'], ['push up', 'Chest'], ['pushup', 'Chest'],
+        ['bench', 'Chest'], ['chest', 'Chest'], ['fly', 'Chest'], ['dip', 'Chest'],
+        // Back — same variant treatment for pull-up / chin-up
+        ['pull-up', 'Back'], ['pull up', 'Back'], ['pullup', 'Back'],
+        ['chin-up', 'Back'], ['chin up', 'Back'], ['chinup', 'Back'],
+        ['row', 'Back'], ['pulldown', 'Back'], ['lat ', 'Back'], ['back', 'Back'],
         ['press', 'Shoulders'], ['raise', 'Shoulders'], ['shoulder', 'Shoulders'], ['delt', 'Shoulders'],
         ['curl', 'Arms'], ['tricep', 'Arms'], ['bicep', 'Arms'], ['skull', 'Arms'],
-        ['plank', 'Core'], ['crunch', 'Core'], ['ab ', 'Core'], ['core', 'Core'], ['russian', 'Core'], ['hollow', 'Core'],
         ['burpee', 'Full Body'], ['thruster', 'Full Body'], ['clean', 'Full Body'], ['snatch', 'Full Body'], ['kettlebell swing', 'Full Body'],
       ];
       for (const [needle, group] of sniff) {
-        if (key.includes(needle)) return group;
+        if (key.includes(needle) || (norm && norm.includes(needle))) return group;
       }
       return 'Other';
     }
