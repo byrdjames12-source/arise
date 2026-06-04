@@ -7563,15 +7563,30 @@ create trigger trg_user_state_updated_at
       // off her radar so she doesn't keep coaching against a goal the user
       // has paused. activeGoals() is also used by the Goals tab UI so the
       // two views stay consistent.
+      // T87.4 — Send each goal's id alongside its name so ARIA can emit
+      // archive_goal / unarchive_goal / update_goal actions with valid
+      // targets. Format: "[id] Name (cat) — current → target by date".
+      // Also include category, current/target, and deadline so update_goal
+      // patches are well-informed without needing a follow-up question.
       const activeGs = (typeof activeGoals === 'function')
         ? activeGoals()
         : (state.goals || []).filter(g => g && !g.archived);
+      const fmtGoal = (g) => {
+        const parts = [`[id:${g.id}] ${g.name}`];
+        if (g.cat) parts.push(`(${g.cat})`);
+        if (g.current || g.target) parts.push(`— ${g.current || '?'} → ${g.target || '?'}`);
+        if (g.date) parts.push(`by ${g.date}`);
+        if (typeof g.progress === 'number') parts.push(`· ${Math.round(g.progress)}% done`);
+        return parts.join(' ');
+      };
       if (activeGs.length) {
-        lines.push(`Active goals: ${activeGs.map(g => g.name).join('; ')}`);
+        lines.push(`Active goals (use the [id:N] when emitting goal actions):`);
+        activeGs.forEach(g => lines.push(`  - ${fmtGoal(g)}`));
       }
-      const archivedCount = (state.goals || []).filter(g => g && g.archived).length;
-      if (archivedCount > 0) {
-        lines.push(`(${archivedCount} goal${archivedCount === 1 ? '' : 's'} archived — paused on user's request; do not coach against unless the user brings them back.)`);
+      const archivedGs = (state.goals || []).filter(g => g && g.archived);
+      if (archivedGs.length > 0) {
+        lines.push(`Archived goals (${archivedGs.length}) — paused on user's request, do not coach against unless they bring them up. Use the [id:N] to unarchive_goal:`);
+        archivedGs.forEach(g => lines.push(`  - ${fmtGoal(g)}`));
       }
       if (state.settings && state.settings.beginnerMode) lines.push('Beginner mode is ON.');
       // T27.6 — share equipment so ARIA respects the user's gym setup
