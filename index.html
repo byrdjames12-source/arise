@@ -4858,6 +4858,11 @@
                     data-icon="sparkles"></span>Replay Tour</button>
                 <button class="btn btn-sm btn-with-icon" onclick="startComprehensiveTour()"><span class="icon-title-slot"
                     data-icon="swords"></span>Full Tour</button>
+                <!-- T95.3 — Replay the one-time Meal Prep concept primer.
+                     Useful when the user clicked through too fast or wants
+                     a refresher after coming back from a break. -->
+                <button class="btn btn-sm btn-with-icon" onclick="replayMealPrepIntro()"><span class="icon-title-slot"
+                    data-icon="utensils"></span>Replay Meal Prep intro</button>
               </div>
             </div>
             <!-- T34.9 / T36.5 — Support & feedback. -->
@@ -5340,6 +5345,46 @@
           <button class="btn btn-full" onclick="closeModal('modal-recipe-builder')">Cancel</button>
           <button class="btn btn-primary btn-full" id="recipe-builder-save-btn" onclick="saveRecipeFromBuilder()">Save Recipe</button>
         </div>
+      </div>
+    </div>
+  </div>
+  <!-- T95 — One-time Meal Prep concept primer. Fires the first time the
+       user opens Fuel → Meal Prep, dismissed via either action button.
+       Replayable from Profile → Tools so a user who clicked through too
+       fast can bring it back. The two buttons funnel to different next
+       steps: "Open ARIA for help" routes into the AI coach with a seeded
+       question; "Got it, let me explore" just closes. -->
+  <div class="modal-overlay" id="modal-meal-prep-intro">
+    <div class="modal" style="max-width:480px;">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:1.6px;color:var(--accent);text-transform:uppercase;font-size:11px;display:inline-flex;align-items:center;gap:6px;">
+          <span class="icon-title-slot" data-icon="sparkles" data-icon-size="13"></span>Welcome to Meal Prep
+        </div>
+        <div style="font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:0.6px;color:var(--text);font-size:20px;">Plan once, eat well all week</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.55;margin:6px 0 14px;">Meal Prep is where you stack the recipes you cook in advance — Sunday-night batches, weekday lunches, anything you eat on a schedule.</div>
+        <ul style="display:flex;flex-direction:column;gap:10px;margin:0 0 14px;padding:0;list-style:none;">
+          <li style="display:flex;gap:10px;font-size:13px;color:var(--text2);line-height:1.5;">
+            <span style="color:var(--green2);flex-shrink:0;margin-top:1px;display:inline-flex;"><span class="icon-title-slot" data-icon="check" data-icon-size="16"></span></span>
+            <span><strong style="color:var(--text);font-weight:600;">Build it once.</strong> Add ingredients, scan barcodes, or pull from your saved recipes — macros auto-sum.</span>
+          </li>
+          <li style="display:flex;gap:10px;font-size:13px;color:var(--text2);line-height:1.5;">
+            <span style="color:var(--green2);flex-shrink:0;margin-top:1px;display:inline-flex;"><span class="icon-title-slot" data-icon="check" data-icon-size="16"></span></span>
+            <span><strong style="color:var(--text);font-weight:600;">Schedule the days.</strong> Pick which days each meal is on. One tap to log when you eat it.</span>
+          </li>
+          <li style="display:flex;gap:10px;font-size:13px;color:var(--text2);line-height:1.5;">
+            <span style="color:var(--green2);flex-shrink:0;margin-top:1px;display:inline-flex;"><span class="icon-title-slot" data-icon="check" data-icon-size="16"></span></span>
+            <span><strong style="color:var(--text);font-weight:600;">Stays in sync with goals.</strong> Recipes flow into your daily macro target so you're not double-counting.</span>
+          </li>
+        </ul>
+        <div style="background:rgba(127,119,221,0.10);border:1px solid rgba(127,119,221,0.45);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.5;display:flex;gap:10px;align-items:flex-start;margin-bottom:14px;">
+          <span style="width:30px;height:30px;border-radius:50%;background:var(--bg2);border:1.5px solid var(--accent);display:inline-flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0;"><span class="icon-title-slot" data-icon="sparkles" data-icon-size="16"></span></span>
+          <div>Not sure what to prep this week? <strong style="color:var(--text);font-weight:600;">Ask ARIA</strong> — she'll build a week of meals that fit your macros and equipment.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-primary btn-full" onclick="dismissMealPrepIntro(true)" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;"><span class="icon-title-slot" data-icon="sparkles" data-icon-size="14"></span>Open ARIA for help</button>
+          <button class="btn btn-full" onclick="dismissMealPrepIntro(false)">Got it, let me explore</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px;">You'll only see this once. Replay anytime from Profile → Tools.</div>
       </div>
     </div>
   </div>
@@ -6098,6 +6143,12 @@
         // FAB diameter, and the bottom-nav rail sitewide. Default off.
         // Toggle lives in Profile → Settings.
         largeMode: false,
+        // T95 — One-time flag for the Meal Prep concept intro modal. Set
+        // true the first time the user dismisses the modal so it never
+        // re-fires unless they choose Profile → Tools → Replay meal prep
+        // intro. Default false so every new user (and existing users on
+        // first launch after this ships) sees it once.
+        mealPrepIntroSeen: false,
         // T18.1 — Light-injury / recovery mode. When active, quest generation substitutes
         // workout types that hit any of `areas` with safer alternatives (Mobility / Rest).
         // areas is a list of MUSCLE_GROUP_OPTIONS strings (Chest, Back, Shoulders, Arms, Legs, Core).
@@ -8451,6 +8502,11 @@ create trigger trg_user_state_updated_at
           if (typeof state.settings.plainMode !== 'boolean') state.settings.plainMode = false;
           // T79.6 — Large mode backfill so existing users get the default-off setting.
           if (typeof state.settings.largeMode !== 'boolean') state.settings.largeMode = false;
+          // T95 — Meal Prep intro flag backfill. Existing users will see the
+          // modal once on their next Meal Prep visit; that's intentional
+          // because the feature surface area grew with T93 and the primer
+          // is useful even to long-time users.
+          if (typeof state.settings.mealPrepIntroSeen !== 'boolean') state.settings.mealPrepIntroSeen = false;
           // T18.1 — Recovery / light-injury mode backfill
           if (!state.settings.injuries || typeof state.settings.injuries !== 'object') {
             state.settings.injuries = { active: false, areas: [] };
@@ -17595,6 +17651,72 @@ create trigger trg_user_state_updated_at
       try { renderSavedRecipes(); } catch (e) {}
       showNotif(`Saved "${name}" to My Recipes`);
     }
+    // ===== T95 — Meal Prep concept primer (one-time intro modal) =====
+    // Fires the first time the user visits Fuel → Meal Prep. Either button
+    // (Open ARIA / Got it) dismisses + sets state.settings.mealPrepIntroSeen
+    // so it never re-shows unless the user resets it from Profile → Tools.
+    function maybeShowMealPrepIntro() {
+      if (state.settings && state.settings.mealPrepIntroSeen) return;
+      // Wait a tick so the underlying page has painted before the modal
+      // overlay slides in — avoids a jarring flash.
+      setTimeout(() => {
+        try { openModal('modal-meal-prep-intro'); } catch (e) {}
+        try { hydrateIcons(document.getElementById('modal-meal-prep-intro')); } catch (e) {}
+      }, 60);
+    }
+    function dismissMealPrepIntro(openAria) {
+      state.settings = state.settings || {};
+      state.settings.mealPrepIntroSeen = true;
+      save();
+      try { closeModal('modal-meal-prep-intro'); } catch (e) {}
+      if (openAria) {
+        // Seed an opener question so ARIA has somewhere to start instead
+        // of greeting the user from scratch. The full coach intro / voice
+        // toggle still runs as normal.
+        try {
+          state.aiCoach = state.aiCoach || { messages: [] };
+          state.aiCoach.messages.push({
+            role: 'user',
+            content: 'I just opened Meal Prep for the first time. Can you walk me through how you\'d use it to fit my goals — what should I build first?',
+            ts: Date.now(),
+          });
+          save();
+          openAICoachModal();
+          // Auto-send the seeded question so ARIA replies right away
+          // instead of leaving the user staring at their own message.
+          if (typeof sendCoachMessage === 'function') {
+            // sendCoachMessage takes a user message string; the message we
+            // just pushed is already in history, so call submitCoachMessage's
+            // network step directly via a no-op user-input shortcut.
+            // Easiest path: rebuild via submitCoachMessage if it exists,
+            // else fall back to just opening the chat.
+            try {
+              // Pull the last user message back off — sendCoachMessage will
+              // re-push it so we don't double up.
+              state.aiCoach.messages.pop();
+              save();
+              sendCoachMessage('I just opened Meal Prep for the first time. Can you walk me through how you\'d use it to fit my goals — what should I build first?')
+                .then(() => { try { renderCoachMessages(); } catch (e) {} })
+                .catch((err) => { console.warn('intro->aria send failed:', err); try { renderCoachMessages(); } catch (e) {} });
+            } catch (e) {
+              try { renderCoachMessages(); } catch (e) {}
+            }
+          }
+        } catch (e) { console.warn('open ARIA from meal prep intro failed:', e); }
+      }
+    }
+    // T95 — Replay entry point for Profile → Tools so a user who tapped
+    // through too fast can bring the modal back.
+    function replayMealPrepIntro() {
+      state.settings = state.settings || {};
+      state.settings.mealPrepIntroSeen = false;
+      save();
+      // Take them straight to Fuel → Meal Prep where the modal will re-fire.
+      try { switchTab('nutrition'); } catch (e) {}
+      try { switchNutTab('prep'); } catch (e) {}
+      showNotif('Meal Prep intro will replay now.', 'var(--accent2)');
+    }
+
     function switchNutTab(tab) {
       // Respect the meal-prep toggle: if disabled, redirect prep requests to daily.
       if (tab === 'prep' && state.settings && state.settings.mealPrepEnabled === false) tab = 'daily';
@@ -17615,6 +17737,11 @@ create trigger trg_user_state_updated_at
         try { renderRecipeSuggestions(); } catch (e) {}
         // T62.3 — Fasting card lives on the Meal Prep tab now.
         try { renderFastingCard(); } catch (e) {}
+        // T95 — One-time concept primer. Fires once per user; either button
+        // on the modal flips the flag. Small delay so the page is visible
+        // behind the modal when it opens (avoids the "modal flashes before
+        // the page paints" feel).
+        try { maybeShowMealPrepIntro(); } catch (e) {}
       }
       if (tab === 'daily') {
         try { renderDailyNutrition(); } catch (e) {}
