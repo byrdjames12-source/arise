@@ -3240,48 +3240,27 @@
          top with no gaps depending on the OTHER column's content.
          JS (organizeProfileColumns) creates .profile-col-left and -right
          wrappers and moves children into them on init. */
+      /* T81 — Profile desktop layout. The earlier two-column row split
+         (300px left + flex right) was paired with organizeProfileColumns(),
+         which moved #profile-hunter-status + the Shop button into the left
+         column. T52.1's subtab reorg nested all those elements inside
+         #prof-pane-profile, so the selectors stopped matching and the left
+         column rendered empty — a ~300px gap to the left of the content.
+         The subtab layout already manages its own vertical flow, so we
+         collapse to a single centered column that fills the available row
+         up to max-width: 1200px. organizeProfileColumns() is now a no-op. */
       #screen-profile > .scroll {
         display: flex;
-        flex-direction: row;
-        align-items: flex-start;
-        gap: 22px;
+        flex-direction: column;
+        gap: 14px;
         padding: 18px 22px;
         max-width: 1200px;
         margin: 0 auto;
         width: 100%;
         box-sizing: border-box;
       }
-      .profile-col-left {
-        flex: 0 0 300px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        min-width: 0;
-      }
-      .profile-col-right {
-        flex: 1 1 0;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        min-width: 0;
-      }
-      /* Sections inside columns are tighter — .profile-section was a grid item
-         in the old layout; now it's just a flex item sequencing label + card. */
-      .profile-col-left > .profile-section,
-      .profile-col-right > .profile-section {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      /* Shop button fills the left column width */
-      .profile-col-left > .btn-primary {
-        max-width: none;
-        margin: 0;
-        width: 100%;
-      }
-      /* Cards inside sections fill the wrapper width */
-      .profile-col-left .card, .profile-col-right .card,
-      .profile-col-right #split-table-display {
+      /* Cards inside any pane fill their parent's width on desktop. */
+      #screen-profile .card, #screen-profile #split-table-display {
         width: 100%;
         box-sizing: border-box;
       }
@@ -12900,25 +12879,16 @@ create trigger trg_user_state_updated_at
     // independently from the top, eliminating the gaps. Mobile keeps the
     // original DOM order via display:contents on the wrappers.
     function organizeProfileColumns() {
-      const scroll = document.querySelector('#screen-profile > .scroll');
-      if (!scroll || scroll.dataset.columnsOrganized) return;
-      // Items that belong in the left column (identity + integrations).
-      const leftSlugs = new Set(['biometrics', 'cloud-account', 'aria']);
-      const left = document.createElement('div');
-      left.className = 'profile-col-left';
-      const right = document.createElement('div');
-      right.className = 'profile-col-right';
-      const children = Array.from(scroll.children);
-      children.forEach(el => {
-        const slug = el.dataset && el.dataset.section;
-        const goLeft = el.id === 'profile-hunter-status'
-          || (el.classList && el.classList.contains('btn-primary'))
-          || (slug && leftSlugs.has(slug));
-        (goLeft ? left : right).appendChild(el);
-      });
-      scroll.appendChild(left);
-      scroll.appendChild(right);
-      scroll.dataset.columnsOrganized = '1';
+      // T81 — Retired. The earlier two-column desktop layout split the
+      // Profile screen into a 300px left rail (identity + Shop button) and
+      // a flex-1 right column (everything else). T52.1's subtab reorg
+      // nested all those elements inside #prof-pane-profile, so the
+      // selectors here stopped matching anything — leaving a permanent
+      // ~300px gap to the left of the content. The CSS now uses a single
+      // centered column up to max-width: 1200px, so this function is a
+      // deliberate no-op. Kept as a function so existing callers don't
+      // error out; safe to remove once those call sites are cleaned up.
+      return;
     }
 
     // T23.6 — Profile picture upload. Reads the file as a Data URL, downscales
