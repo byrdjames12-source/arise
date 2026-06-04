@@ -5886,12 +5886,17 @@
       <div id="coach-typing-indicator"
         style="display:none;font-size:11px;color:var(--text3);margin-bottom:8px;font-style:italic;">ARIA is thinking…
       </div>
-      <div style="display:flex;gap:6px;align-items:flex-end;">
+      <!-- T94 — Textarea spans the full chat width; Send sits on its own row
+           below, aligned right, so the user sees the maximum amount of
+           in-progress text without the button stealing horizontal room. -->
+      <div style="display:flex;flex-direction:column;gap:6px;">
         <textarea id="coach-input" placeholder="Tell ARIA about your goals, schedule, equipment, experience…"
-          rows="2" style="flex:1;resize:vertical;min-height:38px;font-size:14px;"
+          rows="3" style="width:100%;box-sizing:border-box;resize:vertical;min-height:64px;font-size:14px;"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitCoachMessage();}"></textarea>
-        <button class="btn btn-primary" id="coach-send-btn" onclick="submitCoachMessage()"
-          style="flex-shrink:0;height:42px;">Send</button>
+        <div style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary" id="coach-send-btn" onclick="submitCoachMessage()"
+            style="min-width:120px;height:42px;">Send</button>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn btn-full" onclick="closeModal('modal-ai-coach')">Close</button>
