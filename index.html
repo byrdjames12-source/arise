@@ -44,6 +44,18 @@
         }
       } catch (e) { /* localStorage may be blocked in private mode — fall back to dark */ }
     })();
+    // T79.6 — Boot-time Large mode apply. Mirrors arise.largeMode from
+    // localStorage to the data-text-size attribute so the CSS rules in the
+    // main stylesheet take effect BEFORE the first paint. The main state
+    // (state.settings.largeMode) is the source of truth; toggleLargeMode()
+    // keeps this localStorage key in sync.
+    (function applyBootLargeMode() {
+      try {
+        if (localStorage.getItem('arise.largeMode') === '1') {
+          document.documentElement.setAttribute('data-text-size', 'large');
+        }
+      } catch (e) {}
+    })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
@@ -3456,6 +3468,93 @@
     }
     /* ========== END T33.2 ========== */
 
+    /* ========== T79.6 — LARGE MODE (ACCESSIBILITY) ==========
+       Opt-in scale-up applied via data-text-size="large" on documentElement.
+       Targets the elements that move the needle for elderly users: bottom
+       nav (the wayfinding lifeline), top bars, body copy, buttons, FAB,
+       hunter cards, quest cards, and form inputs. Uses !important on a few
+       rules where inline px styles would otherwise win — this is the only
+       place where we override user-set inline sizes, and it's gated on an
+       explicit user preference, so the trade is acceptable. */
+    [data-text-size="large"] body { font-size: 16px; }
+
+    /* Top bar — page title + subtab strip */
+    [data-text-size="large"] .topbar-title { font-size: 16px !important; letter-spacing: 2px; }
+    [data-text-size="large"] .tab-btn { font-size: 14px !important; padding: 9px 14px !important; }
+
+    /* Section labels — the gold uppercase "BIOMETRICS" / "EQUIPMENT" etc. */
+    [data-text-size="large"] .section-label { font-size: 13px !important; letter-spacing: 0.18em; }
+
+    /* Card body text + paragraphs */
+    [data-text-size="large"] .card { font-size: 14px; }
+    [data-text-size="large"] .card .field-label,
+    [data-text-size="large"] .card .field-desc { font-size: 13px !important; }
+    [data-text-size="large"] .field-label { font-size: 14px !important; }
+    [data-text-size="large"] .field-desc { font-size: 13px !important; line-height: 1.55; }
+
+    /* Hunter cards — Progress, Quests, Profile */
+    [data-text-size="large"] .hunter-name { font-size: 22px !important; }
+    [data-text-size="large"] .hunter-rank-badge,
+    [data-text-size="large"] .home-id-rank-pill { font-size: 12px !important; letter-spacing: 2px; }
+    [data-text-size="large"] .avatar-chip { font-size: 13px !important; padding: 4px 10px !important; }
+
+    /* Quest cards */
+    [data-text-size="large"] .quest-card { padding: 14px !important; }
+    [data-text-size="large"] .quest-card-name,
+    [data-text-size="large"] .quest-sub { font-size: 15px !important; line-height: 1.55; }
+    [data-text-size="large"] .quest-summary,
+    [data-text-size="large"] #quest-summary,
+    [data-text-size="large"] #quest-date-label { font-size: 14px !important; }
+
+    /* Streak rail — bigger day circles + labels */
+    [data-text-size="large"] .streak-day .d-lbl { font-size: 12px !important; }
+    [data-text-size="large"] .streak-day .d-node { width: 32px !important; height: 32px !important; }
+    [data-text-size="large"] .streak-day .d-ring { width: 42px !important; height: 42px !important; }
+
+    /* Buttons — bigger tap target across the board */
+    [data-text-size="large"] .btn { font-size: 14px !important; padding: 12px 18px !important; min-height: 44px; }
+    [data-text-size="large"] .btn-sm { font-size: 13px !important; padding: 8px 14px !important; min-height: 38px; }
+    [data-text-size="large"] .btn-primary { font-size: 15px !important; padding: 14px 20px !important; }
+
+    /* Inputs + selects + textareas — bigger text + taller tap target */
+    [data-text-size="large"] input[type="text"],
+    [data-text-size="large"] input[type="number"],
+    [data-text-size="large"] input[type="email"],
+    [data-text-size="large"] input[type="password"],
+    [data-text-size="large"] input[type="date"],
+    [data-text-size="large"] input[type="time"],
+    [data-text-size="large"] select,
+    [data-text-size="large"] textarea { font-size: 16px !important; padding: 10px 12px !important; }
+
+    /* Bottom nav — the wayfinding lifeline */
+    [data-text-size="large"] .nav-btn .nav-lbl,
+    [data-text-size="large"] .nav-btn span:not(.icon-title-slot) { font-size: 12px !important; }
+    [data-text-size="large"] .nav-btn .nav-icon svg,
+    [data-text-size="large"] .nav-btn .nav-icon { width: 24px !important; height: 24px !important; }
+    [data-text-size="large"] .bottom-nav { padding-top: 6px; padding-bottom: 8px; }
+
+    /* FAB — the orb + menu pills the user reaches for constantly */
+    [data-text-size="large"] .fab-coach { width: 64px !important; height: 64px !important; }
+    [data-text-size="large"] .fab-coach .icon-title-slot svg { width: 30px !important; height: 30px !important; }
+    [data-text-size="large"] .fab-menu-label { font-size: 14px !important; padding: 10px 14px !important; }
+    [data-text-size="large"] .fab-menu-icon { width: 46px !important; height: 46px !important; }
+    [data-text-size="large"] .fab-menu-icon .icon-title-slot svg { width: 24px !important; height: 24px !important; }
+
+    /* Modals — bigger heading + body copy */
+    [data-text-size="large"] .modal-title { font-size: 18px !important; }
+    [data-text-size="large"] .modal { font-size: 15px; }
+
+    /* Toggle pills + their labels in the Settings pane */
+    [data-text-size="large"] .toggle-label { font-size: 15px !important; line-height: 1.5; }
+    [data-text-size="large"] .toggle { width: 44px !important; height: 26px !important; }
+    [data-text-size="large"] .toggle::after { width: 22px !important; height: 22px !important; }
+
+    /* Chips + small status badges that the user reads constantly */
+    [data-text-size="large"] .stat-val { font-size: 22px !important; }
+    [data-text-size="large"] .stat-lbl { font-size: 13px !important; }
+    [data-text-size="large"] .stat-delta { font-size: 13px !important; }
+    /* ========== END T79.6 ========== */
+
   </style>
 </head>
 
@@ -4619,6 +4718,16 @@
                   <div class="toggle" id="plain-mode-toggle" onclick="togglePlainMode()"></div>
                   <div class="toggle-label">Plain mode <span style="color:var(--text3);font-size:10px;">— swaps Solo
                       Leveling theme labels for neutral fitness terms</span></div>
+                </div>
+                <!-- T79.6 — Large mode toggle. Flips data-text-size="large" on
+                     documentElement; the [data-text-size="large"] CSS block
+                     scales fonts, buttons, FAB, hunter cards, and bottom nav
+                     sitewide so the app reads cleanly for users with low
+                     vision. -->
+                <div class="toggle-wrap">
+                  <div class="toggle" id="large-mode-toggle" onclick="toggleLargeMode()"></div>
+                  <div class="toggle-label">Large mode <span style="color:var(--text3);font-size:10px;">— bigger text,
+                      buttons, FAB, and nav across the whole app</span></div>
                 </div>
                 <div class="toggle-wrap">
                   <div class="toggle on" id="adaptive-toggle-main"
@@ -5861,6 +5970,12 @@
         // etc.) for neutral fitness-app language. Quests and the E-S rank system stay in
         // both modes per user preference. Visual style (colors, fonts) unchanged for v1.
         plainMode: false,
+        // T79.6 — Large mode. When true, applyLargeMode() flips
+        // data-text-size="large" on documentElement and the CSS block at the
+        // bottom of the stylesheet scales fonts, button padding, icon sizes,
+        // FAB diameter, and the bottom-nav rail sitewide. Default off.
+        // Toggle lives in Profile → Settings.
+        largeMode: false,
         // T18.1 — Light-injury / recovery mode. When active, quest generation substitutes
         // workout types that hit any of `areas` with safer alternatives (Mobility / Rest).
         // areas is a list of MUSCLE_GROUP_OPTIONS strings (Chest, Back, Shoulders, Arms, Legs, Core).
@@ -7910,6 +8025,8 @@ create trigger trg_user_state_updated_at
           if (!state.settings.waterReminders) state.settings.waterReminders = { enabled: false, intervalMinutes: 120, lastFiredAt: null };
           if (typeof state.settings.beginnerMode !== 'boolean') state.settings.beginnerMode = false;
           if (typeof state.settings.plainMode !== 'boolean') state.settings.plainMode = false;
+          // T79.6 — Large mode backfill so existing users get the default-off setting.
+          if (typeof state.settings.largeMode !== 'boolean') state.settings.largeMode = false;
           // T18.1 — Recovery / light-injury mode backfill
           if (!state.settings.injuries || typeof state.settings.injuries !== 'object') {
             state.settings.injuries = { active: false, areas: [] };
@@ -10920,6 +11037,10 @@ create trigger trg_user_state_updated_at
       try { applyThemeLogos(resolveTheme(getThemePref())); } catch (e) { }
       applyBeginnerModeClass();
       applyPlainModeLabels();
+      // T79.6 — Apply Large mode at boot so the data-text-size attribute is
+      // set BEFORE the first render, avoiding a flash of standard-sized UI
+      // on slow loads.
+      try { applyLargeMode(); } catch (e) {}
       // T23.7 — Pair section-labels with their content cards on the Profile page
       // so the desktop grid doesn't split them across columns. Idempotent.
       try { wrapProfileSections(); } catch (e) { console.warn('wrapProfileSections', e); }
@@ -11432,6 +11553,31 @@ create trigger trg_user_state_updated_at
       // Re-render dynamic surfaces
       try { renderProfile(); } catch (e) { }
       try { renderStats(); } catch (e) { }
+    }
+
+    // ===== T79.6 — LARGE MODE (ACCESSIBILITY) =====
+    // Opt-in toggle that flips data-text-size="large" on documentElement.
+    // The CSS block in the stylesheet does the heavy lifting — this is just
+    // the state plumbing, attribute application, and toggle handler.
+    function applyLargeMode() {
+      const on = !!(state.settings && state.settings.largeMode);
+      try {
+        document.documentElement.setAttribute('data-text-size', on ? 'large' : 'standard');
+        // Mirror to localStorage so applyBootLargeMode() in <head> can apply
+        // the attribute before the first paint on the next launch.
+        if (on) localStorage.setItem('arise.largeMode', '1');
+        else localStorage.removeItem('arise.largeMode');
+      } catch (e) {}
+    }
+    function toggleLargeMode() {
+      state.settings = state.settings || {};
+      const next = !state.settings.largeMode;
+      state.settings.largeMode = next;
+      applyLargeMode();
+      const toggleEl = document.getElementById('large-mode-toggle');
+      if (toggleEl) toggleEl.classList.toggle('on', next);
+      save();
+      showNotif(next ? 'Large mode ON — bigger text and buttons' : 'Large mode OFF — standard sizing', 'var(--accent2)');
     }
 
     // ===== T18.1 — RECOVERY / INJURY MODE =====
@@ -18481,6 +18627,9 @@ create trigger trg_user_state_updated_at
       // Plain-mode toggle (themed↔plain labels)
       const plainEl = document.getElementById('plain-mode-toggle');
       if (plainEl) plainEl.classList.toggle('on', state.settings?.plainMode === true);
+      // T79.6 — Large mode toggle.
+      const lmEl = document.getElementById('large-mode-toggle');
+      if (lmEl) lmEl.classList.toggle('on', state.settings?.largeMode === true);
       // T18.1 — Update Recovery Mode button label to reflect active state
       const injBtn = document.getElementById('injury-mode-button');
       if (injBtn) {
