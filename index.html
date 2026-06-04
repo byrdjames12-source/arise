@@ -877,9 +877,14 @@
     /* T42.1 — Equippable card frames. equipItem() / applyEquippedFrame() add
        the .framed class plus --frame-border / --frame-glow custom properties
        to .hunter-card and the home identity card. Animated frames also get a
-       .frame-anim-* class. Frame definitions live in FRAME_STYLES (JS). */
+       .frame-anim-* class. Frame definitions live in FRAME_STYLES (JS).
+       T79.5 — Frames also apply to the Quests-page hunter banner and the
+       Profile screen identity card so the equipped frame shows up everywhere
+       the user is identified, not just on Progress. */
     .hunter-card.framed,
-    .home-identity-card.framed {
+    .home-identity-card.framed,
+    .quests-hunter-banner.framed,
+    #profile-hunter-status.framed {
       border: 2px solid var(--frame-border, var(--accent));
       box-shadow: var(--frame-glow, none);
       transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -2774,6 +2779,8 @@
     .fab-menu.open .fab-menu-item:nth-child(6) { transition-delay: 0.12s; }
     .fab-menu.open .fab-menu-item:nth-child(7) { transition-delay: 0.14s; }
     .fab-menu.open .fab-menu-item:nth-child(8) { transition-delay: 0.16s; }
+    /* T79.3 — Tour pill brings the menu to nine items. */
+    .fab-menu.open .fab-menu-item:nth-child(9) { transition-delay: 0.18s; }
     .fab-menu-label {
       background: var(--bg2);
       border: 1px solid var(--border);
@@ -4835,18 +4842,19 @@
        coin/search/help icons into one discoverable place. -->
   <div class="fab-menu" id="fab-menu">
     <div class="fab-menu-items" id="fab-menu-items">
-      <!-- T63.4 — Order: Daily Check-in, Log Workout, Log Meal, Water,
-           Ask ARIA, Shop (no count), Search, Help & Support. Each icon is
-           rendered via the standard data-icon system so it's centered in
-           its circle (was misaligned before). -->
+      <!-- T79.2 / T79.3 — Order (top → bottom): Ask ARIA, Daily Check-in,
+           Log Workout, Log Meal, +8 oz Water, Shop, Search, Tour, Help.
+           ARIA promoted to the first slot per user request; Tour pill added
+           so the comprehensive walkthrough is one tap from anywhere. -->
+      <button class="fab-menu-item" id="fab-pill-aria" onclick="fabAction('aria')"><span class="fab-menu-label">Ask ARIA</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="sparkles"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-checkin" onclick="fabAction('checkin')"><span class="fab-menu-label">Daily Check-in</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="trending"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-workout" onclick="fabAction('workout')"><span class="fab-menu-label">Log Workout</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="dumbbell"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-meal" onclick="fabAction('meal')"><span class="fab-menu-label">Log Meal</span><span class="fab-menu-icon" style="background:var(--green2);"><span class="icon-title-slot" data-icon="utensils"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-water" onclick="fabAction('water')"><span class="fab-menu-label">+ 8 oz Water</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="water"></span></span></button>
-      <button class="fab-menu-item" id="fab-pill-aria" onclick="fabAction('aria')"><span class="fab-menu-label">Ask ARIA</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="sparkles"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-shop" onclick="fabAction('shop')"><span class="fab-menu-label">Shop</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-search" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);"><span class="icon-title-slot" data-icon="search"></span></span></button>
-      <button class="fab-menu-item" id="fab-pill-help" onclick="fabAction('help')"><span class="fab-menu-label">Help & Support</span><span class="fab-menu-icon" style="background:var(--red2);font-size:16px;font-weight:700;">?</span></button>
+      <button class="fab-menu-item" id="fab-pill-tour" onclick="fabAction('tour')"><span class="fab-menu-label">Tour</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="target"></span></span></button>
+      <button class="fab-menu-item" id="fab-pill-help" onclick="fabAction('help')"><span class="fab-menu-label">Help &amp; Support</span><span class="fab-menu-icon" style="background:var(--red2);font-size:16px;font-weight:700;">?</span></button>
     </div>
     <button class="fab-coach" id="fab-coach" onclick="toggleFabMenu(event)" aria-label="Quick actions" title="Quick actions">
       <span class="fab-coach-default"><span class="icon-title-slot" data-icon="sparkles"></span></span>
@@ -7498,15 +7506,69 @@ create trigger trg_user_state_updated_at
         const displayText = isUser ? m.content : stripPlanBlock(m.content);
         const plan = isUser ? null : parseCoachPlan(m.content);
         const planCard = plan ? renderCoachPlanCard(plan, i) : '';
+        // T79.4 — Tap-to-play voice button on every ARIA reply. Each assistant
+        // message gets a small icon button under the bubble that reads the
+        // text aloud via the existing TTS (Web Speech). Tap again to stop.
+        const isPlaying = _ariaChatPlayingIdx === i;
+        const playBtn = isUser ? '' : `
+          <div style="display:flex;justify-content:flex-start;margin-top:4px;">
+            <button onclick="toggleAriaChatVoice(${i})" title="${isPlaying ? 'Stop' : 'Read aloud'}" style="background:transparent;border:1px solid var(--border);color:${isPlaying ? 'var(--gold)' : 'var(--text3)'};padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">${iconSvg(isPlaying ? 'pause' : 'play', 11)}<span>${isPlaying ? 'Stop' : 'Read aloud'}</span></button>
+          </div>`;
         return `
           <div style="display:flex;justify-content:${align};">
             <div style="max-width:85%;background:${bg};color:${color};border:1px solid ${border};border-radius:12px;padding:8px 12px;font-size:13px;line-height:1.5;white-space:pre-wrap;">${escapeHtml(displayText)}</div>
           </div>
+          ${playBtn}
           ${planCard}
         `;
       }).join('');
       // Auto-scroll to the bottom
       slot.scrollTop = slot.scrollHeight;
+    }
+    // T79.4 — Index of the chat reply currently being read aloud, or null.
+    // Tracked at module scope so renderCoachMessages can render the right
+    // play/stop state on each pass.
+    let _ariaChatPlayingIdx = null;
+    function toggleAriaChatVoice(idx) {
+      const msgs = (state.aiCoach && state.aiCoach.messages) || [];
+      const m = msgs[idx];
+      if (!m || m.role !== 'assistant') return;
+      // Stop any in-flight playback (Web Speech AND any MP3 lines from the
+      // intro). If we're already reading THIS message, the tap means stop.
+      const wasPlayingThis = _ariaChatPlayingIdx === idx;
+      try { _ariaStopSpeech(); } catch (e) {}
+      _ariaChatPlayingIdx = null;
+      if (wasPlayingThis) { try { renderCoachMessages(); } catch (e) {} return; }
+      // Otherwise begin reading. We strip the <plan> JSON block before
+      // speaking so the user doesn't hear raw braces and quotes.
+      const text = stripPlanBlock(m.content);
+      if (!text || !text.trim()) return;
+      _ariaChatPlayingIdx = idx;
+      try { renderCoachMessages(); } catch (e) {}
+      try { _ariaSpeakWebTTS(text); } catch (e) { _ariaChatPlayingIdx = null; }
+      // Reset the playing flag when speech ends so the button flips back
+      // to "Read aloud". The Web Speech API doesn't always fire 'end' on
+      // mobile, so we also watchdog with a length-based timeout.
+      try {
+        if (window.speechSynthesis) {
+          const watchEnd = setInterval(() => {
+            if (!window.speechSynthesis.speaking && _ariaChatPlayingIdx === idx) {
+              clearInterval(watchEnd);
+              _ariaChatPlayingIdx = null;
+              try { renderCoachMessages(); } catch (e) {}
+            }
+          }, 400);
+          // Hard cap: ~12s per 100 chars + 4s buffer.
+          setTimeout(() => {
+            clearInterval(watchEnd);
+            if (_ariaChatPlayingIdx === idx) {
+              _ariaChatPlayingIdx = null;
+              try { _ariaStopSpeech(); } catch (e) {}
+              try { renderCoachMessages(); } catch (e) {}
+            }
+          }, Math.min(60000, 4000 + text.length * 80));
+        }
+      } catch (e) {}
     }
 
     function renderCoachPlanCard(plan, msgIdx) {
@@ -9171,6 +9233,8 @@ create trigger trg_user_state_updated_at
             case 'aria':    openAICoachModal(); break;
             case 'shop':    switchTab('shop'); break;
             case 'search':  openGlobalSearch(); break;
+            // T79.3 — Tour pill launches the comprehensive 15-stop walkthrough.
+            case 'tour':    startComprehensiveTour(); break;
             case 'help':    openSupportModal(); break;
           }
         } catch (err) { console.warn('fabAction', kind, err); }
@@ -13459,6 +13523,8 @@ create trigger trg_user_state_updated_at
         const avatarFace = avatarUrl
           ? `<img src="${escapeHtml(avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">`
           : `<span style="font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;color:${rankColor};">${initial}</span>`;
+        // T79.5 — Re-applying the className strips the .framed class that
+        // applyEquippedFrame added; re-apply at the end of this block.
         banner.className = 'card quests-hunter-banner';
         banner.style.padding = '14px 18px';
         banner.innerHTML = `
@@ -13484,6 +13550,8 @@ create trigger trg_user_state_updated_at
             </div>
           </div>
         `;
+        // T79.5 — Restore equipped frame after the className reset above.
+        try { applyEquippedFrame(); } catch (e) {}
       }
       // Identity card
       const av = document.getElementById('home-id-av');
@@ -17989,6 +18057,9 @@ create trigger trg_user_state_updated_at
         <div class="avatar-chip" style="color:${rankColor};border-color:${rankColor};">${rankLabel}</div>
       </div>
     `;
+        // T79.5 — Re-apply the equipped frame after this innerHTML rewrite so
+        // the .framed class isn't lost on every Profile re-render.
+        try { applyEquippedFrame(); } catch (e) {}
       }
       // T48.1 — Update all coin pills across topbars.
       updateCoinPills();
@@ -19820,7 +19891,10 @@ create trigger trg_user_state_updated_at
       const fid = (state.equipped && state.equipped.frame) || 'default';
       const fs = FRAME_STYLES[fid];
       const animClasses = ['frame-anim-aurora', 'frame-anim-ember', 'frame-anim-circuit', 'frame-anim-monarch'];
-      document.querySelectorAll('.hunter-card, .home-identity-card').forEach(el => {
+      // T79.5 — Extended to include the Quests hunter banner and the
+      // Profile screen identity card so the equipped frame shows on every
+      // surface that identifies the hunter, not just the Progress card.
+      document.querySelectorAll('.hunter-card, .home-identity-card, .quests-hunter-banner, #profile-hunter-status').forEach(el => {
         el.classList.remove('framed', ...animClasses);
         el.style.removeProperty('--frame-border');
         el.style.removeProperty('--frame-glow');
