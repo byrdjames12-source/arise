@@ -3288,6 +3288,32 @@
         border-radius: 16px;
         max-height: 80vh;
       }
+      /* T89.2 — ARIA chat takes a much bigger slice of the desktop viewport
+         so long replies stay readable without scrolling the chat list
+         constantly. Per-modal override of the global .modal sizing. */
+      #modal-ai-coach .modal {
+        max-width: 920px !important;
+        width: 92vw !important;
+        max-height: 90vh !important;
+        height: 90vh;
+      }
+    }
+    /* T89.2 — On phones, ARIA chat is a true full-screen modal: edge-to-edge,
+       no rounded corners, no margins. Lets the user see the full reply
+       without the bottom-sheet feel. */
+    @media (max-width: 1023px) {
+      #modal-ai-coach.show {
+        align-items: stretch;
+        padding: 0;
+      }
+      #modal-ai-coach .modal {
+        max-width: 100vw !important;
+        width: 100vw !important;
+        height: 100vh;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+      }
     }
     /* Mobile fallback: flatten desktop wrappers so children act as direct flex
        items of their screen (preserves original mobile flow). */
@@ -7873,8 +7899,17 @@ create trigger trg_user_state_updated_at
     };
     // T87.2 — Run a single action through its handler. Records to
     // state.aiCoach.appliedActions for audit + toasts the user.
-    function applyCoachAction(action, msgIdx, actionIdx) {
-      if (!action || !action.type) return;
+    // T89.1 — Signature changed from (action, msgIdx, idx) → (msgIdx, idx).
+    // Previously we serialized the action object into the onclick attribute,
+    // which broke whenever the JSON contained double quotes (i.e. always).
+    // Now we re-parse from state.aiCoach.messages[msgIdx].content at click
+    // time — same source ARIA emitted, no escape hazard.
+    function applyCoachAction(msgIdx, actionIdx) {
+      const msg = (state.aiCoach && state.aiCoach.messages && state.aiCoach.messages[msgIdx]);
+      if (!msg) { showNotif('Action message not found.', 'var(--red2)'); return; }
+      const actions = parseCoachActions(msg.content);
+      const action = actions[actionIdx];
+      if (!action || !action.type) { showNotif('Action data not found in the message.', 'var(--red2)'); return; }
       const handler = ACTION_HANDLERS[action.type];
       if (!handler) { showNotif(`Unknown action type: ${action.type}`, 'var(--red2)'); return; }
       const logEntry = { type: action.type, args: action, msgIdx, actionIdx, appliedAt: Date.now(), description: '' };
@@ -7977,7 +8012,9 @@ create trigger trg_user_state_updated_at
             <div style="font-size:13px;color:var(--text);line-height:1.45;margin-bottom:${reason ? '6' : '8'}px;">${escapeHtml(d.body)}</div>
             ${reason ? `<div style="font-size:11px;color:var(--text3);line-height:1.45;margin-bottom:8px;"><strong style="color:var(--text2);">Why:</strong> ${escapeHtml(reason)}</div>` : ''}
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-sm btn-primary" onclick="applyCoachAction(${JSON.stringify(a)}, ${msgIdx}, ${i})" style="font-size:11px;padding:5px 10px;">Apply</button>
+              <!-- T89.1 — Pass indices, not the action object. The handler
+                   re-parses from state to avoid JSON-in-attribute escape bugs. -->
+              <button class="btn btn-sm btn-primary" onclick="applyCoachAction(${msgIdx}, ${i})" style="font-size:11px;padding:5px 10px;">Apply</button>
               <button class="btn btn-sm" onclick="skipCoachAction(${msgIdx}, ${i})" style="font-size:11px;padding:5px 10px;">Skip</button>
             </div>
           </div>`;
@@ -16070,9 +16107,14 @@ create trigger trg_user_state_updated_at
           : '';
         return `
       <tr>
-        <td style="border:1px solid var(--border);padding:1px;">
+        <!-- T89.3 — Exercise cell pinned to a 220px min-width so the input
+             stays readable when a variant tag + ruler button are also
+             present. The table wrapper already has overflow-x:auto so the
+             cell can claim its width without crushing the set columns;
+             users scroll horizontally as they always have. -->
+        <td style="border:1px solid var(--border);padding:1px;min-width:220px;">
           <div style="display:flex;align-items:center;gap:4px;">
-            <input type="text" list="tracker-ex-list" value="${(row.exercise || '').replace(/"/g, '&quot;')}" placeholder="${sheet.muscleGroup ? 'pick ' + sheet.muscleGroup.toLowerCase() + ' exercise' : 'exercise'}" oninput="updateTrackerExercise(${r}, this.value)" style="flex:1;padding:5px;background:transparent;border:none;color:var(--text);font-size:12px;min-width:0;">
+            <input type="text" list="tracker-ex-list" value="${(row.exercise || '').replace(/"/g, '&quot;')}" placeholder="${sheet.muscleGroup ? 'pick ' + sheet.muscleGroup.toLowerCase() + ' exercise' : 'exercise'}" oninput="updateTrackerExercise(${r}, this.value)" style="flex:1;padding:5px;background:transparent;border:none;color:var(--text);font-size:12px;min-width:120px;">
             ${variantTag}
             <!-- T63.2 — Per-row rest-timer button removed; the sheet-level
                  "Rest: 60s / 90s / 3min" buttons cover this concern. -->
@@ -18650,13 +18692,19 @@ create trigger trg_user_state_updated_at
       cutoff.setDate(cutoff.getDate() - 7);
       const cutoffStr = cutoff.toISOString().split('T')[0];
       const recent = log.filter(e => (e.date || '') >= cutoffStr);
-      // Aggregate sets per muscle group. A "working set" = any set with reps > 0
+      // Aggregate sets per muscle group, AND per-exercise inside each group so
+      // tapping a row can break it down. A "working set" = any set with reps > 0
       // (even bodyweight is counted — reps drive hypertrophy regardless of load).
       const counts = {};
+      const perExercise = {}; // { group: { exerciseName: setCount } }
       recent.forEach(e => {
         const group = muscleGroupForExercise(e.exercise);
         const sets = (e.sets || []).filter(s => (parseFloat(s.reps) || 0) > 0).length;
+        if (sets === 0) return;
         counts[group] = (counts[group] || 0) + sets;
+        perExercise[group] = perExercise[group] || {};
+        const name = (e.exercise || 'Unnamed').trim();
+        perExercise[group][name] = (perExercise[group][name] || 0) + sets;
       });
       // Display order — primary movers first, then accessories, then catch-all.
       const order = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Full Body', 'Other'];
@@ -18665,13 +18713,20 @@ create trigger trg_user_state_updated_at
         slot.innerHTML = `<div style="text-align:center;color:var(--text3);padding:8px 0;">No working sets logged in the last 7 days. Volume = sets × reps; log a session from the Tracker or Quests tab.</div>`;
         return;
       }
+      // T88.1 — Distinct training days (one per date), not raw workoutLog entry
+      // count. The old "45 sessions" wording was actually "45 exercise entries"
+      // because workoutLog stores one row per exercise per date.
+      const trainingDays = new Set(recent.map(e => e.date).filter(Boolean)).size;
+      // T88.2 — Cache the per-exercise breakdown on the slot element so the
+      // popover handler can look it up by group name without recomputing.
+      slot._volumeBreakdown = perExercise;
       // Per-muscle minimum effective volume — typical hypertrophy minimums (Schoenfeld 2017+).
       // Used to color-code: dim if under, bright if hitting/exceeding. Numbers err on the
       // conservative side so beginners aren't pushed to over-train.
       const MEV = { Chest: 8, Back: 10, Legs: 8, Shoulders: 6, Arms: 6, Core: 0, 'Full Body': 0, Other: 0 };
       const max = Math.max(...Object.values(counts), 1);
       slot.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:6px;">
+    <div style="display:flex;flex-direction:column;gap:8px;">
       ${order.filter(g => counts[g] !== undefined && counts[g] > 0).map(g => {
         const n = counts[g];
         const pct = Math.min(100, Math.round((n / max) * 100));
@@ -18680,24 +18735,69 @@ create trigger trg_user_state_updated_at
         const color = meetsTarget ? 'var(--green2)' : 'var(--gold)';
         // T27.8 — surface MEV citation on the "need N+/wk" hint
         const targetNote = target > 0
-          ? (meetsTarget ? '' : `<span style="color:var(--gold);font-size:10px;margin-left:4px;">need ${target}+/wk${glossaryTip('mev')}</span>`)
+          ? (meetsTarget ? '' : `<span style="color:var(--gold);font-size:11px;margin-left:4px;">need ${target}+/wk${glossaryTip('mev')}</span>`)
           : '';
+        // T88.2 — Whole row is a button so tapping anywhere on it opens the
+        // exercise breakdown popover. Slight padding bump + larger fonts make
+        // the row a real tap target and improve readability per user feedback.
         return `
-          <div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;margin-bottom:3px;">
-              <span style="font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:0.5px;">${g.toUpperCase()}</span>
-              <span><strong style="color:${color};">${n}</strong> <span style="color:var(--text3);">sets</span>${targetNote}</span>
+          <button type="button" onclick="openWeeklyVolumeBreakdown('${g.replace(/'/g, "\\'")}')" style="background:transparent;border:none;text-align:left;padding:4px 0;cursor:pointer;color:inherit;display:block;width:100%;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:4px;">
+              <span style="font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:0.6px;">${g.toUpperCase()}</span>
+              <span><strong style="color:${color};font-size:14px;">${n}</strong> <span style="color:var(--text3);">sets</span>${targetNote}</span>
             </div>
-            <div class="bar-wrap" style="height:5px;"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
-          </div>
+            <div class="bar-wrap" style="height:6px;"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+          </button>
         `;
       }).join('')}
     </div>
-    <div style="font-size:10px;color:var(--text3);margin-top:10px;line-height:1.4;">
-      <strong style="color:var(--text2);">Total:</strong> ${total} working sets across ${recent.length} session${recent.length !== 1 ? 's' : ''}.
-      Targets are minimum effective volumes for hypertrophy — yellow means you have room to add a set or two; green means you're in the sweet spot.
+    <div style="font-size:11px;color:var(--text3);margin-top:12px;line-height:1.5;">
+      <strong style="color:var(--text2);">Total:</strong> ${total} working ${total === 1 ? 'set' : 'sets'} across ${trainingDays} training ${trainingDays === 1 ? 'day' : 'days'}.
+      Tap a muscle group to see which exercises contributed. Targets are minimum effective volumes for hypertrophy — yellow means you have room to add a set or two; green means you're in the sweet spot.
     </div>
   `;
+    }
+    // T88.2 — Lightweight popover listing the exercises that contributed to
+    // a given muscle group's weekly volume, with set counts. Pulled from the
+    // _volumeBreakdown cache renderWeeklyVolume left on the slot element so
+    // we never recompute. No weights / RPE on purpose per user request —
+    // this is a "what did I actually do" glance, not a full session view.
+    function openWeeklyVolumeBreakdown(group) {
+      const slot = document.getElementById('volume-rollup');
+      const breakdown = (slot && slot._volumeBreakdown && slot._volumeBreakdown[group]) || {};
+      const rows = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+      const total = rows.reduce((acc, [, n]) => acc + n, 0);
+      const id = 'volume-breakdown-popover';
+      let pop = document.getElementById(id);
+      if (!pop) {
+        pop = document.createElement('div');
+        pop.id = id;
+        pop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:18px;';
+        pop.onclick = (e) => { if (e.target === pop) closeWeeklyVolumeBreakdown(); };
+        document.body.appendChild(pop);
+      }
+      pop.innerHTML = `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:80vh;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:1.2px;font-size:15px;color:var(--accent2);text-transform:uppercase;">${escapeHtml(group)} · last 7 days</div>
+            <button class="btn btn-sm" onclick="closeWeeklyVolumeBreakdown()" style="font-size:11px;padding:4px 8px;">Close</button>
+          </div>
+          ${rows.length === 0
+            ? '<div style="color:var(--text3);font-size:13px;text-align:center;padding:14px;">No exercises logged for this group in the last 7 days.</div>'
+            : `<div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;">
+                ${rows.map(([name, n]) => `
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+                    <span style="font-size:14px;color:var(--text);">${escapeHtml(name)}</span>
+                    <span style="font-size:13px;color:var(--text3);"><strong style="color:var(--green2);font-size:15px;">${n}</strong> ${n === 1 ? 'set' : 'sets'}</span>
+                  </div>
+                `).join('')}
+              </div>
+              <div style="font-size:11px;color:var(--text3);text-align:right;">${total} total ${total === 1 ? 'set' : 'sets'}</div>`}
+        </div>`;
+    }
+    function closeWeeklyVolumeBreakdown() {
+      const pop = document.getElementById('volume-breakdown-popover');
+      if (pop) pop.remove();
     }
     // Build a dedupe-by-exercise progression list sorted by most recent activity.
     // T25.6 — Normalize exercise names for grouping so "Pull-up" and "Pull-ups"
