@@ -4093,7 +4093,8 @@
           <button class="nav-btn sidebar-nav-btn" onclick="switchTab('workouts')" data-nav-icon="dumbbell"><span class="nav-icon"></span><span>Workouts</span></button>
           <button class="nav-btn sidebar-nav-btn" onclick="switchTab('nutrition')" data-nav-icon="utensils"><span class="nav-icon"></span><span>Fuel</span></button>
           <button class="nav-btn sidebar-nav-btn" onclick="switchTab('profile')" data-nav-icon="settings"><span class="nav-icon"></span><span>Profile</span></button>
-          <button class="nav-btn sidebar-nav-btn" onclick="switchTab('shop')" data-nav-icon="store"><span class="nav-icon"></span><span>Shop</span></button>
+          <!-- T97 — "Shop" → "Gear" since nothing is purchased anymore. -->
+          <button class="nav-btn sidebar-nav-btn" onclick="switchTab('shop')" data-nav-icon="trophy"><span class="nav-icon"></span><span>Gear</span></button>
         </nav>
         <div class="sidebar-me">
           <div class="sidebar-me-av" id="sidebar-me-av">H</div>
@@ -4174,32 +4175,16 @@
               </div>
             </div>
           </div>
-          <!-- Penalty warning (shown if not all done by late day) -->
-          <div class="penalty-bar" id="penalty-bar" style="display:none;">
-            <span class="icon-title-slot" data-icon="alert"></span>
-            <div class="penalty-text"><strong>SYSTEM WARNING:</strong> Complete all quests before midnight or face an XP
-              penalty.</div>
-          </div>
+          <!-- T96.1 — Penalty bar removed alongside penalty mode. -->
+
           <!-- Quest list -->
+          <!-- T98.1 — ARIA's daily challenge is now merged into the unified
+               quest list below (rendered as a regular quest item with an ARIA
+               source badge). The separate ARIA CHALLENGE card + Accept button
+               were removed because they fragmented the quest surface and
+               added a redundant two-step UX. The challenge is auto-injected
+               into state.quests on each render via _syncAriaChallengeIntoQuests. -->
           <div id="quest-list-container"></div>
-          <!-- AI Quest -->
-          <div class="section-label" data-desktop-hide="ai-label" style="margin-top:4px;">ARIA CHALLENGE</div>
-          <div class="ai-card" id="ai-quest-card">
-            <div class="ai-card-content">
-              <div class="ai-card-header">
-                <span class="ai-tag"><span class="icon-title-slot" data-icon="zap"
-                    style="color:var(--accent);margin-right:0;"></span>SYSTEM</span>
-                <span class="ai-tag" style="color:var(--text3);letter-spacing:1.5px;">ARIA CHALLENGE</span>
-              </div>
-              <div class="ai-loading" id="ai-loading-indicator">
-                <div class="ai-dot"></div>
-                <div class="ai-dot"></div>
-                <div class="ai-dot"></div>
-                <span style="font-size:12px;">Drafting today's challenge…</span>
-              </div>
-              <div class="ai-content" id="ai-quest-content" style="display:none;"></div>
-            </div>
-          </div>
           <!-- Training Log -->
           <div class="section-label"
             style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
@@ -4608,8 +4593,8 @@
 
         <!-- Meal Prep Tab -->
         <div id="nut-prep" class="scroll" style="display:none;">
-          <!-- T62.3 — Fasting card lives here now. Planning-side concern. -->
-          <div id="fasting-card-slot"></div>
+          <!-- T96.4 — Fasting card moved to the bottom of the tab since
+               it's a niche feature most users won't engage with. -->
           <!-- T51.3 — Day-1 welcome card. renderMealPrep fills this with a
                single "Start meal prepping" card when nothing has been added
                (no recipes, no avoid list, no prep entries). The full grid
@@ -4661,6 +4646,11 @@
             <div style="font-size:12px;">Upload meal prep CSV or photo</div>
             <input type="file" id="prep-upload" accept=".csv,.jpg,.png" onchange="handlePrepUpload(this)">
           </label>
+          <!-- T96.4 — Fasting card moved here from the top of the tab.
+               Niche feature; lives at the bottom so it doesn't clutter
+               the primary meal-prep flow. -->
+          <div class="section-label" style="margin-top:14px;">FASTING</div>
+          <div id="fasting-card-slot"></div>
           </div><!-- /#meal-prep-sections -->
         </div>
         </div><!-- /.nut-panes-wrap -->
@@ -4747,11 +4737,9 @@
                   <div class="toggle-label">Beginner mode <span style="color:var(--text3);font-size:10px;">— hides
                       advanced fields, gentler defaults</span></div>
                 </div>
-                <div class="toggle-wrap">
-                  <div class="toggle" id="plain-mode-toggle" onclick="togglePlainMode()"></div>
-                  <div class="toggle-label">Plain mode <span style="color:var(--text3);font-size:10px;">— swaps Solo
-                      Leveling theme labels for neutral fitness terms</span></div>
-                </div>
+                <!-- T96.2 — Plain mode toggle removed. Committed to the
+                     Solo Leveling theme as the brand differentiation. -->
+
                 <!-- T79.6 — Large mode toggle. Flips data-text-size="large" on
                      documentElement; the [data-text-size="large"] CSS block
                      scales fonts, buttons, FAB, hunter cards, and bottom nav
@@ -4768,24 +4756,16 @@
                   </div>
                   <div class="toggle-label">Adaptive macro adjustments</div>
                 </div>
-                <div class="toggle-wrap">
-                  <div class="toggle on" id="penalty-toggle"
-                    onclick="this.classList.toggle('on');state.settings.penaltyMode=this.classList.contains('on');save();">
-                  </div>
-                  <div class="toggle-label">Quest penalty mode</div>
-                </div>
+                <!-- T96.1 — Quest penalty mode removed (retired toggle + system). -->
                 <div class="toggle-wrap">
                   <div class="toggle on" id="notify-toggle"
                     onclick="this.classList.toggle('on');state.settings.notify=this.classList.contains('on');save();">
                   </div>
                   <div class="toggle-label">Daily quest reminders</div>
                 </div>
-                <div class="toggle-wrap">
-                  <div class="toggle on" id="mealprep-toggle"
-                    onclick="this.classList.toggle('on');state.settings.mealPrepEnabled=this.classList.contains('on');save();if(typeof applyMealPrepVisibility==='function')applyMealPrepVisibility();if(typeof renderMealPrep==='function')renderMealPrep();if(typeof renderDailyNutrition==='function')renderDailyNutrition();">
-                  </div>
-                  <div class="toggle-label">Show meal prep dashboard</div>
-                </div>
+                <!-- T96.3 — Meal prep dashboard toggle hidden. Default-on
+                     for all users; the dashboard always shows. -->
+
               </div>
             </div>
             <!-- T35.3 — Appearance: theme toggle. Rendered by renderThemeCard(). -->
@@ -4919,24 +4899,22 @@
       <!-- SHOP SCREEN -->
       <div id="screen-shop" class="screen">
         <div class="topbar">
-          <div class="topbar-title"><span class="icon-title-slot" data-icon="store"></span><span
-              data-label-key="hunter_shop">Hunter Shop</span></div>
+          <!-- T97 — "Hunter Shop" → "Hunter Gear" since nothing is for sale
+               anymore. Frames + Titles unlock at XP thresholds. -->
+          <div class="topbar-title"><span class="icon-title-slot" data-icon="trophy"></span><span>Hunter Gear</span></div>
           <div class="topbar-right">
-            <div class="coin-pill"><span class="icon-title-slot" data-icon="coin"></span><span
-                id="shop-coin-display">0</span></div>
+            <!-- T97.1 — Coin pill removed; coins are retired. -->
           </div>
         </div>
         <div class="scroll">
+          <!-- T97 — Buffs + Inventory subtabs removed. Gear management
+               (equip / unequip) lives directly inside Frames and Titles. -->
           <div class="tab-row" style="margin-bottom:4px;">
             <button class="tab-btn active" id="shop-tab-frames" onclick="switchShopTab('frames')">Frames</button>
             <button class="tab-btn" id="shop-tab-titles" onclick="switchShopTab('titles')">Titles</button>
-            <button class="tab-btn" id="shop-tab-buffs" onclick="switchShopTab('buffs')">Buffs</button>
-            <button class="tab-btn" id="shop-tab-inventory" onclick="switchShopTab('inventory')">Inv.</button>
           </div>
           <div id="shop-pane-frames"></div>
           <div id="shop-pane-titles" style="display:none;"></div>
-          <div id="shop-pane-buffs" style="display:none;"></div>
-          <div id="shop-pane-inventory" style="display:none;"></div>
         </div>
         <div class="nav">
           <button class="nav-btn" onclick="switchTab('quests')" data-nav-icon="swords"><span
@@ -4977,7 +4955,10 @@
       <button class="fab-menu-item" id="fab-pill-workout" onclick="fabAction('workout')"><span class="fab-menu-label">Log Workout</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="dumbbell"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-meal" onclick="fabAction('meal')"><span class="fab-menu-label">Log Meal</span><span class="fab-menu-icon" style="background:var(--green2);"><span class="icon-title-slot" data-icon="utensils"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-water" onclick="fabAction('water')"><span class="fab-menu-label">+ 8 oz Water</span><span class="fab-menu-icon" style="background:var(--accent);"><span class="icon-title-slot" data-icon="water"></span></span></button>
-      <button class="fab-menu-item" id="fab-pill-shop" onclick="fabAction('shop')"><span class="fab-menu-label">Shop</span><span class="fab-menu-icon" style="background:var(--gold);"><span class="icon-title-slot" data-icon="coin"></span></span></button>
+      <!-- T97.1 — Shop FAB pill removed. Hunter Gear is reachable from the
+           sidebar nav; no need for a quick-action shortcut now that there's
+           no purchasing flow. -->
+
       <button class="fab-menu-item" id="fab-pill-search" onclick="fabAction('search')"><span class="fab-menu-label">Search</span><span class="fab-menu-icon" style="background:var(--text2);"><span class="icon-title-slot" data-icon="search"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-tour" onclick="fabAction('tour')"><span class="fab-menu-label">Tour</span><span class="fab-menu-icon" style="background:var(--accent2);"><span class="icon-title-slot" data-icon="target"></span></span></button>
       <button class="fab-menu-item" id="fab-pill-help" onclick="fabAction('help')"><span class="fab-menu-label">Help &amp; Support</span><span class="fab-menu-icon" style="background:var(--red2);font-size:16px;font-weight:700;">?</span></button>
@@ -5400,12 +5381,12 @@
       <div style="display:flex;flex-direction:column;gap:10px;">
         <div class="form-group">
           <label>Fast type</label>
+          <!-- T96.4 — Reduced from 5 variants to 2. Existing fasts of other
+               types still display fine (read-only) since FAST_TYPES retains
+               the entries. -->
           <select id="fast-type" onchange="updateFastTypeDesc()">
+            <option value="intermittent">Intermittent — defined eating window (e.g. 16:8)</option>
             <option value="water">Water Only — strict</option>
-            <option value="liquid">Liquid Fast — water, juice, broth, tea</option>
-            <option value="daniel">Daniel Fast — fruits, veggies, grains, legumes</option>
-            <option value="intermittent">Intermittent — defined eating window</option>
-            <option value="custom">Custom — your own rules</option>
           </select>
           <div id="fast-type-desc" style="font-size:11px;color:var(--text3);margin-top:4px;"></div>
         </div>
@@ -5829,33 +5810,29 @@
        (2) Regional recovery (new) — targets specific lifts within whatever day
        they fall on. Both can be active at the same time and serve different
        purposes: macro day-level routing vs micro lift-level deload. -->
+  <!-- T98.3 — Recovery simplified to a single toggle + free-text "what's
+       hurt" field. The earlier multi-mode UI (region chips, severity sliders,
+       expires-in-N-days, automated workout substitution) was rich but
+       confusing to read and rarely used cleanly. This version just lets the
+       user flag that they're hurt and describe it in their own words; ARIA
+       reads the notes when coaching, and the user adjusts their own training
+       intuitively. No more automated day substitution. -->
   <div class="modal-overlay" id="modal-injuries">
-    <div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto;">
+    <div class="modal" style="max-width:480px;">
       <div class="modal-title"><span class="icon-title-slot" data-icon="shield"></span>Recovery Mode</div>
-
-      <!-- T34.1 — Regional recovery (lift-level) — primary, recommended path -->
-      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:1px;font-size:12px;color:var(--gold);margin-bottom:6px;">INJURY REGIONS</div>
-      <p style="font-size:11px;color:var(--text3);line-height:1.55;margin-bottom:10px;">
-        Pick a body region that's bothering you. The tracker will swap or deload the lifts that aggravate it — not the whole day. Severity controls how aggressive the change is.
+      <p style="font-size:12px;color:var(--text3);line-height:1.55;margin-bottom:14px;">
+        Flag when you're working around an injury. ARIA reads your notes when coaching and the dashboard shows a clear reminder — you stay in control of how you actually train around it.
       </p>
-      <div id="recovery-region-list" style="margin-bottom:14px;"></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button class="btn btn-sm btn-full" onclick="clearAllRecoveryRegions()" style="color:var(--gold);border-color:var(--gold);">Clear All Regions</button>
-      </div>
-
-      <!-- Legacy muscle-group recovery — kept for whole-day routing -->
-      <details style="margin-bottom:12px;">
-        <summary style="cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:1px;font-size:11px;color:var(--text3);padding:6px 0;">
-          ADVANCED — WHOLE-DAY RECOVERY (legacy)
-        </summary>
-        <p style="font-size:11px;color:var(--text3);line-height:1.55;margin:8px 0;">
-          Day-level routing: any selected muscle group converts its scheduled training type to Mobility / Yoga. Use this when you want to skip entire days, not just deload individual lifts.
-        </p>
-        <div id="injury-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
-        <div id="injury-impact-note" style="font-size:10px;color:var(--text3);line-height:1.5;margin-bottom:10px;"></div>
-        <button class="btn btn-sm" id="injury-clear-btn" onclick="clearInjuries()" style="color:var(--gold);border-color:var(--gold);font-size:11px;">Clear Groups</button>
-      </details>
-
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;cursor:pointer;">
+        <div style="flex:1;">
+          <div style="font-size:13px;color:var(--text);font-weight:600;">Recovery Mode</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">Show a banner on your daily quests; flag this to ARIA.</div>
+        </div>
+        <input type="checkbox" id="recovery-active-toggle" onchange="setRecoveryActive(this.checked)" style="width:42px;height:24px;cursor:pointer;">
+      </label>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:1px;font-size:11px;color:var(--text3);margin-bottom:6px;">WHAT'S HURT?</div>
+      <textarea id="recovery-notes" rows="4" placeholder="e.g. left shoulder, deep ache during pressing. Skipping bench this week, doing landmine variations instead." style="width:100%;padding:10px;font-size:12px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;resize:vertical;font-family:inherit;line-height:1.5;" oninput="setRecoveryNotes(this.value)"></textarea>
+      <p style="font-size:10px;color:var(--text3);line-height:1.5;margin:8px 0 14px;">Be specific — what hurts, how it hurts, what aggravates it. ARIA uses this when suggesting alternative work and when checking in with you.</p>
       <button class="btn btn-full" onclick="closeModal('modal-injuries')">Done</button>
     </div>
   </div>
@@ -8395,7 +8372,8 @@ create trigger trg_user_state_updated_at
           if (state.fasting === undefined) state.fasting = null;
           if (!Array.isArray(state.fastingHistory)) state.fastingHistory = [];
           if (!state.settings) state.settings = {};
-          if (typeof state.settings.mealPrepEnabled !== 'boolean') state.settings.mealPrepEnabled = true;
+          // T96.3 — Meal prep dashboard toggle retired; force-on for all users.
+          state.settings.mealPrepEnabled = true;
           if (!Array.isArray(state.workoutLog)) state.workoutLog = [];
           // T38.2 — One-time cleanup: remove quest-sourced placeholder entries
           // that have either empty sets or all-zero weights/reps. These were
@@ -8499,7 +8477,9 @@ create trigger trg_user_state_updated_at
           if (!Array.isArray(state.settings.mealReminders.times)) state.settings.mealReminders.times = ['08:00', '12:30', '18:30'];
           if (!state.settings.waterReminders) state.settings.waterReminders = { enabled: false, intervalMinutes: 120, lastFiredAt: null };
           if (typeof state.settings.beginnerMode !== 'boolean') state.settings.beginnerMode = false;
-          if (typeof state.settings.plainMode !== 'boolean') state.settings.plainMode = false;
+          // T96.2 — Plain mode retired; force false on every load so any
+          // user who had it toggled on in cloud-sync state lands in themed UI.
+          state.settings.plainMode = false;
           // T79.6 — Large mode backfill so existing users get the default-off setting.
           if (typeof state.settings.largeMode !== 'boolean') state.settings.largeMode = false;
           // T95 — Meal Prep intro flag backfill. Existing users will see the
@@ -8507,11 +8487,24 @@ create trigger trg_user_state_updated_at
           // because the feature surface area grew with T93 and the primer
           // is useful even to long-time users.
           if (typeof state.settings.mealPrepIntroSeen !== 'boolean') state.settings.mealPrepIntroSeen = false;
-          // T18.1 — Recovery / light-injury mode backfill
+          // T18.1 — Recovery / light-injury mode backfill (legacy shape kept
+          // so cross-device sync and old saves still parse cleanly).
           if (!state.settings.injuries || typeof state.settings.injuries !== 'object') {
             state.settings.injuries = { active: false, areas: [] };
           }
           if (!Array.isArray(state.settings.injuries.areas)) state.settings.injuries.areas = [];
+          // T98.3 — New simplified recovery shape: single toggle + free text.
+          // Migration: if a legacy injuries.active flag is set, carry it
+          // forward so the user doesn't lose their recovery state on upgrade.
+          if (!state.settings.recovery || typeof state.settings.recovery !== 'object') {
+            const legacyActive = !!(state.settings.injuries && state.settings.injuries.active);
+            const legacyNotes = (state.settings.injuries && Array.isArray(state.settings.injuries.areas) && state.settings.injuries.areas.length > 0)
+              ? `Working around: ${state.settings.injuries.areas.join(', ')}.`
+              : '';
+            state.settings.recovery = { active: legacyActive, notes: legacyNotes };
+          }
+          if (typeof state.settings.recovery.active !== 'boolean') state.settings.recovery.active = false;
+          if (typeof state.settings.recovery.notes !== 'string') state.settings.recovery.notes = '';
           // Avatar backfill — defaults match DEFAULT_STATE.avatar so existing users get a generic
           // character with `customized: false`, which triggers the first-load prompt to personalize.
           if (!state.avatar || typeof state.avatar !== 'object') {
@@ -9131,9 +9124,10 @@ create trigger trg_user_state_updated_at
         } catch (e) { /* keep default */ }
       }
       // Starter progression bonuses (mirrors completeOnboarding)
+      // T97.1 — Starter coin bonus removed; coins retired.
       state.xp = 0; state.rank = 'E'; state.streak = 0;
       state.level = 1;
-      state.coins = 100;
+      state.coins = 0;
       // Attribute fields zeroed but no pending points granted — UI was retired with avatar
       state.attributes = { STR: 10, AGI: 10, VIT: 10, INT: 10, PER: 10 };
       state.attributePointsPending = 0;
@@ -9457,7 +9451,8 @@ create trigger trg_user_state_updated_at
       state.macros = { calories: obCals, protein: obProt, carbs: obCarbs, fat: obFat };
       state.xp = 0; state.rank = 'E'; state.streak = 0;
       state.level = 1;
-      state.coins = 100; // Starter coin bonus
+      // T97.1 — Coins retired.
+      state.coins = 0;
       // Attributes zeroed but no pending points — UI was retired with avatar
       state.attributes = { STR: 10, AGI: 10, VIT: 10, INT: 10, PER: 10 };
       state.attributePointsPending = 0;
@@ -9998,16 +9993,11 @@ create trigger trg_user_state_updated_at
         } catch (err) { console.warn('fabAction', kind, err); }
       }, 60);
     }
-    // T48.1 — Keep every topbar coin pill (Quests / Progress / Workouts / Fuel / Profile)
-    // in sync with state.coins. Called from save() and screen-switch.
-    function updateCoinPills() {
-      const c = (state.coins || 0).toLocaleString();
-      ['quests-coin-count', 'progress-coin-count', 'workouts-coin-count',
-       'fuel-coin-count', 'profile-coin-count'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = c;
-      });
-    }
+    // T97.1 — Coins retired. updateCoinPills is now a no-op; the coin-pill
+    // elements were all already removed from the topbars (most in T62.2, the
+    // last one in T97.1). Kept as a function so existing call sites in
+    // save() and the screen-switch path don't error.
+    function updateCoinPills() { /* no-op since T97.1 */ }
     // T53.5 — Watch each .scroll pane and dim the ARIA FAB when the user is
     // within 120px of the bottom (where +Log Meal / Water Reset / etc. live).
     // Restores full opacity once they scroll back up. Idempotent — safe to
@@ -10714,7 +10704,7 @@ create trigger trg_user_state_updated_at
         id: 'fab',
         selectorFn: () => document.getElementById('fab-menu') || document.getElementById('fab-coach'),
         title: 'Quick Actions',
-        body: 'This floating menu has eight quick actions: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help. It\'s how you record almost everything in the app — one tap away on every screen.',
+        body: 'This floating menu has quick actions: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Search, and Help. It\'s how you record almost everything in the app — one tap away on every screen.',
         placement: 'auto',
         waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
@@ -10750,9 +10740,12 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-aiquest',
-        selectorFn: () => document.getElementById('ai-quest-card'),
-        title: 'ARIA Challenge',
-        body: 'Each day ARIA generates one challenge tuned to your training split and goals. Tap Accept to add it to your quest list for bonus XP.',
+        // T98.1 — ARIA's challenge is now inline in the unified quest list
+        // (look for the ARIA chip on a quest). Point the spotlight at the
+        // quest list container so the user sees the merged surface.
+        selectorFn: () => document.getElementById('quest-list-container'),
+        title: 'ARIA\'s Pick',
+        body: 'Each day ARIA generates one extra challenge tuned to your training split and drops it right into your quest list with an ARIA chip. No separate accept step — just complete it like any other quest.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('quests'); } catch(e){} },
       },
@@ -10760,7 +10753,7 @@ create trigger trg_user_state_updated_at
         id: 'ct-fab',
         selectorFn: () => document.getElementById('fab-menu') || document.getElementById('fab-coach'),
         title: 'The Quick Actions Menu',
-        body: 'Eight one-tap actions live here: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Shop, Search, and Help & Support. It\'s on every screen and replaces the topbar icons you might see in other apps.',
+        body: 'One-tap actions live here: Daily Check-in, Log Workout, Log Meal, +8 oz Water, Ask ARIA, Search, and Help & Support. It\'s on every screen and replaces the topbar icons you might see in other apps.',
         placement: 'auto',
         waitMs: 320,
         beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
@@ -10882,7 +10875,7 @@ create trigger trg_user_state_updated_at
           ? document.getElementById('nut-prep')
           : document.getElementById('nut-tab-prep'),
         title: 'Meal Prep & Fasting',
-        body: 'Save reusable meals, plan the week, and manage your avoid list — tap the star on any meal prep card to save it as a recipe. This is also where Fasting lives: water-only, liquid, Daniel, intermittent, or custom. Active fasts pause macros and quests automatically.',
+        body: 'Save reusable meals, plan the week, and manage your avoid list — tap the star on any meal prep card to save it as a recipe. This is also where Fasting lives: intermittent (defined eating window) or water-only. Active fasts pause macros and quests automatically.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('nutrition'); switchNutTab('prep'); } catch(e){} },
       },
@@ -10896,12 +10889,16 @@ create trigger trg_user_state_updated_at
       },
       {
         id: 'ct-shop',
-        selectorFn: () => document.getElementById('fab-pill-shop'),
-        title: 'The Shop',
-        body: 'Open it any time from the FAB menu\'s Shop pill. Spend the coins you earn from quests on card frames that customize your hunter card, plus consumable buffs like 2× XP and Streak Shields. Titles are earned by hitting milestones.',
+        // T97.1/T97.2 — FAB shop pill removed. Point at the Gear screen
+        // (sidebar nav) and describe the new XP-unlock model: frames unlock
+        // automatically as you hit each rank tier; titles are earned by
+        // hitting milestones (streaks, lifts, etc.).
+        selectorFn: () => document.querySelector('[data-nav="shop"]') || document.getElementById('screen-shop'),
+        title: 'Hunter Gear',
+        body: 'Frames and Titles live here. Card frames unlock automatically as you hit each rank — D, C, B, A, S — and you can equip any unlocked frame at any time. Titles are earned by hitting milestones like streaks, lifts, or full-clear days. No coins, no shop: the work is the price.',
         placement: 'auto',
         waitMs: 320,
-        beforeShow: () => { try { switchTab('quests'); openFabMenu(); } catch(e){} },
+        beforeShow: () => { try { switchTab('shop'); } catch(e){} },
       },
       {
         id: 'ct-done',
@@ -12556,22 +12553,11 @@ create trigger trg_user_state_updated_at
           : 'ARISE — Fitness System';
       }
     }
-    // Toggle handler — flips state.settings.plainMode, applies labels, re-renders.
-    // Re-rendering Profile + Stats picks up the dynamic label uses (e.g., the rank badge).
-    function togglePlainMode() {
-      state.settings = state.settings || {};
-      const next = !state.settings.plainMode;
-      state.settings.plainMode = next;
-      applyPlainModeLabels();
-      // Sync toggle visual
-      const toggleEl = document.getElementById('plain-mode-toggle');
-      if (toggleEl) toggleEl.classList.toggle('on', next);
-      save();
-      showNotif(next ? 'Plain Mode ON — neutral labels active' : 'Themed Mode ON — Solo Leveling labels restored', 'var(--accent2)');
-      // Re-render dynamic surfaces
-      try { renderProfile(); } catch (e) { }
-      try { renderStats(); } catch (e) { }
-    }
+    // T96.2 — Plain mode retired. togglePlainMode is now a no-op so any
+    // surviving caller (cloud-imported saves, old tour steps) doesn't error.
+    // applyPlainModeLabels still runs on init but with plainMode forced false
+    // every label resolves to its themed form.
+    function togglePlainMode() { /* no-op since T96.2 */ }
 
     // ===== T79.6 — LARGE MODE (ACCESSIBILITY) =====
     // Opt-in toggle that flips data-text-size="large" on documentElement.
@@ -12922,21 +12908,22 @@ create trigger trg_user_state_updated_at
     function renderRecoveryBanner() {
       const slot = document.getElementById('recovery-banner-slot');
       if (!slot) return;
-      const regions = getActiveRecoveryRegions();
-      if (regions.length === 0) { slot.innerHTML = ''; return; }
-      const summary = regions.map(r => {
-        const def = RECOVERY_REGIONS[r.region];
-        if (!def) return '';
-        return `<span style="color:var(--gold);font-weight:600;">${def.label}</span> <span style="color:var(--text3);font-size:11px;">(${r.severity})</span>`;
-      }).filter(Boolean).join(' · ');
-      // T76.12 — Recovery banner uses bandage line icon, not 🩹 emoji.
+      // T98.3 — Prefer the new single-toggle + notes shape. Legacy regions
+      // (if a user happened to have them set before the simplification) are
+      // ignored in favor of the new field, which is authoritative now.
+      const rec = (state.settings && state.settings.recovery) || null;
+      if (!rec || !rec.active) { slot.innerHTML = ''; return; }
+      const notes = (rec.notes || '').trim();
+      const summary = notes
+        ? `<span style="color:var(--text2);">${escapeHtml(notes)}</span>`
+        : `<span style="color:var(--text3);">Tap to add details about what's hurt.</span>`;
       slot.innerHTML = `
         <div onclick="openInjuryModal()" style="background:rgba(244,182,63,0.10);border:1px solid var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:10px;">
           <span style="flex-shrink:0;color:var(--gold);display:inline-flex;align-items:center;justify-content:center;">${iconSvg('bandage', 18)}</span>
           <div style="flex:1;min-width:0;">
             <div style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:1px;font-size:10px;color:var(--gold);margin-bottom:2px;">RECOVERY ACTIVE</div>
             <div style="font-size:12px;line-height:1.4;">${summary}</div>
-            <div style="font-size:10px;color:var(--text3);margin-top:3px;">Lifts will be adjusted automatically. Tap to manage.</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:3px;">Tap to manage.</div>
           </div>
         </div>
       `;
@@ -12990,83 +12977,63 @@ create trigger trg_user_state_updated_at
       }).join('');
     }
 
+    // T98.3 — Recovery modal opens to the simplified single-toggle + free-text
+    // surface. Pre-fills both fields from state.settings.recovery (new shape).
     function openInjuryModal() {
-      renderInjuryChips();
-      try { renderRecoveryRegionList(); } catch (e) { console.warn('renderRecoveryRegionList', e); }
+      state.settings = state.settings || {};
+      state.settings.recovery = state.settings.recovery || { active: false, notes: '' };
+      const toggle = document.getElementById('recovery-active-toggle');
+      const notes = document.getElementById('recovery-notes');
+      if (toggle) toggle.checked = !!state.settings.recovery.active;
+      if (notes) notes.value = state.settings.recovery.notes || '';
       openModal('modal-injuries');
     }
 
-    function renderInjuryChips() {
-      const slot = document.getElementById('injury-chips');
-      const note = document.getElementById('injury-impact-note');
-      if (!slot) return;
+    // T98.3 — Flip the Recovery Mode toggle. Triggers a re-render of the
+    // quests banner so the change is immediately visible.
+    function setRecoveryActive(on) {
       state.settings = state.settings || {};
-      state.settings.injuries = state.settings.injuries || { active: false, areas: [] };
-      const active = state.settings.injuries.areas;
-      const groups = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core'];
-      slot.innerHTML = groups.map(g => {
-        const on = active.includes(g);
-        // T76.8 — Injury chip uses inline check icon, not ✓ glyph.
-        return `<button onclick="toggleInjuryArea('${g}')" style="background:${on ? 'rgba(244,182,63,0.18)' : 'var(--bg2)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};color:${on ? 'var(--gold)' : 'var(--text2)'};padding:6px 12px;border-radius:14px;font-size:12px;font-weight:${on ? '600' : '400'};cursor:pointer;display:inline-flex;align-items:center;gap:4px;">${on ? iconSvg('check', 12) : ''}${g}</button>`;
-      }).join('');
-      // Impact summary — show which workout types will get substituted
-      if (note) {
-        const blockedTypes = new Set();
-        active.forEach(a => (INJURY_BLOCKS_WORKOUT[a] || []).forEach(t => blockedTypes.add(t)));
-        if (active.length === 0) {
-          note.innerHTML = '<em>No active injuries — Recovery Mode is OFF.</em>';
-        } else if (blockedTypes.size === 0) {
-          note.innerHTML = `Active: <strong>${active.join(', ')}</strong>. These don't block any compound workout types — your split runs as-is, but consider skipping isolation work for the affected areas.`;
-        } else {
-          note.innerHTML = `Active: <strong>${active.join(', ')}</strong>. Quests will substitute <strong style="color:var(--gold);">${[...blockedTypes].join(', ')}</strong> with Mobility days until you clear these.`;
-        }
-      }
-    }
-
-    function toggleInjuryArea(area) {
-      state.settings = state.settings || {};
-      state.settings.injuries = state.settings.injuries || { active: false, areas: [] };
-      const arr = state.settings.injuries.areas;
-      const idx = arr.indexOf(area);
-      if (idx >= 0) arr.splice(idx, 1);
-      else arr.push(area);
-      state.settings.injuries.active = arr.length > 0;
-      // T41.7 — Stamp the edit so cross-device merge can tell which device
-      // changed injuries last (the global lastSync can't — see mergeStates).
-      state.settings.injuries.updatedAt = new Date().toISOString();
-      // Force quest regen so today's quests reflect the new state
-      state.questsDate = null;
-      state.questsWorkoutType = null;
-      state.quests = [];
+      state.settings.recovery = state.settings.recovery || { active: false, notes: '' };
+      state.settings.recovery.active = !!on;
+      state.settings.recovery.updatedAt = new Date().toISOString();
       save();
-      renderInjuryChips();
-      try { renderQuests(); } catch (e) { }
-      try { renderProfile(); } catch (e) { }
+      try { renderQuests(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
     }
 
+    // T98.3 — Persist the free-text "what's hurt" notes. Stamped with
+    // updatedAt so cross-device merge can pick the freshest edit.
+    function setRecoveryNotes(text) {
+      state.settings = state.settings || {};
+      state.settings.recovery = state.settings.recovery || { active: false, notes: '' };
+      state.settings.recovery.notes = String(text || '');
+      state.settings.recovery.updatedAt = new Date().toISOString();
+      save();
+      try { renderQuests(); } catch (e) {}
+    }
+
+    // T98.3 — Legacy clearInjuries kept as a no-op-ish convenience: turns
+    // Recovery Mode off and clears the notes. Old call sites stay safe.
     function clearInjuries() {
       state.settings = state.settings || {};
-      // T41.7 — updatedAt stamp lets cross-device merge respect this clear.
-      state.settings.injuries = { active: false, areas: [], updatedAt: new Date().toISOString() };
-      state.questsDate = null;
-      state.questsWorkoutType = null;
-      state.quests = [];
+      state.settings.recovery = { active: false, notes: '', updatedAt: new Date().toISOString() };
       save();
-      renderInjuryChips();
-      try { renderQuests(); } catch (e) { }
-      try { renderProfile(); } catch (e) { }
-      showNotif('Recovery Mode cleared — back to normal training', 'var(--green)');
+      try { renderQuests(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
+      showNotif('Recovery Mode cleared', 'var(--green)');
     }
 
-    // Returns the substitute workout type for a given day, accounting for active
-    // injuries. Returns the original type when no injury blocks it.
-    function injurySafeWorkoutType(workoutType) {
-      const inj = state.settings && state.settings.injuries;
-      if (!inj || !inj.active || !Array.isArray(inj.areas) || inj.areas.length === 0) return workoutType;
-      const blocked = new Set();
-      inj.areas.forEach(a => (INJURY_BLOCKS_WORKOUT[a] || []).forEach(t => blocked.add(t)));
-      return blocked.has(workoutType) ? 'Mobility' : workoutType;
-    }
+    // T98.3 — Automated workout substitution retired. The user describes
+    // their situation in free text and adjusts their own training; we no
+    // longer remap their split silently. Stub is a pass-through identity so
+    // every caller continues to work unchanged.
+    function injurySafeWorkoutType(workoutType) { return workoutType; }
+
+    // T98.3 — Legacy stubs for the older muscle-group + region surfaces that
+    // were removed from the modal. Kept so any stale caller (saved DOM after
+    // upgrade, or other parts of the app referencing them) doesn't throw.
+    function renderInjuryChips() { /* no-op since T98.3 */ }
+    function toggleInjuryArea(_area) { /* no-op since T98.3 */ }
     // T91 — Reset transient per-tab state so each bottom-nav tap opens its
     // page fresh: first subtab, cleared search inputs, no leftover filters.
     // Without this, leaving Progress on the Goals subtab would mean the next
@@ -13504,85 +13471,85 @@ create trigger trg_user_state_updated_at
 
     // T29.1 — Programs subtab: list of templates, active program status,
     // start/end controls.
+    // T98.2 — Programs page rewritten for the simple-split model. There's
+    // no "Week N of M" progress, no deload calendar, no prescribed session
+    // view — picking a program just sets the 7-day workoutSplit and the user
+    // executes from the daily Quests + Tracker surfaces like normal.
     function renderProgramsPage() {
       const activeSlot = document.getElementById('programs-active-slot');
       const list = document.getElementById('programs-list');
       if (!activeSlot || !list) return;
-      // Active program card
       const tpl = getActiveProgramTemplate();
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       if (tpl) {
-        const wk = getActiveProgramWeek();
-        const pct = Math.min(100, Math.round((wk / tpl.weeks) * 100));
-        const isDeload = isDeloadWeek();
-        const todaysSession = getTodaysProgramSession();
-        const isComplete = wk > tpl.weeks;
+        const dayChips = days.map(d => {
+          const what = tpl.schedule[d] || 'Rest';
+          const isRest = what === 'Rest';
+          return `<span style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border:1px solid ${isRest ? 'var(--border)' : 'rgba(127,119,221,0.4)'};border-radius:4px;background:${isRest ? 'transparent' : 'rgba(127,119,221,0.08)'};min-width:48px;">
+            <span style="font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.5px;">${d.slice(0,3).toUpperCase()}</span>
+            <span style="font-size:10px;color:${isRest ? 'var(--text3)' : 'var(--text2)'};text-align:center;line-height:1.2;">${isRest ? 'Rest' : what.replace(' / ', '/').replace('Flexibility/Cardio', 'Cardio')}</span>
+          </span>`;
+        }).join('');
         activeSlot.innerHTML = `
           <div class="card" style="padding:14px;border:1px solid var(--accent);background:linear-gradient(135deg,rgba(127,119,221,0.08),rgba(79,142,255,0.04));margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
               <div style="flex:1;min-width:0;">
                 <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:9px;letter-spacing:1.5px;color:var(--accent);">ACTIVE PROGRAM</div>
                 <div style="font-size:16px;font-weight:600;color:var(--text);">${escapeHtml(tpl.name)}</div>
-                <div style="font-size:11px;color:var(--text3);margin-top:2px;">
-                  ${isComplete ? `<strong style="color:var(--green2);">Program complete!</strong> Started ${state.activeProgram.startDate}.`
-                    : `Week <strong>${wk} of ${tpl.weeks}</strong>${isDeload ? ' <span style="color:var(--gold);">· DELOAD</span>' : ''} · started ${state.activeProgram.startDate}`}
-                </div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px;">${tpl.daysPerWeek}×/week · started ${state.activeProgram.startDate}</div>
               </div>
               <button onclick="endProgram()" class="btn btn-sm" style="font-size:11px;color:var(--red2);border-color:var(--red2);">End program</button>
             </div>
-            <div class="bar-wrap" style="margin-top:8px;height:5px;"><div class="bar-fill" style="width:${pct}%;background:var(--accent);"></div></div>
-            ${!isComplete && todaysSession ? `
-              <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
-                <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:6px;">TODAY'S SESSION · ${escapeHtml(todaysSession.name)}</div>
-                <div style="display:flex;flex-direction:column;gap:4px;">
-                  ${todaysSession.exercises.map(ex => {
-                    const sug = suggestProgramWeight(ex.name, ex);
-                    const sugStr = sug ? ` <span style="color:var(--accent2);">@ ~${sug} lb</span>` : '';
-                    return `<div style="font-size:12px;color:var(--text2);">• <strong>${escapeHtml(ex.name)}</strong> — ${ex.sets} × ${ex.reps}${ex.rpe ? ` @ RPE ${ex.rpe}` : ''}${sugStr}</div>`;
-                  }).join('')}
-                </div>
-                <button onclick="loadTodaysProgramIntoTracker()" class="btn btn-sm btn-primary" style="margin-top:10px;font-size:11px;">Load into tracker</button>
-              </div>
-            ` : !isComplete ? `<div style="margin-top:10px;font-size:11px;color:var(--text3);">No prescribed session today — rest day per the program.</div>` : ''}
+            <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap;justify-content:space-between;">${dayChips}</div>
           </div>
         `;
       } else {
-        activeSlot.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:14px;">No active program. Pick one below to start.</div>`;
+        activeSlot.innerHTML = `<div style="font-size:11px;color:var(--text3);margin-bottom:14px;">No active program. Pick one below — it sets your weekly training split.</div>`;
       }
-      // Templates list
+      // Templates list — 6 simple cards, each showing its 7-day split pattern.
       list.innerHTML = PROGRAM_TEMPLATES.map(p => {
         const isActive = state.activeProgram && state.activeProgram.templateId === p.id;
-        const sessionCount = Object.keys(p.sessions).length;
+        const splitChips = days.map(d => {
+          const what = p.schedule[d] || 'Rest';
+          const isRest = what === 'Rest';
+          return `<span style="display:inline-flex;flex-direction:column;align-items:center;gap:1px;padding:3px 2px;border:1px solid ${isRest ? 'var(--border)' : 'rgba(127,119,221,0.3)'};border-radius:3px;background:${isRest ? 'transparent' : 'rgba(127,119,221,0.05)'};flex:1;min-width:0;">
+            <span style="font-size:8px;color:var(--text3);font-weight:600;">${d[0]}</span>
+            <span style="font-size:8px;color:${isRest ? 'var(--text3)' : 'var(--text2)'};">${isRest ? '—' : '●'}</span>
+          </span>`;
+        }).join('');
         return `<div class="card" style="padding:12px 14px;${isActive ? 'border-color:var(--accent);' : ''}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
             <div style="flex:1;min-width:0;">
               <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.5px;">${escapeHtml(p.name)}</div>
-              <div style="font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px;">${p.weeks} weeks · ${p.daysPerWeek}×/week · ${p.level}${p.deloadWeeks.length ? ` · ${p.deloadWeeks.length} deload week${p.deloadWeeks.length > 1 ? 's' : ''}` : ''}</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px;">${p.daysPerWeek}×/week</div>
             </div>
             ${isActive
               ? `<span style="font-size:10px;color:var(--green2);font-weight:600;letter-spacing:0.5px;">ACTIVE</span>`
               : `<button onclick="startProgram(${JSON.stringify(p.id)})" class="btn btn-sm btn-primary" style="font-size:11px;">Start</button>`}
           </div>
           <div style="font-size:12px;color:var(--text2);margin-top:8px;line-height:1.5;">${escapeHtml(p.description)}</div>
-          ${p.cite ? `<div style="font-size:10px;color:var(--text3);margin-top:6px;font-style:italic;">Reference: ${escapeHtml(p.cite)}</div>` : ''}
-          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
-            ${Object.values(p.sessions).map(s => `<span class="avatar-chip" style="font-size:10px;">${escapeHtml(s.name.split('(')[0].trim())}</span>`).join('')}
-          </div>
+          <div style="margin-top:8px;display:flex;gap:3px;">${splitChips}</div>
         </div>`;
       }).join('');
     }
     function startProgram(templateId) {
       const tpl = PROGRAM_TEMPLATES.find(p => p.id === templateId);
       if (!tpl) return;
-      // If a program is already active, ask before replacing
+      // T98.2 — If a program is already active, ask before replacing. No
+      // archive-to-history step — programs are lightweight now.
       if (state.activeProgram && state.activeProgram.templateId !== templateId) {
-        if (!confirm(`Switch from current program to "${tpl.name}"? Your current program will be moved to history.`)) return;
-        endProgram(true); // silent — we're replacing
+        if (!confirm(`Switch your weekly split to "${tpl.name}"? Your current quest and tracker history are kept.`)) return;
       }
       state.activeProgram = { templateId, startDate: todayStr() };
+      // T98.2 — Picking a program just sets the weekly split. The daily
+      // Quests system reads from state.workoutSplit, so the user immediately
+      // sees the new pattern in tomorrow's quest list.
+      state.workoutSplit = { ...tpl.schedule };
       save();
-      showNotif(`Started ${tpl.name} — Week 1 begins today.`, 'var(--green2)');
-      try { renderProgramsPage(); } catch (e) { }
-      try { renderTrackerSheet(); } catch (e) { }
+      showNotif(`Started ${tpl.name} — your weekly split is now set.`, 'var(--green2)');
+      try { renderProgramsPage(); } catch (e) {}
+      try { renderTrackerSheet(); } catch (e) {}
+      try { renderQuests(); } catch (e) {}
     }
     function endProgram(silent) {
       if (!state.activeProgram) return;
@@ -13606,36 +13573,12 @@ create trigger trg_user_state_updated_at
     // T29.1 — Pre-fill the tracker for today with the prescribed exercises.
     // Sets the muscle group + each exercise row's name so the user just fills in
     // weight/reps/RPE. Doesn't overwrite if rows are already populated.
-    function loadTodaysProgramIntoTracker() {
-      const session = getTodaysProgramSession();
-      if (!session) { showNotif('No prescribed session today.', 'var(--gold)'); return; }
-      const date = getActiveTrackerDate();
-      if (!state.trackerSheets[date]) state.trackerSheets[date] = buildEmptyTrackerSheet(date);
-      const sheet = state.trackerSheets[date];
-      // T34.1 — Apply recovery-region adjustments to each prescribed exercise.
-      // Swaps avoid-listed lifts to substitutes, deloads weights via reduce table,
-      // and surfaces a per-row note explaining each modification.
-      const recoveryNotes = [];
-      sheet.rows = session.exercises.map(ex => {
-        const adjusted = applyRecoveryToExercise(ex.name, ex.loadHint || 0);
-        if (adjusted.note) recoveryNotes.push(adjusted.note);
-        return {
-          exercise: adjusted.name,
-          sets: Array.from({ length: ex.sets }, () => ({ weight: adjusted.weight || 0, reps: 0, rpe: null })),
-          prescribedReps: ex.reps,
-          prescribedRpe: ex.rpe,
-          recoveryNote: adjusted.note || null,
-        };
-      });
-      save();
-      try { renderTrackerSheet(); } catch (e) { }
-      switchWorkoutTab('log');
-      if (recoveryNotes.length > 0) {
-        showNotif(`Loaded "${session.name}" — ${recoveryNotes.length} exercise${recoveryNotes.length > 1 ? 's' : ''} adjusted for recovery.`, 'var(--gold)');
-      } else {
-        showNotif(`Loaded "${session.name}" — ${session.exercises.length} exercises queued.`, 'var(--green2)');
-      }
-    }
+    // T98.2 — loadTodaysProgramIntoTracker retired. Programs no longer
+    // prescribe specific exercises — they just set the weekly split, and the
+    // user fills the tracker from their own plan (or from QUEST_TEMPLATES via
+    // the quest list). Stub kept so any stale "Load into tracker" onclick in
+    // upgraded DOM doesn't throw.
+    function loadTodaysProgramIntoTracker() { /* no-op since T98.2 */ }
 
     // T26.1 — Collapse/expand the History or Library pane on desktop. State
     // persists in localStorage so a user's "I always work with library hidden"
@@ -13843,108 +13786,55 @@ create trigger trg_user_state_updated_at
     //   - progressionType: 'linear' (+X lb/wk) or 'percent' (% of 1RM by week)
     // Tracker uses this to pre-fill exercises and suggest a working weight based
     // on the current week and the last logged weight for that lift.
+    // T98.2 — Programs simplified to 6 ready-to-run weekly templates. Each
+    // template sets state.workoutSplit (the 7-day pattern) when picked;
+    // there's no multi-week tracking, no deload calendar, no per-week load
+    // progression. Daily quests + the tracker handle progression organically.
+    // Old multi-week fields (weeks, deloadWeeks, sessions, cite, level) were
+    // removed because they were never visible to the user and added complexity
+    // we couldn't justify for v1.
     const PROGRAM_TEMPLATES = [
       {
-        id: 'beginner_linear_4w',
-        name: 'Beginner Linear Progression',
-        level: 'beginner',
-        weeks: 4,
-        daysPerWeek: 3,
-        deloadWeeks: [],
-        description: '3 days per week, full-body each session. Add 5 lb to compound lifts every week. The classic novice-gain program — works because beginners can recover between sessions while pushing every workout.',
-        cite: 'Rippetoe Starting Strength · Stronglifts 5×5',
-        schedule: { Monday: 'A', Tuesday: 'Rest', Wednesday: 'B', Thursday: 'Rest', Friday: 'A', Saturday: 'Rest', Sunday: 'Rest' },
-        sessions: {
-          'A': { name: 'Workout A', exercises: [
-            { name: 'Squat', sets: 3, reps: 5, loadDelta: 5, kind: 'compound' },
-            { name: 'Bench Press', sets: 3, reps: 5, loadDelta: 5, kind: 'compound' },
-            { name: 'Barbell Row', sets: 3, reps: 5, loadDelta: 5, kind: 'compound' },
-          ]},
-          'B': { name: 'Workout B', exercises: [
-            { name: 'Squat', sets: 3, reps: 5, loadDelta: 5, kind: 'compound' },
-            { name: 'Overhead Press', sets: 3, reps: 5, loadDelta: 2.5, kind: 'compound' },
-            { name: 'Deadlift', sets: 1, reps: 5, loadDelta: 10, kind: 'compound' },
-          ]},
-        },
-      },
-      {
-        id: 'ppl_hypertrophy_8w',
-        name: 'PPL Hypertrophy',
-        level: 'intermediate',
-        weeks: 8,
+        id: 'ppl_classic_6d',
+        name: 'PPL Classic',
         daysPerWeek: 6,
-        deloadWeeks: [4, 8],
-        description: '6 days per week — Push / Pull / Legs split, twice through. Built for muscle growth: 10–14 working sets per muscle per week, RPE 7–9, deload at week 4 and week 8.',
-        cite: 'Schoenfeld 2017 volume meta-analysis · RP volume landmarks',
-        schedule: { Monday: 'Push', Tuesday: 'Pull', Wednesday: 'Legs', Thursday: 'Push', Friday: 'Pull', Saturday: 'Legs', Sunday: 'Rest' },
-        sessions: {
-          'Push': { name: 'Push (chest/shoulders/tris)', exercises: [
-            { name: 'Bench Press', sets: 4, reps: '6-8', rpe: 8, kind: 'compound' },
-            { name: 'Incline Dumbbell Press', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Overhead Press', sets: 3, reps: '6-8', rpe: 8, kind: 'compound' },
-            { name: 'Lateral Raise', sets: 4, reps: '12-15', rpe: 8, kind: 'isolation' },
-            { name: 'Cable Rope Pushdown', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-            { name: 'Overhead Tricep Extension', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-          ]},
-          'Pull': { name: 'Pull (back/biceps/rear delts)', exercises: [
-            { name: 'Pull-Up', sets: 4, reps: '5-10', rpe: 8, kind: 'compound' },
-            { name: 'Barbell Row', sets: 4, reps: '6-8', rpe: 8, kind: 'compound' },
-            { name: 'Cable Row', sets: 3, reps: '10-12', rpe: 8, kind: 'compound' },
-            { name: 'Face Pull', sets: 4, reps: '12-15', rpe: 8, kind: 'isolation' },
-            { name: 'Bicep Curl', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-            { name: 'Hammer Curl', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-          ]},
-          'Legs': { name: 'Legs (quads/hams/glutes/calves)', exercises: [
-            { name: 'Squat', sets: 4, reps: '6-8', rpe: 8, kind: 'compound' },
-            { name: 'Romanian Deadlift', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Leg Press', sets: 3, reps: '10-12', rpe: 8, kind: 'compound' },
-            { name: 'Leg Curl', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-            { name: 'Calf Raise', sets: 4, reps: '10-15', rpe: 8, kind: 'isolation' },
-          ]},
-        },
+        description: 'Six days a week — Push / Pull / Legs cycled twice. High volume per muscle group; designed for muscle growth. Sunday is your only rest day, so be honest with yourself about recovery.',
+        schedule: { Monday: 'Upper Push', Tuesday: 'Upper Pull', Wednesday: 'Lower Body', Thursday: 'Upper Push', Friday: 'Upper Pull', Saturday: 'Lower Body', Sunday: 'Rest' },
       },
       {
-        id: 'upper_lower_strength_8w',
-        name: 'Upper/Lower Strength',
-        level: 'intermediate',
-        weeks: 8,
+        id: 'upper_lower_4d',
+        name: 'Upper / Lower 4-Day',
         daysPerWeek: 4,
-        deloadWeeks: [4, 8],
-        description: '4 days per week — Upper / Lower split. Lower-rep range (3–6) on top sets for strength, with accessories at 8–12. Linear weekly load increases on the big four.',
-        cite: 'Helms & Co. Muscle and Strength Pyramid',
-        schedule: { Monday: 'UpperA', Tuesday: 'LowerA', Wednesday: 'Rest', Thursday: 'UpperB', Friday: 'LowerB', Saturday: 'Rest', Sunday: 'Rest' },
-        sessions: {
-          'UpperA': { name: 'Upper A (bench focus)', exercises: [
-            { name: 'Bench Press', sets: 4, reps: '4-6', rpe: 8, loadDelta: 2.5, kind: 'compound' },
-            { name: 'Barbell Row', sets: 4, reps: '5-7', rpe: 8, loadDelta: 2.5, kind: 'compound' },
-            { name: 'Incline Dumbbell Press', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Lat Pulldown', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Tricep Pushdown', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-            { name: 'Bicep Curl', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-          ]},
-          'LowerA': { name: 'Lower A (squat focus)', exercises: [
-            { name: 'Squat', sets: 4, reps: '4-6', rpe: 8, loadDelta: 5, kind: 'compound' },
-            { name: 'Romanian Deadlift', sets: 3, reps: '6-8', rpe: 8, kind: 'compound' },
-            { name: 'Bulgarian Split Squat', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Leg Curl', sets: 3, reps: '10-12', rpe: 8, kind: 'isolation' },
-            { name: 'Calf Raise', sets: 4, reps: '10-15', rpe: 8, kind: 'isolation' },
-          ]},
-          'UpperB': { name: 'Upper B (overhead focus)', exercises: [
-            { name: 'Overhead Press', sets: 4, reps: '5-7', rpe: 8, loadDelta: 2.5, kind: 'compound' },
-            { name: 'Pull-Up', sets: 4, reps: '5-8', rpe: 8, kind: 'compound' },
-            { name: 'Dumbbell Bench Press', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Cable Row', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Lateral Raise', sets: 3, reps: '12-15', rpe: 8, kind: 'isolation' },
-            { name: 'Skullcrusher', sets: 3, reps: '8-10', rpe: 8, kind: 'isolation' },
-          ]},
-          'LowerB': { name: 'Lower B (deadlift focus)', exercises: [
-            { name: 'Conventional Deadlift', sets: 3, reps: '3-5', rpe: 8, loadDelta: 5, kind: 'compound' },
-            { name: 'Front Squat', sets: 3, reps: '5-7', rpe: 8, kind: 'compound' },
-            { name: 'Leg Press', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Hip Thrust', sets: 3, reps: '8-10', rpe: 8, kind: 'compound' },
-            { name: 'Calf Raise', sets: 4, reps: '10-15', rpe: 8, kind: 'isolation' },
-          ]},
-        },
+        description: 'Four lifting days a week — alternating Upper and Lower body sessions with built-in rest. The most studied split for natural lifters: enough volume to grow, enough rest to recover.',
+        schedule: { Monday: 'Upper Push', Tuesday: 'Lower Body', Wednesday: 'Rest', Thursday: 'Upper Pull', Friday: 'Lower Body', Saturday: 'Rest', Sunday: 'Rest' },
+      },
+      {
+        id: 'full_body_3d',
+        name: 'Full Body 3×',
+        daysPerWeek: 3,
+        description: 'Three full-body sessions a week with a rest day between each. The classic beginner template — hits every major lift multiple times a week with maximum recovery margin. Great for anyone short on time.',
+        schedule: { Monday: 'Full Body', Tuesday: 'Rest', Wednesday: 'Full Body', Thursday: 'Rest', Friday: 'Full Body', Saturday: 'Rest', Sunday: 'Rest' },
+      },
+      {
+        id: 'push_pull_4d',
+        name: 'Push / Pull 4-Day',
+        daysPerWeek: 4,
+        description: 'Four upper-body-focused days a week — two Push, two Pull, no dedicated leg day. Best for people who run/cycle/play sports for their lower-body work, or who just want to grow the mirror muscles.',
+        schedule: { Monday: 'Upper Push', Tuesday: 'Upper Pull', Wednesday: 'Rest', Thursday: 'Upper Push', Friday: 'Upper Pull', Saturday: 'Rest', Sunday: 'Rest' },
+      },
+      {
+        id: 'strength_anchor_3d',
+        name: 'Strength Anchor',
+        daysPerWeek: 3,
+        description: 'Three heavy days a week, each anchored to one of the big lifts (squat, bench, deadlift). Low-rep, high-load, with full rest days between. Pure strength focus — lift heavy, recover hard.',
+        schedule: { Monday: 'Lower Body', Tuesday: 'Rest', Wednesday: 'Upper Push', Thursday: 'Rest', Friday: 'Lower Body', Saturday: 'Rest', Sunday: 'Rest' },
+      },
+      {
+        id: 'hybrid_lift_cardio_5d',
+        name: 'Hybrid Lift + Cardio',
+        daysPerWeek: 5,
+        description: 'Three lifting days, two conditioning days, two rest days. Built for people chasing both strength and endurance — runners who lift, lifters who run. The conditioning days protect your aerobic base.',
+        schedule: { Monday: 'Upper Push', Tuesday: 'Flexibility / Cardio', Wednesday: 'Lower Body', Thursday: 'Flexibility / Cardio', Friday: 'Upper Pull', Saturday: 'Rest', Sunday: 'Rest' },
       },
     ];
 
@@ -13953,57 +13843,16 @@ create trigger trg_user_state_updated_at
       if (!state.activeProgram || !state.activeProgram.templateId) return null;
       return PROGRAM_TEMPLATES.find(p => p.id === state.activeProgram.templateId) || null;
     }
-    function getActiveProgramWeek() {
-      if (!state.activeProgram || !state.activeProgram.startDate) return null;
-      const start = new Date(state.activeProgram.startDate + 'T12:00:00');
-      const today = new Date(todayStr() + 'T12:00:00');
-      const days = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-      return Math.floor(days / 7) + 1; // 1-indexed week
-    }
-    function isProgramActive() {
-      const tpl = getActiveProgramTemplate();
-      if (!tpl) return false;
-      const wk = getActiveProgramWeek();
-      return wk >= 1 && wk <= tpl.weeks;
-    }
-    function isDeloadWeek() {
-      const tpl = getActiveProgramTemplate();
-      if (!tpl) return false;
-      const wk = getActiveProgramWeek();
-      return (tpl.deloadWeeks || []).includes(wk);
-    }
-    function getTodaysProgramSession() {
-      const tpl = getActiveProgramTemplate();
-      if (!tpl || !isProgramActive()) return null;
-      const dow = dayOfWeek();
-      const sessionKey = (tpl.schedule || {})[dow];
-      if (!sessionKey || sessionKey === 'Rest') return null;
-      const session = (tpl.sessions || {})[sessionKey];
-      if (!session) return null;
-      return { ...session, sessionKey };
-    }
-    // Suggest a working weight for an exercise on the current program week.
-    // Looks up the user's last logged weight for this lift, applies week-over-week
-    // load delta, and (if it's a deload week) drops to ~60% of that.
-    function suggestProgramWeight(exerciseName, exerciseConfig) {
-      const tpl = getActiveProgramTemplate();
-      if (!tpl) return null;
-      const wk = getActiveProgramWeek();
-      // Find the most recent set of this exercise in the workout log
-      const norm = (typeof normalizeExerciseName === 'function')
-        ? normalizeExerciseName(exerciseName) : (exerciseName || '').toLowerCase();
-      const past = (state.workoutLog || []).filter(e => {
-        const n = (typeof normalizeExerciseName === 'function')
-          ? normalizeExerciseName(e.exercise) : (e.exercise || '').toLowerCase();
-        return n === norm;
-      }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-      const lastWeight = past[0] && past[0].sets ? past[0].sets.reduce((m, s) => Math.max(m, s.weight || 0), 0) : 0;
-      if (!lastWeight) return null;
-      if (isDeloadWeek()) return Math.round(lastWeight * 0.6);
-      // Linear progression: add loadDelta per week since the last logged session
-      const delta = (exerciseConfig.loadDelta || 0);
-      return Math.round(lastWeight + delta);
-    }
+    // T98.2 — Multi-week program tracking retired. Programs are now just
+    // weekly split templates, so there's no "Week N", no deload calendar,
+    // no per-exercise load delta. These helpers are kept as stubs so any
+    // caller in the codebase (workout tracker, quests, etc.) silently
+    // degrades to "program is just the split" behavior.
+    function getActiveProgramWeek() { return state.activeProgram ? 1 : null; }
+    function isProgramActive() { return !!getActiveProgramTemplate(); }
+    function isDeloadWeek() { return false; }
+    function getTodaysProgramSession() { return null; }
+    function suggestProgramWeight(_exerciseName, _exerciseConfig) { return null; }
     // Per-day mutator — wired to the editable split table dropdowns. Updates one day,
     // saves, force-regens quests if today's slot changed, and re-renders.
     function setSplitDay(day, value) {
@@ -14759,12 +14608,16 @@ create trigger trg_user_state_updated_at
           });
         }
         // Daily challenge — keep the same one across regens within the same day to avoid surprise
-        let challenge = (state.quests || []).find(q => q.type === 'challenge' && q.date === today)
+        let challenge = (state.quests || []).find(q => q.type === 'challenge' && q.source !== 'aria' && q.date === today)
           || DAILY_CHALLENGES[Math.floor(Math.random() * DAILY_CHALLENGES.length)];
         quests.push({ ...challenge, id: Date.now() + 101, done: oldDone.includes(challenge.name), date: today });
         state.quests = quests;
         save();
       }
+      // T98.1 — Re-inject today's ARIA challenge (if generated) so the
+      // unified list always shows it. Idempotent; safe to call on every
+      // render. Done state is preserved across regens by name.
+      try { _syncAriaChallengeIntoQuests(); } catch (e) {}
       // T61 — Refresh the First Session checklist on every quest render so
       // it ticks items off as the user completes them.
       try { renderFirstSessionCard(); } catch (e) {}
@@ -14793,15 +14646,17 @@ create trigger trg_user_state_updated_at
       }
       // T18.1 — Recovery mode banner. Shows the active injury areas + which workout
       // types are being substituted. Tap to open the modal and adjust.
-      if (state.settings?.injuries?.active && Array.isArray(state.settings.injuries.areas) && state.settings.injuries.areas.length > 0) {
+      // T98.3 — Recovery banner reads from the new single-toggle + free-text
+      // model. No more automated workout substitution; the banner just shows
+      // the user's notes so it stays top-of-mind.
+      if (state.settings?.recovery?.active) {
         const banner = document.createElement('div');
         banner.style.cssText = 'background:linear-gradient(180deg, rgba(168,85,247,0.10), transparent);border:1px solid rgba(168,85,247,0.5);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;color:var(--text2);display:flex;align-items:center;justify-content:space-between;gap:8px;';
-        const areas = state.settings.injuries.areas.join(', ');
-        const wasSubstituted = rawWorkoutType !== workoutType;
-        const subtext = wasSubstituted
-          ? `today's <strong>${rawWorkoutType}</strong> swapped to <strong>${workoutType}</strong>.`
-          : `recovering: ${areas}.`;
-        banner.innerHTML = `<div><strong style="color:#c084fc;">RECOVERY MODE</strong> — ${subtext}</div><button class="btn btn-sm" onclick="openInjuryModal()" style="font-size:10px;flex-shrink:0;">Manage</button>`;
+        const notes = (state.settings.recovery.notes || '').trim();
+        const subtext = notes
+          ? `<span style="color:var(--text2);">${escapeHtml(notes)}</span>`
+          : `Working around an injury — tap Manage to add details.`;
+        banner.innerHTML = `<div style="flex:1;min-width:0;"><strong style="color:#c084fc;">RECOVERY MODE</strong> — ${subtext}</div><button class="btn btn-sm" onclick="openInjuryModal()" style="font-size:10px;flex-shrink:0;">Manage</button>`;
         container.appendChild(banner);
       }
       // Deload banner — either an active-deload reminder or a suggestion to start one.
@@ -14815,12 +14670,23 @@ create trigger trg_user_state_updated_at
       }
       state.quests.forEach(q => {
         const div = document.createElement('div');
-        div.className = 'quest-item' + (q.done ? ' done' : '');
+        div.className = 'quest-item' + (q.done ? ' done' : '') + (q.source === 'aria' ? ' from-aria' : '');
+        // T98.1 — ARIA-sourced quests get a small accent chip + the optional
+        // system message (italic, left-bar) so users can tell at a glance
+        // which one ARIA picked for them today. Visually distinct without
+        // needing a separate card surface.
+        const ariaChip = q.source === 'aria'
+          ? `<span style="display:inline-block;font-family:'Rajdhani',sans-serif;font-size:9px;letter-spacing:1.5px;color:var(--accent);background:rgba(127,119,221,0.15);border:1px solid rgba(127,119,221,0.4);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle;">ARIA</span>`
+          : '';
+        const ariaMsg = (q.source === 'aria' && q.ariaSystemMessage)
+          ? `<div style="font-size:11px;color:var(--accent2);font-style:italic;border-left:2px solid var(--accent);padding-left:8px;margin-top:6px;">"${q.ariaSystemMessage}"</div>`
+          : '';
         div.innerHTML = `
       <div class="quest-icon ic-${q.type}">${iconSvg(q.icon, 20)}</div>
       <div class="quest-body">
-        <div class="quest-name">${q.name}</div>
+        <div class="quest-name">${q.name}${ariaChip}</div>
         <div class="quest-sub" style="white-space:pre-line;">${q.desc}</div>
+        ${ariaMsg}
         <div class="quest-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${q.done ? 100 : 0}%;background:${q.done ? 'var(--green)' : 'var(--accent)'}"></div></div></div>
       </div>
       <div class="quest-right">
@@ -15105,16 +14971,14 @@ create trigger trg_user_state_updated_at
       if (!state.stats) state.stats = { totalQuestsCompleted: 0, anyFullDayCompleted: false, macroStreak: 0, lastMacroHitDate: null };
       state.stats.totalQuestsCompleted = (state.stats.totalQuestsCompleted || 0) + 1;
       // Apply 2x buff if active
-      const xpAward = consume2xBuffIfActive(q.xp);
+      // T97.1 / T97.2 — Coins + 2× buff retired. XP award is the unadjusted
+      // quest XP; rank flows from total XP only.
+      const xpAward = q.xp;
       state.xp += xpAward;
       state.rank = getRank(state.xp);
-      // Coins: 10-25 per quest based on XP
-      const coinAward = Math.max(10, Math.round(q.xp / 5));
-      state.coins = (state.coins || 0) + coinAward;
       // T43.1 — Record exactly what this quest awarded so an un-complete can
-      // reverse it precisely (XP may be doubled by a 2× buff).
+      // reverse it precisely.
       q.xpAwarded = xpAward;
-      q.coinAwarded = coinAward;
       showXP(xpAward, el);
       // T38.2 — Quest completion no longer auto-logs placeholder entries to
       // workoutLog. The Tracker is the source of truth for "what I actually
@@ -15124,7 +14988,7 @@ create trigger trg_user_state_updated_at
       // (2) made exercises appear as BW in Progression because the
       // placeholder won the same-date sort tie. The render-layer T37.1 fix
       // is still in place as a safety net for any legacy data.
-      showNotif(`Quest complete! +${xpAward} XP · +${coinAward} coins${xpAward > q.xp ? ' (2× bonus!)' : ''}`);
+      showNotif(`Quest complete! +${xpAward} XP`);
       // Level-up & rank-up bonuses
       checkLevelUp();
       // Check if all done. T43.1 — guarded by a per-day flag so the board-clear
@@ -15133,10 +14997,10 @@ create trigger trg_user_state_updated_at
       if (state.quests.every(q => q.done) && state.allCompleteBonusDate !== todayStr()) {
         state.allCompleteBonusDate = todayStr();
         state.streak++;
-        state.coins += 50; // bonus for clearing the board
+        // T97.1 — Coin bonus retired. The streak bump IS the reward now.
         // Stats: first-ever full-day clear (for First Light title)
         state.stats.anyFullDayCompleted = true;
-        setTimeout(() => showNotif('ALL QUESTS COMPLETE! +50 coins · Streak: ' + state.streak, 'var(--gold)'), 500);
+        setTimeout(() => showNotif('ALL QUESTS COMPLETE! Streak: ' + state.streak, 'var(--gold)'), 500);
       }
       // Evaluate earn-based titles (Relentless, First Light, Iron Will, etc.)
       if (typeof evaluateTitles === 'function') evaluateTitles();
@@ -15156,32 +15020,23 @@ create trigger trg_user_state_updated_at
     // titles are deliberately treated as high-water marks — not rolled back.
     function uncompleteQuest(q) {
       if (!q || !q.done) return;
-      if (!confirm('Mark this quest as not done?\n\nThe XP and coins it awarded will be removed.')) return;
-      // Reverse the board-clear bonus if it was granted today and is still in
-      // effect (all quests currently done — checked before we un-mark this one).
+      // T97.1 — Coins + 2× buff retired. Simpler unmark: just reverse the XP
+      // and the streak bump if today's board-clear is still in effect.
+      if (!confirm('Mark this quest as not done?\n\nThe XP it awarded will be removed.')) return;
       if (state.quests.every(x => x.done) && state.allCompleteBonusDate === todayStr()) {
         state.allCompleteBonusDate = null;
         state.streak = Math.max(0, (state.streak || 0) - 1);
-        state.coins = Math.max(0, (state.coins || 0) - 50);
       }
       q.done = false;
       const xpBack = (typeof q.xpAwarded === 'number') ? q.xpAwarded : (q.xp || 0);
-      const coinBack = (typeof q.coinAwarded === 'number') ? q.coinAwarded : Math.max(10, Math.round((q.xp || 0) / 5));
-      // Refund a 2× buff charge if this completion had consumed one (the award
-      // came out doubled), so the buff isn't wasted on an undone quest.
-      if (xpBack > (q.xp || 0)) {
-        state.activeBuffs = state.activeBuffs || [];
-        state.activeBuffs.push({ id: 'buff_2xp', charges: 1 });
-      }
       state.xp = Math.max(0, (state.xp || 0) - xpBack);
       state.rank = getRank(state.xp);
-      state.coins = Math.max(0, (state.coins || 0) - coinBack);
       if (state.stats) {
         state.stats.totalQuestsCompleted = Math.max(0, (state.stats.totalQuestsCompleted || 0) - 1);
       }
       delete q.xpAwarded;
       delete q.coinAwarded;
-      showNotif(`Quest unmarked — −${xpBack} XP · −${coinBack} coins`, 'var(--text2)');
+      showNotif(`Quest unmarked — −${xpBack} XP`, 'var(--text2)');
       save();
       renderQuests();
       renderStats();
@@ -15244,13 +15099,10 @@ create trigger trg_user_state_updated_at
         rail.style.width = pct.toFixed(1) + '%';
       }
     }
-    function checkPenalty() {
-      const h = new Date().getHours();
-      const anyDone = state.quests.some(q => !q.done);
-      if (h >= 20 && anyDone && document.getElementById('penalty-bar')) {
-        document.getElementById('penalty-bar').style.display = 'flex';
-      }
-    }
+    // T96.1 — Penalty mode removed. Penalty was a known retention killer
+    // and the user defaulted it off. Function kept as a no-op so old call
+    // sites don't error; can be deleted once those callers are cleaned up.
+    function checkPenalty() { /* no-op since T96.1 */ }
     // ===== T77 — ARIA PROACTIVE REVIEW =====
     // ARIA periodically re-evaluates the user's recent training, body-stat
     // trend, sleep, and macro adherence and surfaces an insight card on the
@@ -15278,7 +15130,9 @@ create trigger trg_user_state_updated_at
     function _currentTrainingMode() {
       const s = state.settings || {};
       if (s.vacationMode) return 'vacation';
-      if (s.injuries && s.injuries.active) return 'recovery';
+      // T98.3 — Read from the new state.settings.recovery shape; legacy
+      // settings.injuries.active is no longer authoritative.
+      if (s.recovery && s.recovery.active) return 'recovery';
       if (typeof isInActiveDeload === 'function' && isInActiveDeload()) return 'deload';
       return 'off';
     }
@@ -16470,34 +16324,22 @@ create trigger trg_user_state_updated_at
       const isBackdated = date !== todayStrCached;
       const dateLabelDate = new Date(date + 'T12:00:00');
       const headerDateLabel = dateLabelDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-      // T29.1 — Active program banner above the tracker. Shows current week,
-      // today's session, and a quick-load button. Only renders when a program
-      // is active AND the user is on today's tracker (not a backdated date).
+      // T98.2 — Simplified tracker banner. Programs are weekly splits now,
+      // not prescribed-session systems. Show a lightweight reminder of what
+      // today's slot is per the user's active program (if any); no "Load
+      // prescribed exercises" CTA, no "Week N of M".
       let programBannerHtml = '';
       try {
         const tpl = (typeof getActiveProgramTemplate === 'function') ? getActiveProgramTemplate() : null;
-        if (tpl && !isBackdated && (typeof isProgramActive === 'function') && isProgramActive()) {
-          const wk = getActiveProgramWeek();
-          const session = getTodaysProgramSession();
-          const isDeload = isDeloadWeek();
-          if (session) {
-            programBannerHtml = `
-              <div style="background:linear-gradient(135deg,rgba(127,119,221,0.10),rgba(79,142,255,0.04));border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-                  <div style="font-size:11px;color:var(--accent2);font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:1px;">PLAN · ${escapeHtml(tpl.name)}</div>
-                  <div style="font-size:10px;color:var(--text3);">Week ${wk} of ${tpl.weeks}${isDeload ? ' · DELOAD' : ''}</div>
-                </div>
-                <div style="font-size:12px;color:var(--text);margin-top:4px;">Today: <strong>${escapeHtml(session.name)}</strong></div>
-                <button onclick="loadTodaysProgramIntoTracker()" class="btn btn-sm btn-primary" style="margin-top:6px;font-size:10px;padding:3px 10px;">Load prescribed exercises</button>
-              </div>
-            `;
-          } else {
-            programBannerHtml = `
-              <div style="background:rgba(127,119,221,0.06);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:var(--text3);">
-                <strong style="color:var(--accent2);">${escapeHtml(tpl.name)}</strong> · Week ${wk} of ${tpl.weeks} — rest day per program
-              </div>
-            `;
-          }
+        if (tpl && !isBackdated) {
+          const dow = (typeof dayOfWeek === 'function') ? dayOfWeek() : '';
+          const slot = (tpl.schedule || {})[dow] || 'Rest';
+          const isRest = slot === 'Rest';
+          programBannerHtml = `
+            <div style="background:rgba(127,119,221,0.06);border:1px solid ${isRest ? 'var(--border)' : 'var(--accent)'};border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:var(--text3);">
+              <strong style="color:var(--accent2);">${escapeHtml(tpl.name)}</strong> · Today: <strong style="color:${isRest ? 'var(--text3)' : 'var(--text)'};">${escapeHtml(slot)}</strong>
+            </div>
+          `;
         }
       } catch (e) {}
       wrap.innerHTML = `
@@ -19975,8 +19817,9 @@ create trigger trg_user_state_updated_at
       // Most toggles default to ON (so missing keys read as enabled). Vacation mode is the
       // exception — it MUST default OFF so a stale localStorage doesn't trap the user with
       // bodyweight quests on day one.
-      ['adaptive-toggle-main', 'penalty-toggle', 'notify-toggle', 'mealprep-toggle'].forEach((id, i) => {
-        const keys = ['adaptiveMacros', 'penaltyMode', 'notify', 'mealPrepEnabled'];
+      // T96.1 / T96.3 — penalty-toggle + mealprep-toggle removed.
+      ['adaptive-toggle-main', 'notify-toggle'].forEach((id, i) => {
+        const keys = ['adaptiveMacros', 'notify'];
         const el = document.getElementById(id);
         if (el) {
           const v = state.settings?.[keys[i]] !== false;
@@ -20098,56 +19941,56 @@ create trigger trg_user_state_updated_at
     // fire fetches at once. Combined with state.aiTodayQuest cache, this prevents the
     // "stuck on loading" state when the app re-renders after accepting/completing.
     let _generatingAIQuest = false;
-    function renderAIQuestCard(quest) {
-      const indicator = document.getElementById('ai-loading-indicator');
-      const content = document.getElementById('ai-quest-content');
-      if (!indicator || !content) return;
-      // T47.3 — When no profile exists yet (brand-new user pre-onboarding) the
-      // spinner used to run forever because generateAIQuest short-circuits with
-      // no state.profile. Show an explicit "complete onboarding" hint instead.
-      if (!state.profile || !state.profile.name) {
-        indicator.style.display = 'none';
-        content.style.display = 'block';
-        content.innerHTML = `
-          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px;">Complete your profile to unlock ARIA's challenge.</div>
-          <button class="btn btn-sm btn-primary" onclick="switchTab('profile')" style="font-size:11px;">Go to Profile</button>
-        `;
+    // T98.1 — renderAIQuestCard is a no-op; the dedicated #ai-quest-card was
+    // removed and the challenge now lives in the unified quest list. The
+    // shape is preserved so any stale caller (saved DOM after upgrade) is safe.
+    function renderAIQuestCard(_quest) { /* no-op since T98.1 */ }
+    // T98.1 — Ensure today's ARIA challenge appears as a single entry in
+    // state.quests with source:'aria'. Idempotent: strips stale aria quests,
+    // then injects today's cached one (preserving its done status if a same-
+    // name quest was already there). Called from generateAIQuest (after a new
+    // challenge is produced) and from renderQuests (after the per-day rebuild
+    // so the standard regen doesn't clobber it).
+    function _syncAriaChallengeIntoQuests() {
+      const today = todayStr();
+      // Drop any aria quest from a prior day so it doesn't linger.
+      state.quests = (state.quests || []).filter(q => q.source !== 'aria' || q.date === today);
+      const cached = state.aiTodayQuest;
+      if (!cached || cached.date !== today || !cached.quest) {
+        // No challenge generated for today yet — strip any aria quest in the list
+        // (defensive; shouldn't normally happen).
+        state.quests = state.quests.filter(q => q.source !== 'aria');
         return;
       }
-      // T34.24 — Defensive: if quest is null or missing core fields, show an
-      // explicit error state with a retry button instead of leaving the card
-      // looking half-rendered (header visible, body blank).
-      if (!quest || (!quest.questName && !quest.description)) {
-        indicator.style.display = 'none';
-        content.style.display = 'block';
-        content.innerHTML = `
-          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">Today's challenge didn't load. Tap retry to regenerate.</div>
-          <button class="btn btn-sm" onclick="generateAIQuest({force:true})" style="font-size:11px;">Retry</button>
-        `;
-        return;
-      }
-      indicator.style.display = 'none';
-      content.style.display = 'block';
-      content.innerHTML = `
-      <div style="font-size:16px;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--text);margin-bottom:6px;">${quest.questName || 'ARIA Challenge'} <span style="font-size:13px;color:var(--gold);">+${quest.xpReward || 0} XP</span></div>
-      <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:8px;">${quest.description || ''}</div>
-      <div style="font-size:12px;color:var(--accent2);font-style:italic;border-left:2px solid var(--accent);padding-left:8px;">"${quest.systemMessage || ''}"</div>
-      <div id="ai-challenge-btn-slot"></div>
-    `;
-      renderAIChallengeButton(quest);
+      const q = cached.quest;
+      // Preserve done state if a matching quest already exists for today.
+      const existing = state.quests.find(qq => qq.source === 'aria' && qq.date === today);
+      const wasDone = !!(existing && existing.done);
+      state.quests = state.quests.filter(qq => qq.source !== 'aria');
+      state.quests.push({
+        id: Date.now() + 777,
+        source: 'aria',
+        name: q.questName || 'ARIA Challenge',
+        desc: q.description || '',
+        icon: 'zap',
+        type: q.type || 'challenge',
+        xp: q.xpReward || 100,
+        done: wasDone,
+        date: today,
+        ariaSystemMessage: q.systemMessage || '',
+      });
     }
     async function generateAIQuest(opts) {
-      // T47.3 — Render the "complete onboarding" hint instead of leaving the
-      // card spinning when the user hasn't finished onboarding yet.
-      if (!state.profile || !state.profile.name) {
-        try { renderAIQuestCard(null); } catch (e) {}
-        return;
-      }
+      // T47.3 — Skip silently when no profile exists yet (brand-new user pre-
+      // onboarding). The onboarding flow will trigger this once it completes.
+      if (!state.profile || !state.profile.name) return;
       const force = !!(opts && opts.force);
       const today = todayStr();
-      // T21.2 — if we have today's quest cached, render from cache and skip fetch
+      // T21.2 — if we have today's quest cached, just sync it into the quest
+      // list and re-render. No fetch needed.
       if (!force && state.aiTodayQuest && state.aiTodayQuest.date === today && state.aiTodayQuest.quest) {
-        renderAIQuestCard(state.aiTodayQuest.quest);
+        _syncAriaChallengeIntoQuests();
+        try { renderQuests(); } catch (e) {}
         return;
       }
       // Avoid stacked generates when sync triggers re-render mid-flight
@@ -20165,8 +20008,11 @@ create trigger trg_user_state_updated_at
         state.aiQuestGenerated = true;
         state.questsDate = today;
         state.aiTodayQuest = { date: today, quest };
-        renderAIQuestCard(quest);
+        // T98.1 — Inject into the unified quest list and re-render. No
+        // separate ARIA Challenge card to update.
+        _syncAriaChallengeIntoQuests();
         save();
+        try { renderQuests(); } catch (e) {}
       } catch (e) {
         console.warn('generateAIQuest fallback failed', e);
       } finally {
@@ -20211,56 +20057,21 @@ create trigger trg_user_state_updated_at
         xpReward: 100, type: 'strength'
       };
     }
-    function acceptAIQuest(quest) {
-      state.quests.push({ id: Date.now(), name: quest.questName, desc: quest.description, icon: 'zap', type: quest.type, xp: quest.xpReward, done: false, date: todayStr() });
-      // T17.3 — Track the accepted challenge so the button reflects state going forward
-      state.aiActiveChallenge = { name: quest.questName, original: quest, date: todayStr() };
-      save();
-      try { renderAIChallengeButton(); } catch (e) { }
-      renderQuests();
-      closeModal('modal-generate');
-      showNotif('Quest added to today\'s list!');
+    // T98.1 — acceptAIQuest retired. The two-step Generate → Accept UX is
+    // gone; ARIA's challenge auto-appears in the unified quest list as soon
+    // as it's generated. Stub kept so any stale Accept button in upgraded
+    // DOM doesn't throw.
+    function acceptAIQuest(_quest) {
+      // Fall-through to the new flow: make sure today's challenge is synced
+      // into the quest list, then close any open generate modal.
+      try { _syncAriaChallengeIntoQuests(); save(); renderQuests(); } catch (e) {}
+      try { closeModal('modal-generate'); } catch (e) {}
     }
-
-    // T17.3 — System Challenge button state machine
-    // 'idle' = challenge generated but not accepted yet → "Accept Quest" CTA
-    // 'accepted' = quest in list but not done → disabled "Accepted" badge
-    // 'completed' = matching quest is done → green "Completed!" badge
-    function getAIChallengeStatus() {
-      if (!state.aiActiveChallenge || state.aiActiveChallenge.date !== todayStr()) return 'idle';
-      const q = (state.quests || []).find(qu => qu.name === state.aiActiveChallenge.name && qu.date === todayStr());
-      if (!q) return 'idle';
-      return q.done ? 'completed' : 'accepted';
-    }
-
-    function renderAIChallengeButton(questOverride) {
-      const slot = document.getElementById('ai-challenge-btn-slot');
-      if (!slot) return;
-      // T36.2 — Source of truth for what gets wired to Accept Quest:
-      //   1. Explicit override from the caller (renderAIQuestCard passes today's quest in)
-      //   2. Today's cached quest (state.aiTodayQuest.quest) — covers re-renders from
-      //      cloud sync / other surfaces that don't pass an override.
-      //   3. Previously-accepted challenge original — only as a last-resort fallback,
-      //      and only for the same date so we never wire yesterday's data.
-      // Prior bug: a re-render with no override fell straight through to (3), which
-      // for a brand-new day would point at YESTERDAY's accepted challenge — clicking
-      // Accept added the wrong quest to today's list.
-      const today = todayStr();
-      const todaysCached = (state.aiTodayQuest && state.aiTodayQuest.date === today)
-        ? state.aiTodayQuest.quest : null;
-      const sameDayActive = (state.aiActiveChallenge && state.aiActiveChallenge.date === today)
-        ? state.aiActiveChallenge.original : null;
-      const data = questOverride || todaysCached || sameDayActive;
-      if (!data) return;
-      const status = getAIChallengeStatus();
-      if (status === 'completed') {
-        slot.innerHTML = `<button class="btn btn-sm btn-with-icon" disabled style="margin-top:10px;background:rgba(34,197,94,0.15);border-color:var(--green2);color:var(--green2);cursor:default;opacity:1;">${iconSvg('check', 14)}Challenge Completed!</button>`;
-      } else if (status === 'accepted') {
-        slot.innerHTML = `<button class="btn btn-sm btn-with-icon" disabled style="margin-top:10px;background:rgba(244,182,63,0.10);border-color:var(--gold);color:var(--gold);cursor:default;opacity:1;">${iconSvg('check', 14)}Accepted — see quest list below</button>`;
-      } else {
-        slot.innerHTML = `<button class="btn btn-sm btn-gold btn-with-icon" style="margin-top:10px;" onclick="acceptAIQuest(${JSON.stringify(data).replace(/"/g, '&quot;')})">${iconSvg('zap', 14)}Accept Quest</button>`;
-      }
-    }
+    // T98.1 — getAIChallengeStatus retired (no Accept button to drive).
+    function getAIChallengeStatus() { return 'accepted'; }
+    // T98.1 — renderAIChallengeButton retired (no slot to render into). Stub
+    // kept because renderQuests + several other call sites used to invoke it.
+    function renderAIChallengeButton(_questOverride) { /* no-op since T98.1 */ }
     async function generateQuests() {
       closeModal('modal-generate');
       // T21.2 — manual "Generate" should bypass cache and force a fresh quest
@@ -21508,17 +21319,17 @@ create trigger trg_user_state_updated_at
     function checkLevelUp() {
       const newLevel = Math.floor(state.xp / XP_PER_LEVEL) + 1;
       if (newLevel > (state.level || 1)) {
-        const delta = newLevel - (state.level || 1);
         state.level = newLevel;
-        state.coins += delta * 25;
-        showNotif(`LEVEL UP! Level ${newLevel} — +${delta * 25} ${t('coins').toLowerCase()}`, 'var(--gold)');
+        // T97.1 — Coin bonus removed; the level-up notification is the reward.
+        showNotif(`LEVEL UP! Level ${newLevel}`, 'var(--gold)');
       }
       // Rank-up bonus
       const newRank = getRank(state.xp);
       if (state.lastRankUp !== newRank && newRank !== 'E') {
         state.lastRankUp = newRank;
-        state.coins += 100;
-        showNotif(`${t('rank_up')} You're now Rank ${newRank} — +100 ${t('coins').toLowerCase()}`, 'var(--gold)');
+        // T97.1 — Coin bonus removed; the rank-up unlocks new frames + titles
+        // (T97.3) which is now the real reward for ranking up.
+        showNotif(`${t('rank_up')} You're now Rank ${newRank} — new gear unlocked!`, 'var(--gold)');
       }
       // Evaluate earn-based titles (Shadow Monarch for L50, The Ascendant for S-Rank)
       if (typeof evaluateTitles === 'function') evaluateTitles();
@@ -21539,17 +21350,10 @@ create trigger trg_user_state_updated_at
       frame_amethyst: { id: 'frame_amethyst', kind: 'frame', name: 'Amethyst Frame', icon: 'sparkles', desc: 'A regal violet glow with a mystic edge.', price: 550 },
       frame_circuit: { id: 'frame_circuit', kind: 'frame', name: 'Circuit Frame', icon: 'zap', desc: 'A pulsing neon-cyan border for the data-driven.', price: 700 },
       frame_monarch: { id: 'frame_monarch', kind: 'frame', name: 'Monarch Frame', icon: 'crown', desc: 'The shimmering gold-and-shadow crown of an S-rank hunter.', price: 1000 },
-      // Buffs (functional, consumable)
-      buff_2xp: { id: 'buff_2xp', kind: 'buff', name: '2× XP Token', icon: 'zap', desc: 'Doubles XP on your next completed quest.', price: 150, consumable: true },
-      buff_shield: { id: 'buff_shield', kind: 'buff', name: 'Streak Shield', icon: 'shield', desc: 'Protects your streak from one missed day.', price: 300, consumable: true },
-      buff_rest: { id: 'buff_rest', kind: 'buff', name: 'Rest Day Pass', icon: 'moon', desc: 'Skip today with no penalty. One-time use.', price: 250, consumable: true },
-      buff_insight: { id: 'buff_insight', kind: 'buff', name: 'System Insight', icon: 'sparkles', desc: 'Regenerates your AI quest for free (bypass cooldown).', price: 100, consumable: true },
-      // T29.3 — new consumable buffs
-      buff_macro_pass: { id: 'buff_macro_pass', kind: 'buff', name: 'Macro Forgiveness Pass', icon: 'salad', desc: "One day where missing your macro target won't break your macro streak.", price: 200, consumable: true },
-      buff_skip_token: { id: 'buff_skip_token', kind: 'buff', name: 'Skip Token', icon: 'arrowright', desc: 'Skip a planned training day without losing your overall streak. Keeps the rhythm.', price: 350, consumable: true },
-      buff_recovery: { id: 'buff_recovery', kind: 'buff', name: 'Recovery Crystal', icon: 'shield', desc: 'Take an unplanned deload week without flagging stalled progression. The system understands.', price: 400, consumable: true },
-      buff_quest_reroll: { id: 'buff_quest_reroll', kind: 'buff', name: 'Quest Reroll', icon: 'refresh', desc: 'Regenerate today\'s quest list — useful when the prescribed work conflicts with reality.', price: 75, consumable: true },
-      buff_streak_double: { id: 'buff_streak_double', kind: 'buff', name: 'Streak Multiplier', icon: 'flame', desc: 'Next 7 days count double toward streak titles. Stack with 2× XP for a big push.', price: 500, consumable: true },
+      // T97.2 — Buff catalog entries retired. The buff economy is dead;
+      // SHOP_ITEMS only carries frames now (titles live in TITLE_CATALOG).
+      // Legacy state fields (inventory.buffs, activeBuffs) are still preserved
+      // in storage for backwards compat, but never read or rendered.
     };
     // T42.1 — Visual definitions for each card frame. applyEquippedFrame()
     // reads this to set the --frame-border / --frame-glow custom properties on
@@ -21566,6 +21370,34 @@ create trigger trg_user_state_updated_at
       frame_amethyst:   { border: '#a855f7', glow: '0 0 20px rgba(168,85,247,0.55)' },
       frame_circuit:    { border: '#22d3ee', glow: '0 0 12px rgba(34,211,238,0.4)', anim: 'circuit' },
       frame_monarch:    { border: '#f4b63f', glow: '0 0 16px rgba(244,182,63,0.45)', anim: 'monarch' },
+    };
+    // T97.3 — Frames are unlocked by XP/rank, not bought with coins. Each
+    // frame is bound to a rank tier; reaching that rank's XP threshold unlocks
+    // it permanently. Rank XP thresholds: D=1000, C=3000, B=7000, A=15000,
+    // S=30000. Default frame (no rank) is always available.
+    const FRAME_UNLOCKS = {
+      frame_gold:       1000,   // Rank D — first earned frame
+      frame_verdant:    1000,
+      frame_frost:      3000,   // Rank C
+      frame_aurora:     3000,
+      frame_crimson:    3000,
+      frame_amethyst:   7000,   // Rank B
+      frame_emberforge: 7000,
+      frame_obsidian:   15000,  // Rank A
+      frame_circuit:    15000,
+      frame_monarch:    30000,  // Rank S — capstone
+    };
+    const FRAME_UNLOCK_RANK = {
+      frame_gold:       'D',
+      frame_verdant:    'D',
+      frame_frost:      'C',
+      frame_aurora:     'C',
+      frame_crimson:    'C',
+      frame_amethyst:   'B',
+      frame_emberforge: 'B',
+      frame_obsidian:   'A',
+      frame_circuit:    'A',
+      frame_monarch:    'S',
     };
     // Apply the user's equipped frame to the hunter card + home identity card.
     // These elements are static in the DOM, so calling this once at boot and
@@ -21848,49 +21680,56 @@ create trigger trg_user_state_updated_at
       if (awarded) { save(); if (document.getElementById('shop-pane-titles')) renderShopTab('titles'); }
     }
     function renderShop() {
-      const coinEl = document.getElementById('shop-coin-display');
-      if (coinEl) coinEl.textContent = (state.coins || 0).toLocaleString();
+      // T97.1/T97.2 — Coin display + Inventory subtab retired. Default to the
+      // Frames pane; user can switch to Titles via the tab row.
       renderShopTab('frames');
-      renderInventoryTab();
     }
     function switchShopTab(tab) {
-      ['frames', 'titles', 'buffs', 'inventory'].forEach(t => {
+      // T97.2 — Only Frames + Titles remain (Buffs and Inventory subtabs killed).
+      if (tab !== 'frames' && tab !== 'titles') tab = 'frames';
+      ['frames', 'titles'].forEach(t => {
         const pane = document.getElementById('shop-pane-' + t);
         if (pane) pane.style.display = t === tab ? 'block' : 'none';
         const btn = document.getElementById('shop-tab-' + t);
         if (btn) btn.classList.toggle('active', t === tab);
       });
-      if (tab === 'frames' || tab === 'titles' || tab === 'buffs') renderShopTab(tab);
-      if (tab === 'inventory') renderInventoryTab();
+      renderShopTab(tab);
     }
     function renderShopTab(tab) {
       const paneId = 'shop-pane-' + tab;
       const pane = document.getElementById(paneId);
       if (!pane) return;
       if (tab === 'titles') { renderTitlesTab(pane); return; }
-      const kindMap = { frames: 'frame', buffs: 'buff' };
-      const kind = kindMap[tab];
-      const items = Object.values(SHOP_ITEMS).filter(i => i.kind === kind);
-      pane.innerHTML = `<div class="shop-grid">` + items.map(it => {
-        const owned = kind === 'buff' ? (state.inventory.buffs[it.id] || 0) > 0 : state.inventory.gear.includes(it.id);
-        const equipped = kind === 'frame' ? state.equipped.frame === it.id
-          : false;
-        const cls = equipped ? 'shop-item equipped' : owned ? 'shop-item owned' : 'shop-item';
-        const priceNode = equipped
-          ? `<div style="display:flex;flex-direction:column;gap:6px;width:100%;align-items:flex-start;"><span class="shop-item-tag equipped" style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('check', 11)}EQUIPPED</span><button class="btn btn-sm" onclick="unequipFrame()">Unequip</button></div>`
-          : owned && kind !== 'buff'
-            ? `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`
-            : owned && kind === 'buff'
-              ? `<span class="shop-item-tag owned">×${state.inventory.buffs[it.id] || 0}</span><button class="btn btn-sm" onclick="buyItem('${it.id}')" style="margin-top:4px;">Buy (${it.price})</button>`
-              : `<button class="btn btn-sm" onclick="buyItem('${it.id}')">Buy <span class="shop-item-price">${it.price}</span></button>`;
+      // T97.3 — Frames are now XP-unlocked, not bought. Render lock/unlock
+      // state based on state.xp vs the unlockXp threshold defined per frame.
+      const frames = Object.values(SHOP_ITEMS).filter(i => i.kind === 'frame');
+      const userXp = state.xp || 0;
+      pane.innerHTML = `<div class="shop-grid">` + frames.map(it => {
+        const unlockXp = FRAME_UNLOCKS[it.id] || 0;
+        const unlocked = userXp >= unlockXp;
+        const equipped = state.equipped && state.equipped.frame === it.id;
+        const cls = equipped ? 'shop-item equipped' : unlocked ? 'shop-item owned' : 'shop-item locked';
+        let footer;
+        if (equipped) {
+          footer = `<div style="display:flex;flex-direction:column;gap:6px;width:100%;align-items:flex-start;"><span class="shop-item-tag equipped" style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('check', 11)}EQUIPPED</span><button class="btn btn-sm" onclick="unequipFrame()">Unequip</button></div>`;
+        } else if (unlocked) {
+          footer = `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`;
+        } else {
+          const pct = Math.min(100, Math.round(userXp / unlockXp * 100));
+          const rankLabel = FRAME_UNLOCK_RANK[it.id] || '';
+          footer = `<div style="display:flex;flex-direction:column;gap:2px;width:100%;">
+        <span class="shop-item-tag locked" style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('shield', 12)}LOCKED</span>
+        <div style="font-size:11px;color:var(--text3);">${rankLabel ? `Unlocks at Rank ${rankLabel}` : `Reach ${unlockXp.toLocaleString()} XP`}</div>
+        <div class="bar-wrap" style="height:4px;margin-top:4px;"><div class="bar-fill" style="width:${pct}%;background:var(--text3);"></div></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px;">${userXp.toLocaleString()} / ${unlockXp.toLocaleString()} XP</div>
+      </div>`;
+        }
         return `
       <div class="${cls}">
-        <div class="shop-item-icon">${iconSvg(it.icon, 28)}</div>
-        <div class="shop-item-name">${it.name}</div>
+        <div class="shop-item-icon" style="${unlocked ? '' : 'opacity:0.45;filter:grayscale(0.6);'}">${iconSvg(it.icon, 28)}</div>
+        <div class="shop-item-name" style="${unlocked ? '' : 'color:var(--text3);'}">${it.name}</div>
         <div class="shop-item-desc">${it.desc}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:6px;flex-wrap:wrap;">
-          ${priceNode}
-        </div>
+        <div style="margin-top:6px;">${footer}</div>
       </div>
     `;
       }).join('') + `</div>`;
@@ -21944,80 +21783,29 @@ create trigger trg_user_state_updated_at
       renderShopTab('titles');
       renderProfile();
     }
-    function renderInventoryTab() {
-      const pane = document.getElementById('shop-pane-inventory');
-      if (!pane) return;
-      const gear = (state.inventory.gear || []).map(id => SHOP_ITEMS[id]).filter(Boolean);
-      const buffs = Object.entries(state.inventory.buffs || {}).filter(([, n]) => n > 0).map(([id, n]) => ({ ...SHOP_ITEMS[id], count: n }));
-      // T51.4 — Inventory day-1 welcome. When everything is empty, show one
-      // warm welcome card with a path to earning coins, instead of three cold
-      // "Nothing here" lines.
-      const activeBuffs = state.activeBuffs || [];
-      if (gear.length === 0 && buffs.length === 0 && activeBuffs.length === 0) {
-        pane.innerHTML = `
-          <div class="card" style="padding:18px;text-align:center;margin-top:10px;background:linear-gradient(135deg, rgba(127,119,221,0.10), rgba(244,182,63,0.06));border:1px solid var(--accent);">
-            <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--accent2);margin-bottom:6px;">Your vault is empty</div>
-            <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px;">Complete daily quests to earn coins, then visit the Shop to unlock frames, titles, and buffs.</div>
-            <button class="btn btn-sm btn-primary" onclick="switchShopTab('shop')" style="font-size:11px;">Browse the Shop</button>
-          </div>`;
-        return;
-      }
-      pane.innerHTML = `
-    <div class="section-label" style="margin-top:8px;">OWNED GEAR</div>
-    ${gear.length === 0 ? `<div style="color:var(--text3);padding:10px;font-size:12px;">No gear yet — grind some quests.</div>` : `<div class="shop-grid">${gear.map(it => {
-        const equipped = (it.kind === 'frame' && state.equipped.frame === it.id) || (it.kind === 'title' && state.equipped.title === it.id);
-        return `<div class="shop-item ${equipped ? 'equipped' : 'owned'}">
-        <div class="shop-item-icon">${iconSvg(it.icon, 28)}</div>
-        <div class="shop-item-name">${it.name}</div>
-        <div class="shop-item-desc">${it.desc}</div>
-        ${equipped
-          ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;"><span class="shop-item-tag equipped" style="display:inline-flex;align-items:center;gap:4px;">${iconSvg('check', 11)}EQUIPPED</span><button class="btn btn-sm" onclick="${it.kind === 'frame' ? 'unequipFrame()' : 'unequipTitle()'}">Unequip</button></div>`
-          : `<button class="btn btn-sm" onclick="equipItem('${it.id}')">Equip</button>`}
-      </div>`;
-      }).join('')}</div>`}
-    <div class="section-label" style="margin-top:10px;">BUFFS</div>
-    ${buffs.length === 0 ? `<div style="color:var(--text3);padding:10px;font-size:12px;">No buffs stockpiled.</div>` : buffs.map(b => `
-      <div class="buff-row">
-        <div class="buff-info">
-          <span class="buff-icon">${iconSvg(b.icon, 18)}</span>
-          <div>
-            <div class="buff-name">${b.name}</div>
-            <div class="buff-count">${b.desc}</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="buff-count">×${b.count}</span>
-          <button class="btn btn-sm" onclick="useBuff('${b.id}')">Use</button>
-        </div>
-      </div>
-    `).join('')}
-    <div class="section-label" style="margin-top:10px;">ACTIVE EFFECTS</div>
-    ${(state.activeBuffs || []).length === 0 ? `<div style="color:var(--text3);padding:10px;font-size:12px;">None active.</div>` : state.activeBuffs.map(b => {
-        const it = SHOP_ITEMS[b.id];
-        return `<div class="buff-row"><div class="buff-info"><span class="buff-icon">${iconSvg(it?.icon || 'zap', 18)}</span><div><div class="buff-name">${it?.name || b.id}</div><div class="buff-count">${b.charges ? `${b.charges} charge${b.charges > 1 ? 's' : ''} left` : 'active'}</div></div></div></div>`;
-      }).join('')}
-  `;
-    }
-    function buyItem(id) {
-      const it = SHOP_ITEMS[id];
-      if (!it) return;
-      if ((state.coins || 0) < it.price) { showNotif('Not enough coins', 'var(--red)'); return; }
-      state.coins -= it.price;
-      if (it.kind === 'buff') {
-        state.inventory.buffs[id] = (state.inventory.buffs[id] || 0) + 1;
-      } else {
-        if (!state.inventory.gear.includes(id)) state.inventory.gear.push(id);
-      }
-      showNotif(`Acquired: ${it.name}`, 'var(--gold)');
-      save();
-      renderShop();
-      renderProfile();
-    }
+    // T97.2 — renderInventoryTab retired. The Inventory subtab and coin/buff
+    // economy were removed; legacy callers (e.g. saved DOM after upgrade) hit
+    // this no-op safely.
+    function renderInventoryTab() { /* no-op since T97.2 */ }
+    // T97.2/T97.3 — buyItem retired. Frames are XP-unlocked (no purchase) and
+    // buffs no longer exist. Stub kept so any stale onclick="buyItem(...)" in
+    // upgraded DOM doesn't throw.
+    function buyItem(id) { /* no-op since T97.2/T97.3 */ }
+    // T97.3 — equipItem now gates frames on the XP unlock threshold instead
+    // of inventory.gear ownership. Titles are unchanged (still earned via the
+    // condition system in TITLE_CATALOG).
     function equipItem(id) {
       const it = SHOP_ITEMS[id];
       if (!it) return;
-      if (it.kind === 'frame') state.equipped.frame = id;
-      if (it.kind === 'title') state.equipped.title = id;
+      if (it.kind === 'frame') {
+        const unlockXp = FRAME_UNLOCKS[id] || 0;
+        if ((state.xp || 0) < unlockXp) { showNotif('Frame still locked', 'var(--red)'); return; }
+        state.equipped.frame = id;
+      }
+      if (it.kind === 'title') {
+        if (!state.inventory || !Array.isArray(state.inventory.titles) || !state.inventory.titles.includes(id)) return;
+        state.equipped.title = id;
+      }
       showNotif(`${it.name} equipped`, 'var(--gold)');
       save();
       renderShop();
@@ -22039,36 +21827,13 @@ create trigger trg_user_state_updated_at
       try { renderStats(); } catch (e) {}
     }
     function useBuff(id) {
-      if ((state.inventory.buffs[id] || 0) <= 0) return;
-      state.inventory.buffs[id]--;
-      if (id === 'buff_2xp') {
-        state.activeBuffs.push({ id, charges: 1 });
-        showNotif('2× XP active — next quest awards double XP', 'var(--gold)');
-      }
-      if (id === 'buff_shield') {
-        state.activeBuffs.push({ id, charges: 1 });
-        showNotif('Streak Shield active — one missed day protected', 'var(--accent)');
-      }
-      if (id === 'buff_rest') {
-        state.activeBuffs.push({ id, charges: 1, usedDate: todayStr() });
-        // Mark penalty bar hidden for today
-        const pb = document.getElementById('penalty-bar'); if (pb) pb.style.display = 'none';
-        showNotif('Rest Day Pass applied — no penalty today', 'var(--accent)');
-      }
-      if (id === 'buff_insight') {
-        generateAIQuest({ force: true });
-        showNotif('System Insight used — regenerating challenge', 'var(--accent)');
-      }
-      save();
-      renderShop();
+      // T97.2 — useBuff retired. The buff economy is dead; this stub keeps
+      // any stale onclick="useBuff(...)" from upgraded DOM from throwing.
     }
-    function consume2xBuffIfActive(baseXp) {
-      const idx = (state.activeBuffs || []).findIndex(b => b.id === 'buff_2xp' && b.charges > 0);
-      if (idx < 0) return baseXp;
-      state.activeBuffs[idx].charges--;
-      if (state.activeBuffs[idx].charges <= 0) state.activeBuffs.splice(idx, 1);
-      return baseXp * 2;
-    }
+    // T97.2 — consume2xBuffIfActive is now a pass-through. 2× XP buffs no
+    // longer exist, but completeQuest() still calls this with the base XP
+    // award in older builds. Returning baseXp untouched is the safe identity.
+    function consume2xBuffIfActive(baseXp) { return baseXp; }
     // ===== PERSISTENCE / SYNC BACKUP =====
     // Backup file format:
     //   { _format: 'ARISE_BACKUP', _schemaVersion: N, _exportedAt: ISO, _appVersion: 'x.y',
