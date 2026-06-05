@@ -4177,6 +4177,14 @@
           </div>
           <!-- T96.1 — Penalty bar removed alongside penalty mode. -->
 
+          <!-- T99.5 — Sunday Briefing card (only renders on Sundays, dismissible
+               for the day). Sits above the quest list so the week-in-review
+               prompt is the first thing the user sees on Sunday morning. -->
+          <div id="sunday-briefing-slot"></div>
+          <!-- T99.1 — Persistent "ARIA Today" callout. Always-on read on
+               what to focus on today, plus an Ask button that seeds the chat
+               with the same take so the user can dig deeper. -->
+          <div id="aria-today-callout-slot"></div>
           <!-- Quest list -->
           <!-- T98.1 — ARIA's daily challenge is now merged into the unified
                quest list below (rendered as a regular quest item with an ARIA
@@ -4600,6 +4608,12 @@
                (no recipes, no avoid list, no prep entries). The full grid
                below is hidden via inline display when this card is visible. -->
           <div id="meal-prep-welcome-slot"></div>
+          <!-- T99.6 — "Plan with ARIA" entry. Routes through askAriaAbout
+               with the user's macro targets + current prep items so ARIA can
+               suggest a week of options. The user reads, picks, and creates
+               via the existing Recipe Builder — no auto-write, no override
+               of the manual flow. Manual autonomy preserved. -->
+          <div id="meal-prep-aria-slot"></div>
           <div id="meal-prep-sections">
           <!-- AVOID LIST (allergens + disliked ingredients) -->
           <div class="section-label"><span class="icon-title-slot" data-icon="ban"></span>AVOID LIST</div>
@@ -8168,6 +8182,172 @@ create trigger trg_user_state_updated_at
         const inp = document.getElementById('coach-input');
         if (inp) inp.focus();
       }, 50);
+    }
+
+    // T99.2 — Shared entry point for every "Ask ARIA about this" surface in
+    // the app. Opens the chat modal and pre-fills the input with the supplied
+    // text so the user can edit before sending. Pre-fill (not auto-send) is
+    // deliberate: the user stays in control of what's actually asked, and the
+    // chat history doesn't suddenly grow without a tap.
+    function askAriaAbout(prefilledText) {
+      try { openAICoachModal(); }
+      catch (e) { try { showNotif('ARIA chat unavailable here.', 'var(--red2)'); } catch (e2) {} return; }
+      // openAICoachModal already does a 50ms-deferred focus on coach-input;
+      // schedule the prefill just after so we win the focus race and the
+      // cursor lands at the end of the seeded text.
+      setTimeout(() => {
+        const inp = document.getElementById('coach-input');
+        if (!inp) return;
+        inp.value = String(prefilledText || '');
+        inp.focus();
+        try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {}
+        // Bump auto-resize if the textarea has it wired.
+        try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+      }, 90);
+    }
+
+    // T99.2 — Context-builder helpers. Each returns a short, plain-language
+    // prompt the user can read, edit, and send. Kept terse so the seeded
+    // message doesn't dwarf what the user wants to type themselves.
+    function buildAriaContextForQuest(q) {
+      if (!q) return 'Help me think about today\'s quests.';
+      const parts = [`Help me think about this quest: "${q.name}".`];
+      if (q.desc) parts.push(`Details: ${q.desc}`);
+      if (q.source === 'aria') parts.push(`(This was your pick for me today.)`);
+      const dow = (typeof dayOfWeek === 'function') ? dayOfWeek() : '';
+      const slot = (state.workoutSplit && state.workoutSplit[dow]) || 'Rest';
+      parts.push(`Today is a ${slot} day for me.`);
+      return parts.join(' ');
+    }
+    function buildAriaContextForWorkout(entry) {
+      if (!entry) return 'Review my last workout with me.';
+      const sets = (entry.sets || []).filter(s => (s.weight || 0) > 0 || (s.reps || 0) > 0);
+      const setSummary = sets.length
+        ? sets.map(s => `${s.weight || 0}×${s.reps || 0}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`).join(', ')
+        : 'no working sets logged';
+      return `Review this lift with me: ${entry.exercise || 'exercise'} on ${entry.date || 'today'} — ${setSummary}. What stood out, and what should I do next time?`;
+    }
+    function buildAriaContextForMeal(meal) {
+      if (!meal) return 'Look at my recent eating with me.';
+      const m = `${meal.calories || 0} cal · ${meal.protein || 0}p / ${meal.carbs || 0}c / ${meal.fat || 0}f`;
+      return `Help me think about this meal: "${meal.name || 'meal'}" — ${m}. Does it fit my targets and goals?`;
+    }
+    function buildAriaContextForGoal(g) {
+      if (!g) return 'Help me think about my goals.';
+      const parts = [`Help me think about this goal: "${g.title || g.name || 'goal'}".`];
+      if (g.target) parts.push(`Target: ${g.target}.`);
+      if (g.deadline) parts.push(`Deadline: ${g.deadline}.`);
+      return parts.join(' ');
+    }
+    // T99.1 — "ARIA Today" callout reads state client-side (no API call) and
+    // produces a one-line take + a longer seeded prompt for the chat. Keeps
+    // the surface always-on even when the user is offline or hasn't wired
+    // ARIA yet (the take still renders; the Ask button just opens chat).
+    function buildAriaTodayTake() {
+      const dow = (typeof dayOfWeek === 'function') ? dayOfWeek() : '';
+      const slot = (state.workoutSplit && state.workoutSplit[dow]) || 'Rest';
+      const streak = state.streak || 0;
+      const recoveryActive = !!(state.settings && state.settings.recovery && state.settings.recovery.active);
+      const vacationActive = !!(state.settings && state.settings.vacationMode);
+      // Pick a take based on the strongest signal.
+      if (recoveryActive) {
+        return { headline: 'Recovery mode — keep it honest.', body: 'You flagged an injury. Today\'s job is to do the work that doesn\'t aggravate it and skip the work that does. Quality over heroics.' };
+      }
+      if (vacationActive) {
+        return { headline: 'Vacation block — protect the floor.', body: 'Bodyweight + walking is the win this week. Don\'t chase PRs; just keep the rhythm so you snap back fast when you\'re home.' };
+      }
+      if (slot === 'Rest') {
+        return { headline: 'Rest day — recover like you train.', body: 'Hydrate, get the steps in, sleep 7–9. Tomorrow\'s session needs today\'s recovery. Don\'t fill the gap with junk food.' };
+      }
+      if (streak >= 30) {
+        return { headline: `${streak}-day streak — don\'t coast.`, body: `You're past the hard-to-start phase. Now the trap is auto-pilot — same weights, same reps. Push one variable up today.` };
+      }
+      if (streak >= 7) {
+        return { headline: `Day ${streak + 1} of the streak — clear the board.`, body: `You're in the rhythm. Today's a ${slot} day; finish every quest and protect the streak.` };
+      }
+      return { headline: `${slot} day — make it count.`, body: `One full-clear day is worth more than three half-cleared ones. Pick the hardest quest first and stack the rest behind it.` };
+    }
+    function renderAriaTodayCallout() {
+      const slot = document.getElementById('aria-today-callout-slot');
+      if (!slot) return;
+      const take = buildAriaTodayTake();
+      const seed = `${take.headline} — what should I focus on today specifically? My split says ${(state.workoutSplit && state.workoutSplit[(typeof dayOfWeek === 'function') ? dayOfWeek() : '']) || 'Rest'}, streak is ${state.streak || 0}.`;
+      slot.innerHTML = `
+        <div style="background:linear-gradient(135deg, rgba(127,119,221,0.12), rgba(79,142,255,0.05));border:1px solid rgba(127,119,221,0.4);border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;">
+          <span style="flex-shrink:0;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;margin-top:1px;">${iconSvg('sparkles', 16)}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.5px;color:var(--accent);margin-bottom:2px;">ARIA TODAY</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.4;font-weight:600;">${escapeHtml(take.headline)}</div>
+            <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-top:3px;">${escapeHtml(take.body)}</div>
+          </div>
+          <button onclick="askAriaAbout(${JSON.stringify(seed).replace(/"/g, '&quot;')})" class="btn btn-sm" style="flex-shrink:0;font-size:10px;padding:4px 10px;align-self:center;border-color:var(--accent);color:var(--accent);">Ask</button>
+        </div>
+      `;
+    }
+
+    // T99.5 — Sunday Briefing. A once-per-Sunday banner above the quest list
+    // that invites the user to do a week-in-review with ARIA. Dismissible for
+    // the day so it doesn't nag if the user already reviewed. State key
+    // (state.settings.sundayBriefingDismissedFor = YYYY-MM-DD) tracks the
+    // Sunday's date, so next Sunday the banner comes back automatically.
+    function _isSunday(dStr) {
+      try {
+        const d = new Date((dStr || (typeof todayStr === 'function' ? todayStr() : new Date().toISOString().slice(0,10))) + 'T12:00:00');
+        return d.getDay() === 0;
+      } catch (e) { return false; }
+    }
+    function _weekSummaryForAria() {
+      // Look back 7 days and summarize: distinct training days, total quests
+      // completed, streak, average daily calories logged. Cheap, deterministic,
+      // and gives ARIA enough to coach against without a network call.
+      const today = (typeof todayStr === 'function') ? todayStr() : new Date().toISOString().slice(0,10);
+      const todayD = new Date(today + 'T12:00:00');
+      const cutoff = new Date(todayD.getTime() - 7 * 86400000);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const log = state.workoutLog || [];
+      const trainingDays = new Set(
+        log.filter(e => e.date && e.date >= cutoffStr && e.date <= today)
+           .map(e => e.date)
+      ).size;
+      // Total quests cleared in the last 7 days (state.quests holds today only,
+      // so this is an approximation — counts today's done quests + the streak).
+      const todayDone = (state.quests || []).filter(q => q.done && q.date === today).length;
+      const streak = state.streak || 0;
+      const meals = (state.foodLog || []).filter(m => m.date && m.date >= cutoffStr && m.date <= today);
+      const totalCals = meals.reduce((s, m) => s + (parseFloat(m.calories) || 0), 0);
+      const daysWithMeals = new Set(meals.map(m => m.date)).size;
+      const avgCals = daysWithMeals > 0 ? Math.round(totalCals / daysWithMeals) : 0;
+      return { trainingDays, todayDone, streak, avgCals, daysWithMeals };
+    }
+    function renderSundayBriefing() {
+      const slot = document.getElementById('sunday-briefing-slot');
+      if (!slot) return;
+      const today = (typeof todayStr === 'function') ? todayStr() : new Date().toISOString().slice(0,10);
+      if (!_isSunday(today)) { slot.innerHTML = ''; return; }
+      const dismissed = state.settings && state.settings.sundayBriefingDismissedFor === today;
+      if (dismissed) { slot.innerHTML = ''; return; }
+      const s = _weekSummaryForAria();
+      const seed = `It's Sunday — walk me through the past week. Numbers: ${s.trainingDays} training days, current streak ${s.streak}, ${s.daysWithMeals} days with meals logged (avg ${s.avgCals} kcal). What went well, what slipped, and what should I lock in for next week?`;
+      slot.innerHTML = `
+        <div style="background:linear-gradient(135deg, rgba(244,182,63,0.15), rgba(127,119,221,0.06));border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+          <span style="flex-shrink:0;color:var(--gold);display:inline-flex;align-items:center;justify-content:center;margin-top:1px;">${iconSvg('crown', 16)}</span>
+          <div style="flex:1;min-width:140px;">
+            <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--gold);">SUNDAY BRIEFING</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.4;font-weight:600;margin-top:2px;">Close the week with ARIA.</div>
+            <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-top:3px;">${s.trainingDays} training day${s.trainingDays === 1 ? '' : 's'} · ${s.streak}-day streak · ${s.daysWithMeals} day${s.daysWithMeals === 1 ? '' : 's'} of food logged</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <button class="btn btn-sm" onclick="dismissSundayBriefing()" style="font-size:11px;color:var(--text3);">Later</button>
+            <button class="btn btn-sm btn-gold" onclick="askAriaAbout(${JSON.stringify(seed).replace(/"/g, '&quot;')}); dismissSundayBriefing();" style="font-size:11px;">Review week</button>
+          </div>
+        </div>
+      `;
+    }
+    function dismissSundayBriefing() {
+      state.settings = state.settings || {};
+      state.settings.sundayBriefingDismissedFor = (typeof todayStr === 'function') ? todayStr() : new Date().toISOString().slice(0,10);
+      try { save(); } catch (e) {}
+      try { renderSundayBriefing(); } catch (e) {}
     }
 
     function renderCoachMessages() {
@@ -14621,6 +14801,11 @@ create trigger trg_user_state_updated_at
       // T61 — Refresh the First Session checklist on every quest render so
       // it ticks items off as the user completes them.
       try { renderFirstSessionCard(); } catch (e) {}
+      // T99.1 + T99.5 — Refresh the ARIA Today callout and the Sunday Briefing
+      // (when it's a Sunday and not already dismissed) on every quest render
+      // so streak/slot changes show up immediately.
+      try { renderAriaTodayCallout(); } catch (e) {}
+      try { renderSundayBriefing(); } catch (e) {}
       const doneCount = state.quests.filter(q => q.done).length;
       const totalXP = state.quests.reduce((a, q) => a + (q.done ? q.xp : 0), 0);
       // T76.15 — Drop 🏝 emoji; the "Vacation" word carries the meaning and
@@ -14681,6 +14866,12 @@ create trigger trg_user_state_updated_at
         const ariaMsg = (q.source === 'aria' && q.ariaSystemMessage)
           ? `<div style="font-size:11px;color:var(--accent2);font-style:italic;border-left:2px solid var(--accent);padding-left:8px;margin-top:6px;">"${q.ariaSystemMessage}"</div>`
           : '';
+        // T99.3 — Ask ARIA pill on each quest item. Routes through
+        // askAriaAbout so the chat opens with a quest-specific prompt the
+        // user can edit before sending. stopPropagation keeps the tap from
+        // also toggling the quest done.
+        const seedJson = JSON.stringify(buildAriaContextForQuest(q)).replace(/"/g, '&quot;');
+        const askBtn = `<button onclick="event.stopPropagation(); askAriaAbout(${seedJson})" class="quest-ask-aria-btn" title="Ask ARIA about this quest" style="background:rgba(127,119,221,0.10);border:1px solid rgba(127,119,221,0.35);color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:9px;letter-spacing:1px;font-weight:700;padding:2px 6px;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;margin-top:4px;">${iconSvg('sparkles', 9)}ASK ARIA</button>`;
         div.innerHTML = `
       <div class="quest-icon ic-${q.type}">${iconSvg(q.icon, 20)}</div>
       <div class="quest-body">
@@ -14688,6 +14879,7 @@ create trigger trg_user_state_updated_at
         <div class="quest-sub" style="white-space:pre-line;">${q.desc}</div>
         ${ariaMsg}
         <div class="quest-bar"><div class="bar-wrap"><div class="bar-fill" style="width:${q.done ? 100 : 0}%;background:${q.done ? 'var(--green)' : 'var(--accent)'}"></div></div></div>
+        ${askBtn}
       </div>
       <div class="quest-right">
         <div class="check-circle${q.done ? ' done' : ''}">${q.done ? iconSvg('check', 14) : ''}</div>
@@ -16001,6 +16193,10 @@ create trigger trg_user_state_updated_at
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
               <button onclick="event.stopPropagation();editGoalProgress(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;" title="Quick progress update">Progress</button>
               <button onclick="event.stopPropagation();openAddGoalModal(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;" title="Edit goal details">Edit</button>
+              <!-- T99.3 — Ask ARIA about this goal. Routes through askAriaAbout
+                   with a prompt that names the goal + target so the chat has
+                   real context to push back or coach against. -->
+              <button onclick="event.stopPropagation();askAriaAbout(buildAriaContextForGoal({title:${JSON.stringify(goal.name)}, target:${JSON.stringify(goal.target || '')}, deadline:${JSON.stringify(goal.date || '')}}))" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;" title="Ask ARIA about this goal">Ask ARIA</button>
               <!-- T86.1 — Archive moves a goal into "Inactive goals" without
                    losing its history; the same goal can be unarchived later. -->
               <button onclick="event.stopPropagation();archiveGoal(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;" title="Move to Inactive goals — restore later without losing progress">Archive</button>
@@ -16584,11 +16780,75 @@ create trigger trg_user_state_updated_at
         showNotif('Fill in at least one set first', 'var(--amber)');
       } else {
         showNotif(`${logged} exercise${logged === 1 ? '' : 's'} saved · tracker cleared`);
+        // T99.4 — Post-workout review trigger. Once per day, surface a quick
+        // "Review with ARIA" CTA so the user gets the loop-closing reflection
+        // moment without us auto-opening chat. Summarizes what was just saved
+        // so ARIA has real context to read back.
+        try { maybeShowPostWorkoutReview(date, sheet, c); } catch (e) {}
       }
       // T38.1 — Re-render the now-blank tracker so the cleared state shows.
       if (typeof renderTrackerSheet === 'function') renderTrackerSheet();
       if (typeof renderTrainingLog === 'function') renderTrainingLog();
       if (typeof renderExerciseProgression === 'function') renderExerciseProgression();
+    }
+    // T99.4 — Post-workout review prompt. Renders an inline banner inside
+    // the tracker pane with two CTAs: Review with ARIA (opens chat seeded
+    // with the session summary) and Dismiss. State is tracked in
+    // state.settings.lastPostWorkoutReviewDate so we only fire once per day —
+    // no spamming if the user logs three workouts back-to-back.
+    function maybeShowPostWorkoutReview(date, sheet, cardio) {
+      state.settings = state.settings || {};
+      const today = (typeof todayStr === 'function') ? todayStr() : date;
+      // Only trigger when the saved sheet is for today — backfilled logs
+      // shouldn't pop a "review your session" prompt mid-edit of last week.
+      if (date !== today) return;
+      if (state.settings.lastPostWorkoutReviewDate === today) return;
+      state.settings.lastPostWorkoutReviewDate = today;
+      try { save(); } catch (e) {}
+      // Build a one-line session summary from the rows we just persisted.
+      const summaryParts = (sheet && Array.isArray(sheet.rows) ? sheet.rows : [])
+        .map(r => {
+          const ex = (r.exercise || '').trim();
+          if (!ex) return '';
+          const sets = (r.sets || []).filter(s => (parseFloat(s.weight) || 0) > 0 || (parseInt(s.reps) || 0) > 0);
+          if (!sets.length) return '';
+          const setStr = sets.map(s => `${parseFloat(s.weight) || 0}×${parseInt(s.reps) || 0}`).join(', ');
+          return `${ex}: ${setStr}`;
+        })
+        .filter(Boolean);
+      if (cardio && cardio.exercise && (cardio.duration || cardio.distance)) {
+        const bits = [];
+        if (cardio.duration) bits.push(`${cardio.duration} min`);
+        if (cardio.distance) bits.push(`${cardio.distance}`);
+        summaryParts.push(`${cardio.exercise} (${bits.join(' · ')})`);
+      }
+      const summary = summaryParts.join(' · ');
+      const seed = `Just finished today's session: ${summary}. Walk me through what stood out, anything I should adjust next time, and whether I'm progressing where I think I am.`;
+      // Inject the banner into the tracker pane so the user sees it inline
+      // (not as a transient toast they might miss). Lives until dismissed
+      // or until they tap Review.
+      const trackerPane = document.getElementById('workout-tab-log') || document.getElementById('screen-workout');
+      if (!trackerPane) return;
+      // Avoid stacking banners if the function fires twice for some reason.
+      const existing = document.getElementById('post-workout-review-banner');
+      if (existing) existing.remove();
+      const banner = document.createElement('div');
+      banner.id = 'post-workout-review-banner';
+      banner.style.cssText = 'background:linear-gradient(135deg, rgba(127,119,221,0.15), rgba(244,182,63,0.06));border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+      const seedJsonAttr = JSON.stringify(seed).replace(/"/g, '&quot;');
+      banner.innerHTML = `
+        <span style="flex-shrink:0;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;">${iconSvg('sparkles', 16)}</span>
+        <div style="flex:1;min-width:140px;">
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;color:var(--accent);">SESSION SAVED</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.4;margin-top:2px;">Want ARIA's take on what you just did?</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-sm" onclick="document.getElementById('post-workout-review-banner').remove()" style="font-size:11px;color:var(--text3);">Dismiss</button>
+          <button class="btn btn-sm btn-primary" onclick="askAriaAbout(${seedJsonAttr}); document.getElementById('post-workout-review-banner').remove();" style="font-size:11px;">Review with ARIA</button>
+        </div>
+      `;
+      // Insert near the top of the pane so it's immediately visible.
+      trackerPane.insertBefore(banner, trackerPane.firstChild);
     }
     // ===== NUTRITION SMARTS: blocklist, saved recipes, suggestion bank =====
     // Curated whole-food recipes. Structure: label + ingredients (for blocklist
@@ -17346,6 +17606,34 @@ create trigger trg_user_state_updated_at
             welcome.innerHTML = '';
             sections.style.display = '';
           }
+        }
+      } catch (e) {}
+      // T99.6 — Render the "Plan with ARIA" entry whenever the user has
+      // anything started (so it doesn't crowd the day-1 welcome card). The
+      // CTA opens chat seeded with macros + current prep so ARIA can suggest
+      // a week of options. User reads, picks, and uses the Recipe Builder
+      // to actually create — we never auto-write meals.
+      try {
+        const ariaSlot = document.getElementById('meal-prep-aria-slot');
+        if (ariaSlot) {
+          const macros = state.macros || {};
+          const currentPrepNames = (state.mealPrep || []).map(p => p.name || 'untitled').slice(0, 5);
+          const prepLine = currentPrepNames.length
+            ? `Current prep: ${currentPrepNames.join(', ')}.`
+            : `I haven't added any prep yet.`;
+          const blocklist = (state.blocklist || []).slice(0, 8).join(', ');
+          const blockLine = blocklist ? `Avoid list: ${blocklist}.` : '';
+          const seed = `Help me plan a week of meal prep. Targets: ${macros.calories || '?'} cal · ${macros.protein || '?'}g protein · ${macros.carbs || '?'}g carbs · ${macros.fat || '?'}g fat. ${prepLine} ${blockLine} Suggest 4–6 options I can rotate. Keep portions specific and grocery-list friendly — I'll build the ones I like in the Recipe Builder myself.`.trim();
+          ariaSlot.innerHTML = `
+            <div style="background:linear-gradient(135deg, rgba(127,119,221,0.10), rgba(34,197,94,0.04));border:1px solid rgba(127,119,221,0.35);border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="flex-shrink:0;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;">${iconSvg('sparkles', 16)}</span>
+              <div style="flex:1;min-width:140px;">
+                <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--accent);">PLAN WITH ARIA</div>
+                <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-top:2px;">Get a week of suggestions tuned to your macros and avoid list. You still build them yourself.</div>
+              </div>
+              <button class="btn btn-sm btn-primary" onclick="askAriaAbout(${JSON.stringify(seed).replace(/"/g, '&quot;')})" style="flex-shrink:0;font-size:11px;">Ask ARIA</button>
+            </div>
+          `;
         }
       } catch (e) {}
       const list = document.getElementById('meal-prep-list');
