@@ -4615,19 +4615,12 @@
                of the manual flow. Manual autonomy preserved. -->
           <div id="meal-prep-aria-slot"></div>
           <div id="meal-prep-sections">
-          <!-- AVOID LIST (allergens + disliked ingredients) -->
-          <div class="section-label"><span class="icon-title-slot" data-icon="ban"></span>AVOID LIST</div>
-          <div class="card" style="padding:10px;">
-            <div id="blocklist-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
-            <div style="display:flex;gap:6px;">
-              <input type="text" id="blocklist-input" placeholder="Add allergen or disliked ingredient..."
-                style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;"
-                onkeydown="if(event.key==='Enter'){addToBlocklist();event.preventDefault();}">
-              <button class="btn btn-sm btn-primary" onclick="addToBlocklist()">Add</button>
-            </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:8px;">Quick add:</div>
-            <div id="blocklist-quick" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;"></div>
-          </div>
+          <!-- T100 — Avoid List moved to the bottom of the page (next to
+               Upload Prep + Fasting). It's a set-and-forget config item: once
+               the user has added their allergens / dislikes, it just filters
+               Suggestions in the background and rarely needs to be touched
+               again. Top-of-page real estate is reserved for high-frequency
+               work — recipes, prep entries, the Plan-with-ARIA card. -->
           <!-- MY RECIPES -->
           <div class="section-label"
             style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
@@ -4660,6 +4653,23 @@
             <div style="font-size:12px;">Upload meal prep CSV or photo</div>
             <input type="file" id="prep-upload" accept=".csv,.jpg,.png" onchange="handlePrepUpload(this)">
           </label>
+          <!-- T100 — Avoid List relocated here from the top of the page. Set
+               once during onboarding (or after a new diagnosis / dislike),
+               then it just sits in the background filtering Suggestions. The
+               quick-add chips below the input cover the common allergens to
+               make first-setup fast. -->
+          <div class="section-label" style="margin-top:14px;"><span class="icon-title-slot" data-icon="ban"></span>AVOID LIST</div>
+          <div class="card" style="padding:10px;">
+            <div id="blocklist-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="blocklist-input" placeholder="Add allergen or disliked ingredient..."
+                style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;"
+                onkeydown="if(event.key==='Enter'){addToBlocklist();event.preventDefault();}">
+              <button class="btn btn-sm btn-primary" onclick="addToBlocklist()">Add</button>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:8px;">Quick add:</div>
+            <div id="blocklist-quick" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;"></div>
+          </div>
           <!-- T96.4 — Fasting card moved here from the top of the tab.
                Niche feature; lives at the bottom so it doesn't clutter
                the primary meal-prep flow. -->
