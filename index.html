@@ -855,6 +855,114 @@
       background: var(--green);
     }
 
+    /* T102 — Training plan / schedule on the goal card */
+    .plan-summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--accent);
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+    .plan-summary .plan-next { color: var(--text3); }
+    .plan-actions { margin-left: auto; display: flex; gap: 10px; }
+    .plan-actions button {
+      background: none; border: none; cursor: pointer; font-size: 11px; padding: 0;
+    }
+    .plan-cal {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .plan-dow {
+      font-size: 9px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text3); text-align: center; padding-bottom: 2px;
+    }
+    .plan-cell {
+      min-height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 2px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg2);
+    }
+    .plan-cell.empty { background: transparent; border-color: transparent; }
+    .plan-cell.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+    .plan-cell.past { opacity: 0.5; }
+    .plan-cell .plan-daynum { font-size: 9px; color: var(--text3); line-height: 1; }
+    .plan-chip {
+      width: 100%;
+      font-size: 8.5px;
+      line-height: 1.1;
+      text-align: center;
+      border-radius: 4px;
+      padding: 2px 1px;
+      color: #fff;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .plan-chip.done { opacity: 0.45; text-decoration: line-through; }
+    .plan-legend {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+      font-size: 9.5px; color: var(--text3);
+    }
+    .plan-legend span { display: inline-flex; align-items: center; gap: 3px; }
+    .plan-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+    .plan-chip.sel { box-shadow: 0 0 0 2px var(--text) inset; }
+    .plan-detail {
+      margin-top: 10px;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 11px 12px;
+      background: var(--bg);
+    }
+    .plan-detail-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+    .plan-detail-badge {
+      font-size: 9.5px; font-weight: 700; letter-spacing: .4px; color: #fff;
+      padding: 2px 8px; border-radius: 20px; text-transform: uppercase;
+    }
+    .plan-detail-date { font-size: 10.5px; color: var(--text3); }
+    .plan-detail-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+    .plan-detail-body { font-size: 11.5px; line-height: 1.55; color: var(--text2); }
+    .plan-detail-done {
+      margin-top: 11px; width: 100%;
+      border: 1px solid var(--accent); background: rgba(79,142,255,0.08); color: var(--accent);
+      border-radius: 6px; padding: 8px; font-size: 12px; cursor: pointer;
+      font-family: 'Rajdhani', sans-serif; letter-spacing: .5px;
+    }
+    .plan-detail-done.is-done { border-color: var(--green2); color: var(--green2); background: rgba(76,175,120,0.10); }
+    .plan-glossary { margin-top: 10px; }
+    .plan-glossary summary {
+      cursor: pointer; color: var(--accent2); font-size: 11px; list-style: none;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .plan-glossary summary::-webkit-details-marker { display: none; }
+    .plan-glossary .gl-item { margin-top: 8px; font-size: 11px; color: var(--text2); line-height: 1.5; }
+    .plan-glossary .gl-term { color: var(--text); font-weight: 600; }
+    .plan-generate-btn {
+      margin-top: 10px;
+      width: 100%;
+      border: 1px dashed var(--accent);
+      background: rgba(99,102,241,0.06);
+      color: var(--accent);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      letter-spacing: .5px;
+    }
+
     /* HUNTER CARD */
     .hunter-card {
       background: linear-gradient(135deg, #0d1a2e 0%, #101c30 100%);
@@ -16236,6 +16344,7 @@ create trigger trg_user_state_updated_at
             </div>
           `).join('')}
         </div>` : ''}
+        ${renderGoalPlanSection(goal)}
       `;
           list.appendChild(div);
         });
@@ -16276,6 +16385,177 @@ create trigger trg_user_state_updated_at
       list.classList.toggle('open');
       const caret = el.querySelector('.milestone-caret');
       if (caret) caret.style.transform = wasOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+    // ===== T102 — Training plan UI on the goal card =====
+    const PLAN_TYPE_META = {
+      easy:       { color: 'var(--green)',   abbr: 'Easy',  label: 'Easy run' },
+      long:       { color: 'var(--purple)',  abbr: 'Long',  label: 'Long run' },
+      tempo:      { color: 'var(--gold)',    abbr: 'Tempo', label: 'Tempo' },
+      intervals:  { color: 'var(--red2)',    abbr: 'Int',   label: 'Intervals' },
+      race:       { color: 'var(--accent)',  abbr: 'RACE',  label: 'Race day' },
+      lift:       { color: 'var(--red2)',    abbr: 'Lift',  label: 'Lift' },
+      volume:     { color: 'var(--accent2)', abbr: 'Vol',   label: 'Volume' },
+      test:       { color: 'var(--accent)',  abbr: 'TEST',  label: 'Test day' },
+      checkpoint: { color: 'var(--accent2)', abbr: '✓',     label: 'Checkpoint' },
+    };
+    const _PLAN_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    // Which session (if any) is expanded on a card. Persists across in-place re-renders.
+    let _planSel = null;
+    // Beginner reference for running plans.
+    const RUN_GLOSSARY = [
+      { term: 'Easy run', def: 'A relaxed, conversational-pace run — easy enough to chat the whole way. Most of your running should feel this easy; it builds fitness without wearing you down.' },
+      { term: 'Long run', def: 'Your longest run of the week, done slow and easy. Builds the endurance to go the distance. The mileage matters here, not the speed.' },
+      { term: 'Tempo run', def: 'A sustained "comfortably hard" effort — a pace where you can only say a few words at a time. Teaches your body to hold a strong, steady pace.' },
+      { term: 'Intervals', def: 'Short bursts of fast running (2–3 min) with easy jogging to recover between them. Builds speed and efficiency. Always warm up and cool down.' },
+    ];
+    function fmtShortDate(d) {
+      if (!d) return '';
+      return `${_PLAN_MON[parseInt(d.slice(5, 7), 10) - 1]} ${parseInt(d.slice(8, 10), 10)}`;
+    }
+    // Which plan week 'today' falls in (1..weeks); 0 if the plan hasn't started.
+    function currentPlanWeek(plan) {
+      const sessions = (plan && plan.sessions) || [];
+      if (!sessions.length) return 0;
+      const first = sessions[0].date, today = todayStr();
+      if (today < first) return 0;
+      const wk = Math.floor((new Date(today + 'T00:00:00') - new Date(first + 'T00:00:00')) / (7 * 86400000)) + 1;
+      return Math.max(1, Math.min(plan.weeks || wk, wk));
+    }
+
+    // The whole plan area for a goal card (wrapped so we can refresh it in place).
+    function renderGoalPlanSection(goal) {
+      return `<div class="goal-plan" id="plan-${goal.id}">${renderGoalPlanInner(goal)}</div>`;
+    }
+    function renderGoalPlanInner(goal) {
+      if (!goal.plan || !goal.plan.sessions || !goal.plan.sessions.length) {
+        const hint = goal.date ? '' : ' <span style="color:var(--text3);font-size:10px;">(add a target date for exact scheduling)</span>';
+        return `<button class="plan-generate-btn" onclick="event.stopPropagation();generateGoalPlan(${JSON.stringify(goal.id)})">${iconSvg('calendar', 13)} Build training schedule</button>${hint}`;
+      }
+      const plan = goal.plan;
+      const st = planStats(goal);
+      const weekNow = currentPlanWeek(plan);
+      const nextTxt = st.next ? `Next: ${fmtShortDate(st.next.date)} · ${escapeHtml(st.next.title)}` : 'Plan complete — nice work.';
+      return `
+        <div class="plan-summary">
+          <span>${iconSvg('calendar', 13)} Training plan · ${st.done}/${st.total} done${weekNow ? ` · Week ${weekNow} of ${plan.weeks}` : ''}</span>
+          <span class="plan-actions">
+            <button style="color:var(--accent2);" onclick="event.stopPropagation();regenerateGoalPlan(${JSON.stringify(goal.id)})" title="Rebuild the schedule from current/target/date">↻ regen</button>
+            <button style="color:var(--text3);" onclick="event.stopPropagation();removeGoalPlan(${JSON.stringify(goal.id)})" title="Remove this schedule">remove</button>
+          </span>
+        </div>
+        <div class="plan-next" style="font-size:10.5px;color:var(--text3);margin-top:4px;">${nextTxt}</div>
+        ${buildPlanCalendar(goal)}
+        ${renderSessionDetailPanel(goal)}
+        ${buildPlanLegend(plan)}
+        ${renderRunGlossary(plan)}
+      `;
+    }
+    // Expanded detail for the tapped session: plain-English description + an
+    // explicit complete button. Selection persists across in-place re-renders.
+    function renderSessionDetailPanel(goal) {
+      if (!_planSel || _planSel.goalId != goal.id) return '';
+      const s = (goal.plan.sessions || []).find(x => x.id == _planSel.sessionId);
+      if (!s) return '';
+      const m = PLAN_TYPE_META[s.type] || PLAN_TYPE_META.checkpoint;
+      return `<div class="plan-detail">
+        <div class="plan-detail-head">
+          <span class="plan-detail-badge" style="background:${m.color};">${m.label}</span>
+          <span class="plan-detail-date">${dowShort(s.date)} · ${fmtShortDate(s.date)}${s.week ? ` · Week ${s.week}` : ''}</span>
+        </div>
+        <div class="plan-detail-title">${escapeHtml(s.title)}</div>
+        <div class="plan-detail-body">${escapeHtml(s.detail || '')}</div>
+        <button class="plan-detail-done${s.done ? ' is-done' : ''}" onclick="event.stopPropagation();toggleSessionDone(${JSON.stringify(goal.id)},${JSON.stringify(s.id)})">${s.done ? '✓ Completed — tap to undo' : 'Mark complete'}</button>
+      </div>`;
+    }
+    function renderRunGlossary(plan) {
+      if (!plan || plan.archetype !== 'running') return '';
+      return `<details class="plan-glossary"><summary>ⓘ New to running? What these runs mean</summary>${RUN_GLOSSARY.map(g => `<div class="gl-item"><span class="gl-term">${g.term}:</span> ${g.def}</div>`).join('')}</details>`;
+    }
+    function selectPlanSession(goalId, sessionId) {
+      if (_planSel && _planSel.goalId == goalId && _planSel.sessionId == sessionId) _planSel = null; // tap again = close
+      else _planSel = { goalId, sessionId };
+      refreshGoalPlan(goalId);
+    }
+    // Bounded "training calendar": week rows × 7 weekday columns, from the plan's
+    // first session week through its last, each session a tappable chip.
+    function buildPlanCalendar(goal) {
+      const plan = goal.plan;
+      const sessions = plan.sessions;
+      const byDate = {};
+      sessions.forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
+      const first = sessions[0].date, last = sessions[sessions.length - 1].date;
+      const startPad = new Date(first + 'T00:00:00').getDay();          // 0=Sun
+      const endPad = 6 - new Date(last + 'T00:00:00').getDay();
+      let d = addDaysStr(first, -startPad);
+      const end = addDaysStr(last, endPad);
+      const today = todayStr();
+      const dows = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<div class="plan-dow">${x}</div>`).join('');
+      let cells = '';
+      while (d <= end) {
+        const sess = byDate[d] || [];
+        let cls = 'plan-cell';
+        if (!sess.length && (d < first || d > last)) cls += ' empty';
+        if (d < today) cls += ' past';
+        if (d === today) cls += ' today';
+        const dayNum = parseInt(d.slice(8, 10), 10);
+        const chips = sess.map(s => {
+          const m = PLAN_TYPE_META[s.type] || PLAN_TYPE_META.checkpoint;
+          const isSel = _planSel && _planSel.goalId == goal.id && _planSel.sessionId == s.id;
+          return `<div class="plan-chip${s.done ? ' done' : ''}${isSel ? ' sel' : ''}" style="background:${m.color};" title="${escapeHtml(s.title)}" onclick="event.stopPropagation();selectPlanSession(${JSON.stringify(goal.id)},${JSON.stringify(s.id)})">${m.abbr}</div>`;
+        }).join('');
+        cells += `<div class="${cls}"><span class="plan-daynum">${dayNum}</span>${chips}</div>`;
+        d = addDaysStr(d, 1);
+      }
+      return `<div class="plan-cal">${dows}${cells}</div>`;
+    }
+    function buildPlanLegend(plan) {
+      const types = [...new Set(plan.sessions.map(s => s.type))];
+      const items = types.map(t => {
+        const m = PLAN_TYPE_META[t] || PLAN_TYPE_META.checkpoint;
+        return `<span><i style="background:${m.color}"></i>${m.label}</span>`;
+      }).join('');
+      return `<div class="plan-legend">${items}<span style="margin-left:auto;">tap a session for details</span></div>`;
+    }
+    function refreshGoalPlan(goalId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      const node = document.getElementById('plan-' + goalId);
+      if (g && node) node.innerHTML = renderGoalPlanInner(g);
+      else { try { renderGoals(); } catch (e) {} }
+    }
+    function generateGoalPlan(goalId, opts) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g) return;
+      g.plan = generatePlanForGoal(g, opts || {});
+      if (typeof save === 'function') save();
+      refreshGoalPlan(goalId);
+      showNotif('Training schedule built');
+    }
+    function regenerateGoalPlan(goalId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g) return;
+      const dpw = g.plan && g.plan.daysPerWeek;
+      g.plan = generatePlanForGoal(g, dpw ? { daysPerWeek: dpw } : {});
+      if (typeof save === 'function') save();
+      refreshGoalPlan(goalId);
+      showNotif('Schedule rebuilt');
+    }
+    function removeGoalPlan(goalId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g) return;
+      if (!confirm('Remove this training schedule?')) return;
+      delete g.plan;
+      if (typeof save === 'function') save();
+      refreshGoalPlan(goalId);
+    }
+    function toggleSessionDone(goalId, sessionId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g || !g.plan) return;
+      const s = (g.plan.sessions || []).find(x => x.id == sessionId);
+      if (!s) return;
+      s.done = !s.done;
+      if (s.done) { state.xp = (state.xp || 0) + 30; showNotif('Session done · +30 XP'); }
+      if (typeof save === 'function') save();
+      refreshGoalPlan(goalId);
     }
     function toggleMilestone(goalId, idx) {
       const g = state.goals.find(g => g.id == goalId);
@@ -18493,6 +18773,9 @@ create trigger trg_user_state_updated_at
         state.workoutLog.push(entry);
         const xp = 60; // flat cardio XP — refine later if needed
         state.xp += xp;
+        // T101 — fold this session into any matching goals before save/render.
+        let goalAdv = [];
+        try { goalAdv = applyLogToGoals(entry); } catch (e) {}
         save();
         closeModal('modal-log-exercise');
         try { renderTrainingLog(); } catch (e) {}
@@ -18502,7 +18785,7 @@ create trigger trg_user_state_updated_at
         ['log-ex-total-min', 'log-ex-distance', 'log-ex-pace'].forEach(id => {
           const el = document.getElementById(id); if (el) el.value = '';
         });
-        showNotif(`Cardio logged · +${xp} XP`);
+        showNotif(`Cardio logged · +${xp} XP${goalAdvanceMsg(goalAdv)}`);
         return;
       }
       // Resistance + Held branch. Held mode stores the first column as
@@ -18539,6 +18822,9 @@ create trigger trg_user_state_updated_at
       const volume = sets.reduce((a, s) => a + (s.reps * s.weight || s.reps || 0), 0);
       const xp = Math.max(30, Math.min(150, Math.round(volume / 80)));
       state.xp += xp;
+      // T101 — fold this session into any matching goals before save/render.
+      let goalAdv = [];
+      try { goalAdv = applyLogToGoals(entry); } catch (e) {}
       save();
       closeModal('modal-log-exercise');
       renderTrainingLog();
@@ -18556,7 +18842,7 @@ create trigger trg_user_state_updated_at
       }
       const suggestEl = document.getElementById('log-ex-suggest');
       if (suggestEl) suggestEl.innerHTML = '';
-      showNotif(`Session logged · +${xp} XP`);
+      showNotif(`Session logged · +${xp} XP${goalAdvanceMsg(goalAdv)}`);
     }
     // Delete one session entry. Confirmed via native prompt to keep chrome light.
     function deleteWorkoutEntry(id) {
@@ -20606,6 +20892,444 @@ create trigger trg_user_state_updated_at
     // Schema version — bump this when the milestone format changes so stale auto milestones
     // get regenerated on next render instead of silently persisting.
     const MILESTONE_SCHEMA_VERSION = 3;
+    // ===== T101 — Goal auto-progress from logged workouts =====
+    // This is the wire that makes "effort relates to the goal" literally true:
+    // when a workout is logged, map it onto active goals. If the exercise matches
+    // and the logged value advances the goal toward its target, the goal's
+    // current value, progress bar, and any cleared milestones update on their own.
+    // Reuses parseGoalValue / detectGoalKind / formatMilestoneValue from the goal
+    // system so units and kinds stay consistent with how milestones are generated.
+
+    // Kinds we can derive from a workout log. Bodyweight / bodyfat / numeric come
+    // from weigh-ins or manual entry, not from a training session, so we leave them
+    // to manual progress (editGoalProgress) and skip them here.
+    const LOG_TRACKABLE_KINDS = new Set(['weightlift', 'reps', 'duration', 'distance', 'pace', 'loaded_carry']);
+
+    // Normalize an exercise/goal name to comparable tokens. Strips brand/equipment
+    // words and PR/max flavor so "Barbell Back Squat" and "Back Squat Max" align.
+    function normExName(s) {
+      const base = String(s || '')
+        .toLowerCase()
+        .replace(/\b(max|maximum|1\s?rm|3\s?rm|5\s?rm|rep\s?max|goal|target|test|pr|personal\s+record|barbell|dumbbell|kettlebell|machine|cable|smith|the|a|an)\b/g, ' ')
+        .replace(/dead\s*lift/g, 'deadlift')
+        .replace(/[-_/]/g, ' ')
+        .replace(/[^a-z0-9 ]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      // Singularize tokens so "pull ups" matches "pull up" and "squats" matches
+      // "squat". Drop a trailing 's' on tokens of length >= 3, but never on "ss"
+      // endings (so "press" stays "press").
+      return base.split(' ').map(t =>
+        (t.length >= 3 && t.endsWith('s') && !t.endsWith('ss')) ? t.slice(0, -1) : t
+      ).join(' ');
+    }
+
+    // How well a logged exercise name covers a goal's name. Returns the fraction of
+    // the goal's content tokens present in the logged name (0..1). Coverage of the
+    // GOAL by the ENTRY (not symmetric) so a goal "Back Squat" needs both tokens in
+    // the log, but a logged "Barbell Back Squat" still satisfies goal "Back Squat".
+    function exMatchScore(goalName, entryName) {
+      const g = normExName(goalName).split(' ').filter(Boolean);
+      const e = new Set(normExName(entryName).split(' ').filter(Boolean));
+      if (!g.length || !e.size) return 0;
+      let inter = 0;
+      g.forEach(t => { if (e.has(t)) inter++; });
+      return inter / g.length;
+    }
+
+    // Convert a value between the unit pairs the app uses, so a kg/km goal still
+    // tracks an lbs/mi log (and vice versa). Unknown pairs pass through unchanged.
+    function convertUnit(val, fromUnit, toUnit) {
+      if (val == null || !isFinite(val)) return val;
+      const f = String(fromUnit || '').toLowerCase();
+      const t = String(toUnit || '').toLowerCase();
+      if (!f || !t || f === t) return val;
+      if (f === 'lbs' && t === 'kg') return val / 2.20462;
+      if (f === 'kg' && t === 'lbs') return val * 2.20462;
+      if (f === 'mi' && t === 'km') return val * 1.60934;
+      if (f === 'km' && t === 'mi') return val / 1.60934;
+      return val;
+    }
+
+    // Pull the achieved value (in its own unit) out of a workoutLog entry for a
+    // given goal kind. "Best of the session": heaviest lift, most reps, longest
+    // hold, longest run, fastest pace. Returns null when the entry has nothing
+    // relevant to that kind.
+    function achievedFromEntry(entry, kind) {
+      const sets = (entry && entry.sets) || [];
+      const cardio = entry && entry.cardio;
+      switch (kind) {
+        case 'weightlift':
+        case 'loaded_carry': {
+          let best = null;
+          sets.forEach(s => { if ((s.reps || 0) >= 1 && isFinite(s.weight)) { if (best === null || s.weight > best) best = s.weight; } });
+          return best === null ? null : { value: best, unit: 'lbs' };
+        }
+        case 'reps': {
+          let best = null;
+          sets.forEach(s => { const r = s.reps || 0; if (r > 0) { if (best === null || r > best) best = r; } });
+          return best === null ? null : { value: best, unit: 'reps' };
+        }
+        case 'duration': {
+          let best = null;
+          sets.forEach(s => { const h = s.holdSec || 0; if (h > 0) { if (best === null || h > best) best = h; } });
+          if (best === null && entry && entry.totalMin) best = entry.totalMin * 60;
+          return best === null ? null : { value: best, unit: 's' };
+        }
+        case 'distance': {
+          if (cardio && cardio.distance) { const p = parseGoalValue(cardio.distance); if (p) return { value: p.value, unit: p.unit }; }
+          return null;
+        }
+        case 'pace': {
+          if (cardio && cardio.speed) { const p = parseGoalValue(cardio.speed); if (p && p.format === 'pace') return { value: p.value, unit: 's' }; }
+          // Fall back to deriving pace from distance + duration (minutes).
+          if (cardio && cardio.distance && cardio.duration) {
+            const d = parseGoalValue(cardio.distance);
+            const minutes = parseFloat(cardio.duration);
+            if (d && d.value > 0 && isFinite(minutes) && minutes > 0) return { value: (minutes * 60) / d.value, unit: 's' };
+          }
+          return null;
+        }
+        default: return null;
+      }
+    }
+
+    // Mark any milestones this value has cleared, respecting goal direction
+    // (higher-is-better vs lower-is-better). Returns how many newly ticked.
+    function tickMilestonesForValue(goal, achieved, dir) {
+      let n = 0;
+      (goal.milestones || []).forEach(m => {
+        if (m.done || m.target == null) return;
+        const passed = dir === 1 ? achieved >= m.target : achieved <= m.target;
+        if (passed) { m.done = true; n++; }
+      });
+      return n;
+    }
+
+    // Core: apply one saved workoutLog entry to all active goals. Mutates matching
+    // goals (current, progress, milestones, startValue baseline) and returns a
+    // summary of what advanced so the caller can surface it. Progress is monotonic-
+    // forward — a worse session never drags a bar backward.
+    function applyLogToGoals(entry) {
+      const results = [];
+      if (!entry || !Array.isArray(state.goals)) return results;
+      const exName = entry.exercise || '';
+      let changed = false;
+      state.goals.filter(g => g && !g.archived).forEach(g => {
+        const cur = parseGoalValue(g.current);
+        const tgt = parseGoalValue(g.target);
+        if (!tgt) return;                                  // need a numeric target to measure against
+        const kind = detectGoalKind(g, cur, tgt);
+        if (!LOG_TRACKABLE_KINDS.has(kind)) return;        // skip bodyweight/bodyfat/numeric
+        if (exMatchScore(g.name, exName) < 0.6) return;    // the exercise has to match the goal
+        const achievedRaw = achievedFromEntry(entry, kind);
+        if (!achievedRaw) return;
+        const unit = tgt.unit || (cur && cur.unit) || achievedRaw.unit;
+        const achieved = convertUnit(achievedRaw.value, achievedRaw.unit, unit);
+        // Capture the starting baseline once, so progress is measured from where the
+        // user began — not from zero. Falls back to the first achieved value.
+        if (g.startValue == null) {
+          g.startValue = cur ? convertUnit(cur.value, cur.unit, unit) : achieved;
+        }
+        const start = g.startValue;
+        const target = tgt.value;
+        if (start === target) return;                      // no delta — nothing to measure
+        const dir = target > start ? 1 : -1;               // +1 higher-is-better, -1 lower-is-better (pace, bodyfat)
+        const frac = dir === 1 ? (achieved - start) / (target - start) : (start - achieved) / (start - target);
+        const pct = Math.round(Math.max(0, Math.min(100, frac * 100)));
+        const oldPct = g.progress || 0;
+        const newPct = Math.max(oldPct, pct);              // monotonic-forward
+        // Update the displayed current value only when this session is the best so far.
+        const curVal = cur ? convertUnit(cur.value, cur.unit, unit) : null;
+        const isBest = curVal == null || (dir === 1 ? achieved > curVal : achieved < curVal);
+        if (isBest) g.current = formatMilestoneValue(achieved, kind, unit);
+        const ticked = tickMilestonesForValue(g, achieved, dir);
+        if (newPct !== oldPct || isBest || ticked > 0) {
+          g.progress = newPct;
+          changed = true;
+          results.push({ id: g.id, name: g.name, oldPct, newPct, ticked });
+        }
+      });
+      if (changed) {
+        if (typeof save === 'function') save();
+        if (typeof renderGoals === 'function') { try { renderGoals(); } catch (e) {} }
+      }
+      return results;
+    }
+
+    // Compose a short "· Squat 82% (+6%)" tail for the log-saved notification.
+    function goalAdvanceMsg(results) {
+      if (!results || !results.length) return '';
+      const r = results.slice().sort((a, b) => (b.newPct - b.oldPct) - (a.newPct - a.oldPct))[0];
+      const delta = r.newPct - r.oldPct;
+      const tail = delta > 0 ? ` (+${delta}%)` : '';
+      const extra = results.length > 1 ? ` +${results.length - 1} more` : '';
+      return ` · ${toTitleCase(exerciseShortName(r.name)) || 'Goal'} ${r.newPct}%${tail}${extra}`;
+    }
+
+    // ===== T102 — Training Plan generator =====
+    // Turns a goal into a dated, week-by-week training schedule (the "real
+    // schedule feel"): a sequence of sessions, each with a date, phase, type,
+    // and (where relevant) a numeric target that the T101 matcher can auto-clear
+    // when the session is logged. Deterministic and offline by design — a proven
+    // periodization skeleton. ARIA personalization layers on later via the chat
+    // edge function (see personalizePlanWithAria); direct browser->Anthropic is
+    // CORS-blocked, so the template is the reliable core, not a fallback.
+
+    // Date helpers (string in/out, local-midnight to avoid TZ drift).
+    function addDaysStr(startStr, n) {
+      const d = startStr ? new Date(startStr + 'T00:00:00') : new Date();
+      d.setDate(d.getDate() + n);
+      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    }
+    function dowShort(dateStr) {
+      return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(dateStr + 'T00:00:00').getDay()];
+    }
+    function weeksUntil(dateStr, fromStr) {
+      const from = fromStr || todayStr();
+      if (!dateStr) return 8; // no deadline → default 8-week block
+      const days = Math.round((new Date(dateStr + 'T00:00:00') - new Date(from + 'T00:00:00')) / 86400000);
+      return Math.max(1, Math.round(days / 7));
+    }
+
+    // Which schedule shape fits this goal.
+    function planArchetypeForGoal(goal) {
+      const cur = parseGoalValue(goal.current), tgt = parseGoalValue(goal.target);
+      const kind = detectGoalKind(goal, cur, tgt);
+      const name = (goal.name || '').toLowerCase();
+      if (kind === 'distance' || kind === 'pace' || /\brun|\bjog|marathon|\b5k\b|\b10k\b|\bmile/.test(name)) return 'running';
+      if (kind === 'weightlift') return 'strength';
+      return 'generic';
+    }
+
+    // Weekly session templates by days/week (offset = days from the week's start).
+    const RUN_WEEK_TEMPLATES = {
+      3: [{ o: 0, t: 'easy' }, { o: 3, t: 'quality' }, { o: 6, t: 'long' }],
+      4: [{ o: 0, t: 'easy' }, { o: 2, t: 'quality' }, { o: 4, t: 'easy' }, { o: 6, t: 'long' }],
+      5: [{ o: 0, t: 'easy' }, { o: 2, t: 'quality' }, { o: 3, t: 'easy' }, { o: 5, t: 'easy' }, { o: 6, t: 'long' }],
+    };
+
+    // Build a running plan: base → build → peak → taper, with a progressive long
+    // run that peaks ~85% of race distance, tapers, then the race itself on the
+    // goal date.
+    function buildRunningPlan(goal, opts) {
+      const start = (opts && opts.startDate) || todayStr();
+      const W = Math.max(3, weeksUntil(goal.date, start));
+      const dpw = [3, 4, 5].includes(opts && opts.daysPerWeek) ? opts.daysPerWeek : 4;
+      const tmpl = RUN_WEEK_TEMPLATES[dpw];
+      const tgt = parseGoalValue(goal.target);
+      const cur = parseGoalValue(goal.current);
+      const unit = (tgt && tgt.unit) || (cur && cur.unit) || 'mi';
+      const raceDist = (tgt && tgt.format === 'distance') ? tgt.value : 13.1;
+      const startLong = (cur && cur.format === 'distance' && cur.value > 0) ? cur.value : Math.max(2, Math.round(raceDist * 0.25));
+      const peakLong = Math.max(startLong, +(raceDist * 0.85).toFixed(1));
+      const taperWeeks = Math.min(2, Math.max(1, Math.floor(W * 0.18)));
+      const buildWeeks = Math.max(1, W - taperWeeks); // weeks before taper (long-run progression window)
+      const sessions = [];
+      for (let w = 0; w < W; w++) {
+        const weekStart = addDaysStr(start, w * 7);
+        const isTaper = w >= buildWeeks;
+        const isLastWeek = w === W - 1;
+        const frac = W > 1 ? w / (W - 1) : 1;
+        const phase = frac < 0.4 ? 'base' : frac < 0.72 ? 'build' : (isTaper ? 'taper' : 'peak');
+        // long-run distance for this week
+        let longDist;
+        if (!isTaper) {
+          longDist = buildWeeks > 1 ? startLong + (peakLong - startLong) * (w / (buildWeeks - 1)) : peakLong;
+        } else {
+          const tw = w - buildWeeks; // 0-based taper index
+          longDist = peakLong * (taperWeeks > 1 ? (0.7 - 0.2 * (tw / (taperWeeks - 1))) : 0.6);
+        }
+        longDist = Math.max(startLong, +longDist.toFixed(1));
+        tmpl.forEach(s => {
+          const date = addDaysStr(weekStart, s.o);
+          if (date > (goal.date || date) && !(isLastWeek && s.t === 'long')) {
+            // don't schedule past the race date except the race itself
+          }
+          if (s.t === 'long') {
+            if (isLastWeek) {
+              sessions.push({ date: goal.date || date, dow: dowShort(goal.date || date), week: w + 1, phase: 'race',
+                type: 'race', title: `Race / time trial — ${raceDist} ${unit}`,
+                detail: `Goal day — the full ${raceDist} ${unit}. Start slower than feels necessary, settle into a rhythm, and finish strong. Everything before this built to it. Log it to complete your goal.`,
+                target: raceDist, unit, done: false });
+            } else {
+              sessions.push({ date, dow: dowShort(date), week: w + 1, phase,
+                type: 'long', title: `Long run — ${longDist} ${unit}`,
+                detail: `Your longest run of the week: ${longDist} ${unit} at an easy, conversational pace (you should be able to talk in full sentences). Go slow — the distance is the point, not speed. This builds the endurance to go the distance on race day. Log it and your goal bar moves.`,
+                target: longDist, unit, done: false });
+            }
+          } else if (s.t === 'quality') {
+            const interval = (w % 2 === 0);
+            sessions.push({ date, dow: dowShort(date), week: w + 1, phase,
+              type: interval ? 'intervals' : 'tempo',
+              title: interval ? 'Intervals' : 'Tempo run',
+              detail: interval
+                ? 'Speed work. Warm up with 10 min of easy jogging, then run 6–8 rounds of 2–3 min at a hard-but-controlled effort, each followed by an equal easy jog to catch your breath. Finish with 10 min easy. Builds speed and makes easy pace feel easier.'
+                : 'A sustained "comfortably hard" effort. Warm up 10 min easy, then hold 20–30 min at a pace where you can only get out a few words at a time (not all-out — controlled). Cool down 10 min easy. Trains you to hold a strong steady pace.',
+              target: null, unit, done: false });
+          } else {
+            sessions.push({ date, dow: dowShort(date), week: w + 1, phase,
+              type: 'easy', title: 'Easy run',
+              detail: '30–40 min at a relaxed, conversational pace — easy enough to chat the whole way. This is meant to feel gentle; it builds your aerobic base without tiring you out. Most of your running should feel this easy.',
+              target: null, unit, done: false });
+          }
+        });
+      }
+      return finalizePlan(goal, 'running', dpw, W, sessions,
+        `${W}-week half-marathon-style build to ${raceDist} ${unit}: base → build → peak → taper, ${dpw} runs/week.`);
+    }
+
+    // ---- Split alignment: place strength sessions on the days the user's own
+    // workout split already trains that lift, so a lift quest is the work they
+    // planned anyway (with a target) rather than extra volume. ----
+    function dowFull(dateStr) {
+      return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(dateStr + 'T00:00:00').getDay()];
+    }
+    // Which split slot trains this lift, by name. Returns a split label or null.
+    function splitCategoryForExercise(name) {
+      const n = (name || '').toLowerCase();
+      // Lower first so "deadlift" resolves to Lower Body (a Pull day would also work).
+      if (/squat|lunge|\bleg\b|calf|quad|hamstring|glute|rdl|romanian|deadlift|hip\s*thrust|split\s*squat/.test(n)) return 'Lower Body';
+      if (/bench|chest|shoulder|\bohp\b|overhead|\bpress\b|push|tricep|\bdip\b/.test(n)) return 'Upper Push';
+      if (/pull|\brow\b|\blat\b|curl|bicep|chin|\bback\b/.test(n)) return 'Upper Pull';
+      return null;
+    }
+    // Weekdays (in week order) whose split slot matches the category. Full Body
+    // days count for any lift.
+    function splitDaysForCategory(cat) {
+      if (!cat) return [];
+      const order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const sp = (typeof state !== 'undefined' && state.workoutSplit) || {};
+      return order.filter(d => { const t = sp[d]; return t && (t === cat || t === 'Full Body'); });
+    }
+    // The date of a given weekday within the 7-day window starting at weekStart.
+    function dateForWeekdayInWindow(weekStart, weekdayName) {
+      for (let i = 0; i < 7; i++) { const d = addDaysStr(weekStart, i); if (dowFull(d) === weekdayName) return d; }
+      return weekStart;
+    }
+
+    // Build a strength plan: progressive top-set toward the target lift, with
+    // periodized loading and a deload before the test. Sessions land on the user's
+    // own split days for that lift when a split is set (opts.alignToSplit !== false).
+    function buildStrengthPlan(goal, opts) {
+      const start = (opts && opts.startDate) || todayStr();
+      const W = Math.max(3, weeksUntil(goal.date, start));
+      const cur = parseGoalValue(goal.current);
+      const tgt = parseGoalValue(goal.target);
+      const unit = (tgt && tgt.unit) || (cur && cur.unit) || 'lbs';
+      const startTop = cur ? cur.value : Math.max(45, snapToPlate(tgt.value * 0.7));
+      const target = tgt.value;
+      const ex = toTitleCase(exerciseShortName(goal.name)) || 'Main lift';
+      const deloadWeek = W >= 5 ? W - 2 : -1; // deload near the end if the block is long enough
+      // Split alignment (default on). Empty array → fall back to fixed Tue/Fri offsets.
+      const align = !(opts && opts.alignToSplit === false);
+      const splitDays = align ? splitDaysForCategory(splitCategoryForExercise(goal.name)) : [];
+      const aligned = splitDays.length > 0;
+      const sessions = [];
+      for (let w = 0; w < W; w++) {
+        const weekStart = addDaysStr(start, w * 7);
+        const isLast = w === W - 1;
+        const isDeload = w === deloadWeek;
+        const frac = W > 1 ? w / (W - 1) : 1;
+        const phase = isLast ? 'test' : isDeload ? 'deload' : frac < 0.5 ? 'accumulation' : 'intensification';
+        const topThisWeek = snapToPlate(startTop + (target - startTop) * frac);
+        const keyTarget = isLast ? target : (isDeload ? snapToPlate(topThisWeek * 0.85) : topThisWeek);
+        // Session days: on aligned split days when available, else Tue/Fri offsets.
+        const dates = aligned
+          ? splitDays.map(dn => dateForWeekdayInWindow(weekStart, dn)).sort()
+          : [addDaysStr(weekStart, 1), addDaysStr(weekStart, 4)];
+        const keyDate = dates[0];
+        const volDate = dates[1] || null; // only one split day/week → single session, no add-on volume
+        sessions.push({ date: keyDate, dow: dowShort(keyDate), week: w + 1, phase,
+          type: isLast ? 'test' : 'lift',
+          title: isLast ? `Test ${ex} — ${target} ${unit}` : `${ex} top set — ${keyTarget} ${unit}`,
+          detail: isLast ? `Attempt your target. Warm up thoroughly, then go for ${target} ${unit}.`
+                         : isDeload ? `Deload — keep it crisp at ${keyTarget} ${unit}, leave reps in the tank.`
+                                    : `Work up to a strong set at ${keyTarget} ${unit} (RPE 7–8) on your ${dowFull(keyDate)} session. Back-off sets after.`,
+          target: keyTarget, unit, done: false });
+        // Add-on volume only if there's a second matching day that week (and not the test week).
+        if (!isLast && volDate) {
+          const volLoad = snapToPlate(keyTarget * 0.8);
+          sessions.push({ date: volDate, dow: dowShort(volDate), week: w + 1, phase,
+            type: 'volume', title: `${ex} volume — ${volLoad} ${unit}`,
+            detail: `3–4 sets at ${volLoad} ${unit} on your ${dowFull(volDate)} session. Quality reps, build the pattern.`,
+            target: null, unit, done: false });
+        }
+      }
+      const alignNote = aligned ? ` on your ${splitDays.join(' / ')} split day${splitDays.length > 1 ? 's' : ''}` : '';
+      return finalizePlan(goal, 'strength', aligned ? splitDays.length : 2, W, sessions,
+        `${W}-week progression on ${ex}: ${startTop} → ${target} ${unit}${alignNote}.`);
+    }
+
+    // Generic fallback: spread the goal's milestones across their dates as
+    // checkpoint sessions, plus a weekly progress nudge.
+    function buildGenericPlan(goal, opts) {
+      const start = (opts && opts.startDate) || todayStr();
+      const W = weeksUntil(goal.date, start);
+      const ms = (goal.milestones && goal.milestones.length) ? goal.milestones : generateMilestonesForGoal(goal);
+      const sessions = (ms || []).filter(m => m.date).map(m => ({
+        date: m.date, dow: dowShort(m.date), week: Math.max(1, Math.ceil((new Date(m.date + 'T00:00:00') - new Date(start + 'T00:00:00')) / (7 * 86400000))),
+        phase: 'checkpoint', type: 'checkpoint', title: m.text,
+        detail: 'Checkpoint toward your goal. Log the work that gets you here.',
+        target: (typeof m.target === 'number') ? m.target : null, unit: m.unit || '', done: !!m.done,
+      }));
+      return finalizePlan(goal, 'generic', 1, W, sessions,
+        `${W}-week progression across ${sessions.length} checkpoints toward "${goal.name}".`);
+    }
+
+    // Common assembly: sort by date, stamp metadata.
+    function finalizePlan(goal, archetype, daysPerWeek, weeks, sessions, summary) {
+      sessions.sort((a, b) => a.date.localeCompare(b.date));
+      sessions.forEach((s, i) => { s.id = i + 1; });
+      return { archetype, createdAt: todayStr(), goalDate: goal.date || null, daysPerWeek, weeks, summary, sessions };
+    }
+
+    // Public entry: generate a plan object for a goal (does not save).
+    function generatePlanForGoal(goal, opts) {
+      if (!goal) return null;
+      switch (planArchetypeForGoal(goal)) {
+        case 'running': return buildRunningPlan(goal, opts);
+        case 'strength': return buildStrengthPlan(goal, opts);
+        default: return buildGenericPlan(goal, opts);
+      }
+    }
+
+    // Generate + attach a plan to a goal, then persist and re-render.
+    function attachPlanToGoal(goalId, opts) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g) return null;
+      g.plan = generatePlanForGoal(g, opts);
+      if (typeof save === 'function') save();
+      if (typeof renderGoals === 'function') { try { renderGoals(); } catch (e) {} }
+      return g.plan;
+    }
+
+    // Completion stats for a goal's plan.
+    function planStats(goal) {
+      const sessions = (goal && goal.plan && goal.plan.sessions) || [];
+      const done = sessions.filter(s => s.done).length;
+      const total = sessions.length;
+      const today = todayStr();
+      const next = sessions.find(s => !s.done && s.date >= today) || null;
+      return { total, done, pct: total ? Math.round((done / total) * 100) : 0, next };
+    }
+
+    // All plan sessions falling on a given date (feeds the goal-derived daily board).
+    function sessionsForDate(dateStr) {
+      const out = [];
+      (state.goals || []).filter(g => g && !g.archived && g.plan).forEach(g => {
+        (g.plan.sessions || []).forEach(s => { if (s.date === dateStr) out.push(Object.assign({ goalId: g.id, goalName: g.name }, s)); });
+      });
+      return out;
+    }
+
+    // ARIA personalization hook. When the chat edge function is wired, this would
+    // POST the deterministic plan + goal/profile context and merge ARIA's tweaks
+    // (swap days, adjust volume for injuries, etc.). CORS blocks direct browser ->
+    // Anthropic calls, so for now it returns the template plan unchanged.
+    async function personalizePlanWithAria(plan, goal) { return plan; }
+
     // Generate sensible unit-aware milestones from a goal's current/target/date window.
     function generateMilestonesForGoal(goal) {
       if (!goal || !goal.date) return [];
