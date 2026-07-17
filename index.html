@@ -963,6 +963,37 @@
       letter-spacing: .5px;
     }
 
+    /* T105 — per-goal quest row on the goal card */
+    .goal-quest {
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;
+      cursor: pointer;
+    }
+    .goal-quest-check {
+      width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--accent);
+      display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
+    }
+    .goal-quest-check.done { background: var(--green); border-color: var(--green); }
+    .goal-quest.done .goal-quest-name { text-decoration: line-through; color: var(--text3); }
+    .goal-quest-body { flex: 1; min-width: 0; }
+    .goal-quest-label { font-size: 9px; letter-spacing: 1px; color: var(--accent); font-family: 'Rajdhani', sans-serif; font-weight: 700; }
+    .goal-quest-name { font-size: 13px; color: var(--text); }
+    .goal-quest-sub { font-size: 11px; color: var(--text3); line-height: 1.4; }
+    .goal-quest-xp { font-size: 12px; color: var(--gold); font-family: 'Rajdhani', sans-serif; font-weight: 700; flex-shrink: 0; }
+    .plan-generate-btn {
+      margin-top: 10px;
+      width: 100%;
+      border: 1px dashed var(--accent);
+      background: rgba(99,102,241,0.06);
+      color: var(--accent);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      letter-spacing: .5px;
+    }
+
     /* HUNTER CARD */
     .hunter-card {
       background: linear-gradient(135deg, #0d1a2e 0%, #101c30 100%);
@@ -1135,7 +1166,11 @@
       align-items: flex-start;
       justify-content: space-between;
       margin-bottom: 10px;
+      gap: 12px;
     }
+    /* T104 — reserve space for the % column so a long target date can't run under it */
+    .goal-header > div:first-child { flex: 1; min-width: 0; }
+    .goal-header > div:last-child { flex-shrink: 0; }
 
     .goal-name {
       font-size: 14px;
@@ -4387,7 +4422,7 @@
           <div class="hunter-card">
             <div class="hunter-card-content">
               <div class="hunter-rank-badge" id="rank-badge"><span class="icon-title-slot"
-                  data-icon="trophy"></span>Rank E Hunter</div>
+                  data-icon="trophy"></span>Rank E</div>
               <div class="hunter-name" id="hunter-name-display">Hunter</div>
               <div style="font-size:12px;color:var(--text3);margin-top:2px;" id="xp-sub-label">0 / 1000 XP to Rank D
               </div>
@@ -4962,7 +4997,7 @@
             <div class="section-label" style="margin-top:4px;">TOUR & TIPS</div>
             <div class="card">
               <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;">Two guided tours. The
-                quick <strong>Hunter Orientation</strong> highlights the five tabs and ARIA. The
+                quick <strong>Quick Orientation</strong> highlights the five tabs and ARIA. The
                 <strong>Full Tour</strong> goes deeper — a ~15-stop walkthrough of every system: quests, the workout
                 tracker, fuel, progress, the shop, and more.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -5153,7 +5188,7 @@
        onboarding. Dismissible. Triggers startTutorial() when accepted. -->
   <div class="tutorial-optin" id="tutorial-optin">
     <div class="tutorial-optin-text">
-      <strong>Hunter Orientation</strong>
+      <strong>Quick Orientation</strong>
       Take a 60-second tour of the app?
     </div>
     <div class="tutorial-optin-actions">
@@ -6245,7 +6280,7 @@
         // plainMode: when true, swaps Solo Leveling theme labels (Hunter, ARISE, Hunter Shop,
         // etc.) for neutral fitness-app language. Quests and the E-S rank system stay in
         // both modes per user preference. Visual style (colors, fonts) unchanged for v1.
-        plainMode: false,
+        plainMode: true, // T106 — generic terminology is the default (keeps ARISE + Rank)
         // T79.6 — Large mode. When true, applyLargeMode() flips
         // data-text-size="large" on documentElement and the CSS block at the
         // bottom of the stylesheet scales fonts, button padding, icon sizes,
@@ -8777,7 +8812,7 @@ create trigger trg_user_state_updated_at
           if (typeof state.settings.beginnerMode !== 'boolean') state.settings.beginnerMode = false;
           // T96.2 — Plain mode retired; force false on every load so any
           // user who had it toggled on in cloud-sync state lands in themed UI.
-          state.settings.plainMode = false;
+          state.settings.plainMode = true; // T106 — force generic terminology (keeps ARISE + Rank)
           // T79.6 — Large mode backfill so existing users get the default-off setting.
           if (typeof state.settings.largeMode !== 'boolean') state.settings.largeMode = false;
           // T95 — Meal Prep intro flag backfill. Existing users will see the
@@ -10928,7 +10963,7 @@ create trigger trg_user_state_updated_at
       const lbl = document.getElementById('food-picker-toggle-label');
       if (lbl) lbl.textContent = 'Pick from food library';
     }
-    // ===== T33.2 — Tutorial / Hunter Orientation =====
+    // ===== T33.2 — Tutorial / Quick Orientation =====
     // Opt-in spotlight tour shown after onboarding. Five stops:
     //   1. Quests tab  2. Progress tab  3. Workouts tab  4. Fuel tab
     //   5. Profile tab 6. ARIA FAB      7. Replay note (final card)
@@ -11010,7 +11045,7 @@ create trigger trg_user_state_updated_at
       {
         id: 'replay',
         selectorFn: null, // final card, no target
-        title: 'You\'re Ready, Hunter',
+        title: 'You\'re Ready',
         body: 'That\'s the tour. Replay it anytime from Profile → Tools → Tour & Tips, where the deeper Full Tour also lives. The hunt starts now.',
         placement: 'center',
         beforeShow: () => { try { switchTab('quests'); } catch(e){} },
@@ -11076,7 +11111,7 @@ create trigger trg_user_state_updated_at
       {
         id: 'ct-rank',
         selectorFn: () => document.getElementById('rank-badge'),
-        title: 'Hunter Rank & XP',
+        title: 'Rank & XP',
         body: 'Your rank climbs from E to S as you bank XP, and the bar shows how close the next rank is. Card frames you equip in the Shop appear right here on this card.',
         placement: 'auto',
         beforeShow: () => { try { switchTab('progress'); switchProgressTab('stats'); } catch(e){} },
@@ -11192,7 +11227,7 @@ create trigger trg_user_state_updated_at
         // automatically as you hit each rank tier; titles are earned by
         // hitting milestones (streaks, lifts, etc.).
         selectorFn: () => document.querySelector('[data-nav="shop"]') || document.getElementById('screen-shop'),
-        title: 'Hunter Gear',
+        title: 'Rewards',
         body: 'Frames and Titles live here. Card frames unlock automatically as you hit each rank — D, C, B, A, S — and you can equip any unlocked frame at any time. Titles are earned by hitting milestones like streaks, lifts, or full-clear days. No coins, no shop: the work is the price.',
         placement: 'auto',
         waitMs: 320,
@@ -11202,7 +11237,7 @@ create trigger trg_user_state_updated_at
         id: 'ct-done',
         selectorFn: null,
         title: 'That\'s the Full Picture',
-        body: 'You\'ve seen every system. Replay either tour anytime from Profile → Tools → Tour & Tips. Now go put in the work, Hunter.',
+        body: 'You\'ve seen every system. Replay either tour anytime from Profile → Tools → Tour & Tips. Now go put in the work.',
         placement: 'center',
         beforeShow: () => { try { switchTab('quests'); } catch(e){} },
       },
@@ -12385,7 +12420,7 @@ create trigger trg_user_state_updated_at
         // Render the cached quest into the AI quest card slot
         try { renderAIQuestCard(state.aiTodayQuest.quest); } catch (e) {}
       }
-      // T33.2 — Show the Hunter Orientation opt-in on first launch after
+      // T33.2 — Show the Quick Orientation opt-in on first launch after
       // onboarding. No-op if already seen.
       try { maybeShowTutorialPrompt(); } catch (e) { console.warn('tutorial prompt', e); }
       // T34.1 — Render recovery banner if any regions are active, and run
@@ -12777,13 +12812,13 @@ create trigger trg_user_state_updated_at
       hunter_shop: { themed: 'Hunter Shop', plain: 'Rewards Shop' },
       // Buttons
       enter_hunter_shop: { themed: 'Enter Hunter Shop', plain: 'Open Rewards Shop' },
-      arise_begin: { themed: 'ARISE — Begin Training', plain: 'Begin Training' },
+      arise_begin: { themed: 'ARISE — Begin Training', plain: 'ARISE — Begin Training' },
       // Onboarding step header tags
-      arise_awakening: { themed: 'ARISE SYSTEM — AWAKENING', plain: 'SETUP — GET STARTED' },
-      arise_init: { themed: 'ARISE SYSTEM — INITIALIZATION', plain: 'SETUP — STEP 1 OF 4' },
-      arise_step2: { themed: 'ARISE SYSTEM — STEP 2 OF 4', plain: 'SETUP — STEP 2 OF 4' },
-      arise_step3: { themed: 'ARISE SYSTEM — STEP 3 OF 4', plain: 'SETUP — STEP 3 OF 4' },
-      arise_step4: { themed: 'ARISE SYSTEM — STEP 4 OF 4', plain: 'SETUP — STEP 4 OF 4' },
+      arise_awakening: { themed: 'ARISE SYSTEM — AWAKENING', plain: 'ARISE — GET STARTED' },
+      arise_init: { themed: 'ARISE SYSTEM — INITIALIZATION', plain: 'ARISE — STEP 1 OF 4' },
+      arise_step2: { themed: 'ARISE SYSTEM — STEP 2 OF 4', plain: 'ARISE — STEP 2 OF 4' },
+      arise_step3: { themed: 'ARISE SYSTEM — STEP 3 OF 4', plain: 'ARISE — STEP 3 OF 4' },
+      arise_step4: { themed: 'ARISE SYSTEM — STEP 4 OF 4', plain: 'ARISE — STEP 4 OF 4' },
       // Field labels
       hunter_name_label: { themed: 'Hunter Name', plain: 'Name' },
       // Default user name fallback (when ob-name is empty)
@@ -12791,10 +12826,10 @@ create trigger trg_user_state_updated_at
       // Status / hero card display
       rank_x_hunter: { themed: 'Hunter', plain: '' }, // suffix after "Rank E"
       // Currency
-      coins: { themed: 'Coins', plain: 'Points' },
-      coin: { themed: 'Coin', plain: 'Point' },
+      coins: { themed: 'Coins', plain: 'Coins' },
+      coin: { themed: 'Coin', plain: 'Coin' },
       // Notif text
-      rank_up: { themed: 'RANK UP!', plain: 'NEW TIER!' },
+      rank_up: { themed: 'RANK UP!', plain: 'RANK UP!' },
       // Graduation prompt header
       hunter_evaluation: { themed: 'Hunter Evaluation', plain: 'Progress Check' },
       // Title achievements (kept user-visible, swapped for plain).
@@ -12802,12 +12837,12 @@ create trigger trg_user_state_updated_at
       title_monarch: { themed: 'Shadow Monarch', plain: 'Champion' },
       title_ascendant: { themed: 'The Ascendant', plain: 'Elite' },
       // User-facing copy referring to backup files (file format itself stays 'ARISE_BACKUP')
-      arise_backup: { themed: 'ARISE backup', plain: 'app backup' },
-      arise_test_notif: { themed: 'ARISE test', plain: 'Test notification' },
+      arise_backup: { themed: 'ARISE backup', plain: 'ARISE backup' },
+      arise_test_notif: { themed: 'ARISE test', plain: 'ARISE test' },
       // Onboarding starter-card descriptions
       returning_blurb: {
         themed: 'Already have an ARISE backup from another device? Import the JSON file and pick up where you left off — quests, training log, and everything else.',
-        plain: 'Already have a backup from another device? Import the JSON file and pick up where you left off — quests, training log, and everything else.',
+        plain: 'Already have an ARISE backup from another device? Import the JSON file and pick up where you left off — quests, training log, and everything else.',
       },
     };
     // t(key, fallback) — return the right label for current plainMode state.
@@ -12846,9 +12881,7 @@ create trigger trg_user_state_updated_at
       });
       // Document title also reflects mode
       if (document.title) {
-        document.title = (state.settings && state.settings.plainMode)
-          ? 'Fitness System'
-          : 'ARISE — Fitness System';
+        document.title = 'ARISE — Fitness System';
       }
     }
     // T96.2 — Plain mode retired. togglePlainMode is now a no-op so any
@@ -14931,7 +14964,12 @@ create trigger trg_user_state_updated_at
       // is the visual cue.
       document.getElementById('quest-date-label').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + (state.workoutSplit[dayOfWeek()] || 'Rest') + (vacationMode ? ' · Vacation' : '');
       { const v = document.getElementById('streak-display-value'); if (v) v.textContent = state.streak; }
-      document.getElementById('quest-summary').textContent = `${doneCount} of ${state.quests.length} complete · ${totalXP} XP earned today`;
+      // T107 — summary now reflects today's scheduled training sessions (the new board).
+      { const _sess = todaysScheduledSessions(); const _done = _sess.filter(x => x.session.done).length;
+        const _el = document.getElementById('quest-summary');
+        if (_el) _el.textContent = _sess.length
+          ? `${_done} of ${_sess.length} of today's sessions done`
+          : 'No sessions scheduled today — rest, or get ahead on a goal'; }
       renderStreakRow();
       const container = document.getElementById('quest-list-container');
       container.innerHTML = '';
@@ -14971,7 +15009,14 @@ create trigger trg_user_state_updated_at
           container.appendChild(wrap);
         }
       }
-      state.quests.forEach(q => {
+      // T107 — The Quests tab now renders the goals page: each goal card carries
+      // its own TODAY'S QUEST (renderGoalQuest). The old template quest-item list
+      // is retired here — the goal cards are the board. The loop below is neutered
+      // (iterates an empty array) so the surrounding scaffolding stays intact.
+      const goalsWrap = document.createElement('div');
+      container.appendChild(goalsWrap);
+      try { renderGoalsInto(goalsWrap); } catch (e) { console.warn('renderGoalsInto (quests tab)', e); }
+      [].forEach(q => {
         const div = document.createElement('div');
         div.className = 'quest-item' + (q.done ? ' done' : '') + (q.source === 'aria' ? ' from-aria' : '');
         // T98.1 — ARIA-sourced quests get a small accent chip + the optional
@@ -15025,7 +15070,7 @@ create trigger trg_user_state_updated_at
     // calling this on mobile is harmless.
     function renderHomeDashboard() {
       if (!state.profile) return;
-      const userName = state.profile.name || 'Hunter';
+      const userName = state.profile.name || 'Athlete';
       const r = state.rank || 'E';
       const color = (typeof RANK_COLORS !== 'undefined' && RANK_COLORS[r]) || '#888';
       // T25.3 — Render the wide Hunter banner at the top of the Quests page
@@ -15057,7 +15102,7 @@ create trigger trg_user_state_updated_at
               </div>
             </div>
             <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
-              <div style="font-size:18px;font-weight:700;color:var(--text);font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${escapeHtml(p.name || 'Hunter')}</div>
+              <div style="font-size:18px;font-weight:700;color:var(--text);font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${escapeHtml(p.name || 'Athlete')}</div>
               <div style="font-size:11px;color:${rankColor};font-family:'Rajdhani',sans-serif;letter-spacing:2px;font-weight:600;">${rankLabel.toUpperCase()} · LVL ${state.level || 1}</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
                 ${w ? `<div class="avatar-chip"><strong>${w}</strong> lbs</div>` : ''}
@@ -15880,6 +15925,8 @@ create trigger trg_user_state_updated_at
       state.logs = state.logs.filter(l => l.date !== todayStr());
       state.logs.push(entry);
       state.xp += 25;
+      // T108 — fold this weigh-in into any bodyweight / body-fat goals.
+      try { const wa = applyWeighInToGoals(entry); if (wa && wa.length) showNotif(`Weigh-in logged${goalAdvanceMsg(wa)}`, 'var(--green2)'); } catch (e) {}
       save();
       closeModal('modal-log');
       // Clear staged photo + reset measurement inputs so next open is fresh
@@ -16223,6 +16270,19 @@ create trigger trg_user_state_updated_at
     // is actively focused on.
     function activeGoals() { return (state.goals || []).filter(g => g && !g.archived); }
     function archivedGoals() { return (state.goals || []).filter(g => g && g.archived); }
+    // T104 — Direct delete for an active goal (previously only reachable after
+    // archiving). Confirms, removes the goal + its plan, clears any open plan
+    // selection, then re-renders.
+    function deleteGoalConfirm(goalId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g) return;
+      if (!confirm(`Delete "${toTitleCase(g.name)}"? This permanently removes the goal and its training plan.`)) return;
+      state.goals = (state.goals || []).filter(x => x.id != goalId);
+      if (typeof _planSel !== 'undefined' && _planSel && _planSel.goalId == goalId) _planSel = null;
+      save();
+      renderGoals();
+      showNotif('Goal deleted', 'var(--text2)');
+    }
     function archiveGoal(goalId) {
       const g = (state.goals || []).find(x => x && x.id == goalId);
       if (!g) return;
@@ -16251,8 +16311,106 @@ create trigger trg_user_state_updated_at
       try { renderStats(); } catch (e) {}
     }
 
-    function renderGoals() {
-      const list = document.getElementById('goals-list');
+    // ===== T105 — Per-goal quest (goals-as-quests) =====
+    // One actionable quest under each goal, shown after the milestone dropdown:
+    // today's scheduled training session if there is one (completing it marks the
+    // plan session done + advances via the calendar), otherwise a small challenge
+    // nudge toward the goal. Makes "do X → contributes to Y" explicit. This is the
+    // additive display layer; re-basing the daily streak onto these quests is a
+    // separate, deliberate follow-up.
+    function questXpForSession(s) {
+      if (!s) return 60;
+      if (s.type === 'race' || s.type === 'test') return 120;
+      if (s.type === 'long') return 80;
+      return 60;
+    }
+    // A doable-any-day nudge when a goal has no session scheduled today.
+    function generateGoalChallenge(g) {
+      const cur = parseGoalValue(g.current), tgt = parseGoalValue(g.target);
+      const kind = detectGoalKind(g, cur, tgt);
+      const ex = toTitleCase(exerciseShortName(g.name)) || 'this goal';
+      switch (kind) {
+        case 'weightlift': return { name: `Log a ${ex} set`, desc: 'Get a working set in and log it — it auto-updates this goal.', xp: 40 };
+        case 'reps': return { name: `Log ${ex} reps`, desc: `Do a set of ${ex} and log your reps.`, xp: 40 };
+        case 'distance':
+        case 'pace': return { name: 'Get a run in', desc: `Log a run toward "${toTitleCase(g.name)}".`, xp: 40 };
+        case 'duration': return { name: `Train ${ex}`, desc: 'Log a session toward this goal.', xp: 40 };
+        default: return { name: `Advance ${toTitleCase(g.name)}`, desc: 'Take one concrete step toward this goal today.', xp: 35 };
+      }
+    }
+    // Resolve the goal's quest for today.
+    function goalQuestForToday(g) {
+      const today = todayStr();
+      if (g.plan && Array.isArray(g.plan.sessions)) {
+        const s = g.plan.sessions.find(x => x.date === today);
+        if (s) return { kind: 'session', sessionId: s.id, title: s.title, sub: 'Scheduled today · complete it to advance this goal', xp: questXpForSession(s), done: !!s.done };
+      }
+      const ch = generateGoalChallenge(g);
+      return { kind: 'challenge', title: ch.name, sub: ch.desc, xp: ch.xp, done: g.challengeDoneDate === today };
+    }
+    function renderGoalQuest(g) {
+      const q = goalQuestForToday(g);
+      if (!q) return '';
+      const onclick = q.kind === 'session'
+        ? `event.stopPropagation();toggleSessionDone(${JSON.stringify(g.id)},${JSON.stringify(q.sessionId)});renderGoals();`
+        : `event.stopPropagation();toggleGoalChallenge(${JSON.stringify(g.id)});`;
+      return `<div class="goal-quest${q.done ? ' done' : ''}" onclick="${onclick}" title="Tap to ${q.done ? 'undo' : 'complete'}">
+        <div class="goal-quest-check${q.done ? ' done' : ''}">${q.done ? iconSvg('check', 13) : ''}</div>
+        <div class="goal-quest-body">
+          <div class="goal-quest-label">TODAY'S QUEST</div>
+          <div class="goal-quest-name">${escapeHtml(q.title)}</div>
+          <div class="goal-quest-sub">${escapeHtml(q.sub)}</div>
+        </div>
+        <div class="goal-quest-xp">+${q.xp}</div>
+      </div>`;
+    }
+    // Complete/undo a goal's challenge-nudge (only used when no session is scheduled
+    // today). XP mirrors the quest-completion path; deliberately NOT wired to the
+    // daily streak yet (that re-base is a separate step).
+    function toggleGoalChallenge(goalId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g) return;
+      const today = todayStr();
+      if (g.challengeDoneDate === today) {
+        g.challengeDoneDate = null;
+        const back = g.challengeXp || 35;
+        state.xp = Math.max(0, (state.xp || 0) - back);
+        if (typeof getRank === 'function') state.rank = getRank(state.xp);
+        try { state.xpByDomain = state.xpByDomain || { fitness: 0, mind: 0 }; state.xpByDomain.fitness = Math.max(0, (state.xpByDomain.fitness || 0) - back); } catch (e) {}
+        showNotif('Quest unmarked', 'var(--text2)');
+      } else {
+        const xp = generateGoalChallenge(g).xp || 35;
+        g.challengeDoneDate = today;
+        g.challengeXp = xp;
+        state.xp = (state.xp || 0) + xp;
+        if (typeof getRank === 'function') state.rank = getRank(state.xp);
+        try { state.xpByDomain = state.xpByDomain || { fitness: 0, mind: 0 }; state.xpByDomain.fitness = (state.xpByDomain.fitness || 0) + xp; } catch (e) {}
+        showNotif(`Quest complete! +${xp} XP`, 'var(--green2)');
+        if (typeof checkLevelUp === 'function') { try { checkLevelUp(); } catch (e) {} }
+      }
+      save();
+      renderGoals();
+      try { renderStats(); } catch (e) {}
+      try { renderProfile(); } catch (e) {}
+    }
+    // T107 — today's scheduled plan sessions across active goals. Drives the
+    // re-based daily streak ("finish today's scheduled sessions").
+    function todaysScheduledSessions() {
+      const today = todayStr();
+      const out = [];
+      (state.goals || []).filter(g => g && !g.archived && g.plan && Array.isArray(g.plan.sessions)).forEach(g => {
+        g.plan.sessions.forEach(s => { if (s.date === today) out.push({ goalId: g.id, session: s }); });
+      });
+      return out;
+    }
+    // True when there's at least one session scheduled today and all are done.
+    // Goals with nothing scheduled today don't block it (rest days stay safe).
+    function dailyBoardComplete() {
+      const sess = todaysScheduledSessions();
+      return sess.length > 0 && sess.every(x => x.session.done);
+    }
+    function renderGoals() { renderGoalsInto(document.getElementById('goals-list')); }
+    function renderGoalsInto(list) {
       if (!list) return;
       // Backfill milestones for any legacy goals that have none AND regenerate any
       // auto milestones from an older schema version (so parser fixes roll forward).
@@ -16318,6 +16476,7 @@ create trigger trg_user_state_updated_at
               <!-- T86.1 — Archive moves a goal into "Inactive goals" without
                    losing its history; the same goal can be unarchived later. -->
               <button onclick="event.stopPropagation();archiveGoal(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;" title="Move to Inactive goals — restore later without losing progress">Archive</button>
+              <button onclick="event.stopPropagation();deleteGoalConfirm(${JSON.stringify(goal.id)})" style="background:none;border:none;color:var(--red2);font-size:11px;cursor:pointer;" title="Delete this goal and its plan permanently">Delete</button>
             </div>
           </div>
         </div>
@@ -16344,6 +16503,7 @@ create trigger trg_user_state_updated_at
             </div>
           `).join('')}
         </div>` : ''}
+        ${renderGoalQuest(goal)}
         ${renderGoalPlanSection(goal)}
       `;
           list.appendChild(div);
@@ -16440,6 +16600,7 @@ create trigger trg_user_state_updated_at
           <span>${iconSvg('calendar', 13)} Training plan · ${st.done}/${st.total} done${weekNow ? ` · Week ${weekNow} of ${plan.weeks}` : ''}</span>
           <span class="plan-actions">
             <button style="color:var(--accent2);" onclick="event.stopPropagation();regenerateGoalPlan(${JSON.stringify(goal.id)})" title="Rebuild the schedule from current/target/date">↻ regen</button>
+            <button style="color:var(--accent);" onclick="event.stopPropagation();downloadGoalICS(${JSON.stringify(goal.id)})" title="Export sessions to Google / Apple Calendar (.ics)">↥ calendar</button>
             <button style="color:var(--text3);" onclick="event.stopPropagation();removeGoalPlan(${JSON.stringify(goal.id)})" title="Remove this schedule">remove</button>
           </span>
         </div>
@@ -16552,10 +16713,30 @@ create trigger trg_user_state_updated_at
       if (!g || !g.plan) return;
       const s = (g.plan.sessions || []).find(x => x.id == sessionId);
       if (!s) return;
+      const wasComplete = dailyBoardComplete(); // board state BEFORE this toggle
       s.done = !s.done;
       if (s.done) { state.xp = (state.xp || 0) + 30; showNotif('Session done · +30 XP'); }
+      else { state.xp = Math.max(0, (state.xp || 0) - 30); }
+      // T107 — re-based streak: advances when all of TODAY's scheduled sessions
+      // are done (once/day); reverses if the board is un-completed the same day.
+      if (s.date === todayStr()) {
+        const nowComplete = dailyBoardComplete();
+        if (nowComplete && !wasComplete && state.allCompleteBonusDate !== todayStr()) {
+          state.allCompleteBonusDate = todayStr();
+          state.streak = (state.streak || 0) + 1;
+          if (!state.stats) state.stats = { totalQuestsCompleted: 0, anyFullDayCompleted: false, macroStreak: 0, lastMacroHitDate: null };
+          state.stats.anyFullDayCompleted = true;
+          setTimeout(() => { try { showNotif("Today's sessions complete! Streak: " + state.streak, 'var(--gold)'); } catch (e) {} }, 400);
+        } else if (!nowComplete && wasComplete && state.allCompleteBonusDate === todayStr()) {
+          state.allCompleteBonusDate = null;
+          state.streak = Math.max(0, (state.streak || 0) - 1);
+        }
+      }
+      if (typeof getRank === 'function') state.rank = getRank(state.xp);
       if (typeof save === 'function') save();
       refreshGoalPlan(goalId);
+      try { renderQuests(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
     }
     function toggleMilestone(goalId, idx) {
       const g = state.goals.find(g => g.id == goalId);
@@ -21057,6 +21238,41 @@ create trigger trg_user_state_updated_at
       return results;
     }
 
+    // T108 — Body-composition goals advance from a weigh-in (not a workout log).
+    // Bodyweight / body-fat goals are current-state metrics, so progress reflects
+    // the LATEST reading (not a monotonic PR). Direction-aware (cut vs bulk, or
+    // body-fat down) via start-vs-target. Only touches goals whose relevant metric
+    // is present in this weigh-in.
+    function applyWeighInToGoals(entry) {
+      const results = [];
+      if (!entry || !Array.isArray(state.goals)) return results;
+      let changed = false;
+      state.goals.filter(g => g && !g.archived).forEach(g => {
+        const cur = parseGoalValue(g.current), tgt = parseGoalValue(g.target);
+        if (!tgt) return;
+        const kind = detectGoalKind(g, cur, tgt);
+        let achieved = null, unit = tgt.unit || '';
+        if (kind === 'bodyweight' && entry.weight != null) { achieved = entry.weight; unit = tgt.unit || 'lbs'; }
+        else if (kind === 'bodyfat' && entry.bf != null) { achieved = entry.bf; unit = '%'; }
+        else return;
+        if (g.startValue == null) g.startValue = cur ? cur.value : achieved;
+        const start = g.startValue, target = tgt.value;
+        if (start === target) return;
+        const dir = target > start ? 1 : -1; // -1 = lower-is-better (weight loss / bodyfat down)
+        const frac = dir === 1 ? (achieved - start) / (target - start) : (start - achieved) / (start - target);
+        const pct = Math.round(Math.max(0, Math.min(100, frac * 100)));
+        const oldPct = g.progress || 0;
+        g.progress = pct;                                   // latest reading (not monotonic)
+        g.current = kind === 'bodyfat' ? `${achieved}%` : `${achieved} ${unit}`;
+        changed = true;
+        results.push({ id: g.id, name: g.name, oldPct, newPct: pct });
+      });
+      if (changed) {
+        if (typeof save === 'function') save();
+        if (typeof renderGoals === 'function') { try { renderGoals(); } catch (e) {} }
+      }
+      return results;
+    }
     // Compose a short "· Squat 82% (+6%)" tail for the log-saved notification.
     function goalAdvanceMsg(results) {
       if (!results || !results.length) return '';
@@ -21324,6 +21540,49 @@ create trigger trg_user_state_updated_at
       return out;
     }
 
+    // ===== T104 — Calendar (.ics) export =====
+    // Turns a goal's training plan into a standard iCalendar file: one all-day
+    // event per session. Imports into Google Calendar, Apple Calendar, or Outlook.
+    // No login/OAuth — a downloadable file. (Live two-way Google sync is a later,
+    // separate feature.)
+    function icsEscape(t) {
+      return String(t == null ? '' : t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+    }
+    function buildGoalICS(goal) {
+      const p = goal && goal.plan;
+      if (!p || !p.sessions || !p.sessions.length) return '';
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      const ymd = d => String(d).replace(/-/g, '');
+      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ARISE//Training Plan//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+      p.sessions.forEach(s => {
+        lines.push('BEGIN:VEVENT');
+        lines.push(`UID:arise-${goal.id}-${s.id}-${ymd(s.date)}@arise.fitness`);
+        lines.push(`DTSTAMP:${stamp}`);
+        lines.push(`DTSTART;VALUE=DATE:${ymd(s.date)}`);
+        lines.push(`DTEND;VALUE=DATE:${ymd(addDaysStr(s.date, 1))}`);
+        lines.push(`SUMMARY:${icsEscape(s.title)}`);
+        if (s.detail) lines.push(`DESCRIPTION:${icsEscape(s.detail)}`);
+        lines.push('END:VEVENT');
+      });
+      lines.push('END:VCALENDAR');
+      return lines.join('\r\n');
+    }
+    function downloadGoalICS(goalId) {
+      const g = (state.goals || []).find(x => x.id == goalId);
+      if (!g || !g.plan) { showNotif('Build a training schedule first'); return; }
+      const ics = buildGoalICS(g);
+      if (!ics) { showNotif('No sessions to export'); return; }
+      try {
+        const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${String(g.name || 'training-plan').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showNotif('Calendar file exported · open it to add to Google / Apple Calendar', 'var(--green2)');
+      } catch (e) { showNotif('Export failed'); }
+    }
     // ARIA personalization hook. When the chat edge function is wired, this would
     // POST the deterministic plan + goal/profile context and merge ARIA's tweaks
     // (swap days, adjust volume for injuries, etc.). CORS blocks direct browser ->
@@ -21773,7 +22032,7 @@ create trigger trg_user_state_updated_at
       casual: { name: 'Casual' },
       athletic: { name: 'Athletic' },
       professional: { name: 'Professional' },
-      hunter: { name: 'Hunter' },
+      hunter: { name: 'Scout' },
     };
     // --- Accessories: glasses, small face accents
     const ACCESSORY_META = {
@@ -22504,7 +22763,7 @@ create trigger trg_user_state_updated_at
         progress: (s) => ({ current: s.streak || 0, target: 100 }),
       },
       title_volume_hunter: {
-        id: 'title_volume_hunter', kind: 'title', name: 'Volume Hunter', icon: 'barchart',
+        id: 'title_volume_hunter', kind: 'title', name: 'Volume Warrior', icon: 'barchart',
         desc: 'A thousand working sets logged. The work always shows.',
         condition: 'Log 1,000 working sets total',
         check: (s) => {
@@ -22572,7 +22831,7 @@ create trigger trg_user_state_updated_at
         },
       },
       title_night_hunter: {
-        id: 'title_night_hunter', kind: 'title', name: 'Night Hunter', icon: 'moon',
+        id: 'title_night_hunter', kind: 'title', name: 'Night Owl', icon: 'moon',
         desc: 'Logged at least 10 sessions after 9 PM. The gym is quietest at night.',
         condition: 'Log 10 workouts after 9 PM',
         check: (s) => {
