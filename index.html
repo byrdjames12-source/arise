@@ -599,6 +599,22 @@
       margin-bottom: 6px;
       padding-left: 2px;
     }
+    /* T110.4 — Goal category headers (STRENGTH, ENDURANCE, etc.) are the
+       structural spine of the Goals page; scope them up so they read as real
+       section dividers, not throwaway captions. Applied only to labels
+       inside the Goals surfaces (opt-in class) so the rest of the app's
+       section-labels stay their tighter default. */
+    .section-label.goals-cat-label {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      color: var(--text);
+      margin-top: 14px;
+      margin-bottom: 10px;
+    }
+    /* First category shouldn't get the extra top margin — it sits at the
+       top of the list. */
+    .section-label.goals-cat-label:first-child { margin-top: 4px; }
 
     /* INPUTS */
     input[type=text],
@@ -1156,9 +1172,13 @@
     /* GOAL CARDS */
     .goal-card {
       background: var(--bg2);
-      border: 1px solid var(--border);
+      /* T110.2 — Stronger visible frame so stacked cards read as distinct
+         blocks. Was a hairline that blended into the page; bumped to a
+         thicker 1.5px on a higher-contrast tone plus a soft inner glow. */
+      border: 1.5px solid var(--text3);
       border-radius: 12px;
       padding: 14px 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
     }
 
     .goal-header {
@@ -15013,9 +15033,12 @@ create trigger trg_user_state_updated_at
       // its own TODAY'S QUEST (renderGoalQuest). The old template quest-item list
       // is retired here — the goal cards are the board. The loop below is neutered
       // (iterates an empty array) so the surrounding scaffolding stays intact.
+      // T110.5 — Pass filter:'today' so this shows only goals whose scheduled
+      // session or category matches today's split — not the full Goals list
+      // (that stayed a duplicate before, defeating the daily-board purpose).
       const goalsWrap = document.createElement('div');
       container.appendChild(goalsWrap);
-      try { renderGoalsInto(goalsWrap); } catch (e) { console.warn('renderGoalsInto (quests tab)', e); }
+      try { renderGoalsInto(goalsWrap, { filter: 'today' }); } catch (e) { console.warn('renderGoalsInto (quests tab)', e); }
       [].forEach(q => {
         const div = document.createElement('div');
         div.className = 'quest-item' + (q.done ? ' done' : '') + (q.source === 'aria' ? ' from-aria' : '');
@@ -16301,6 +16324,19 @@ create trigger trg_user_state_updated_at
       try { renderStats(); } catch (e) {}
       showNotif(`Restored "${g.name}"`, 'var(--green)');
     }
+    // T110.1 — Reopen a completed goal (drops completedAt so it returns to its
+    // category). Does NOT reset progress; the user can still see how far they
+    // went if the goal was over-shot (e.g. target 315, current 335 → reopen
+    // brings it back at 100% clamped; user can edit target upward).
+    function uncompleteGoal(goalId) {
+      const g = (state.goals || []).find(x => x && x.id == goalId);
+      if (!g) return;
+      g.completedAt = null;
+      save();
+      try { renderGoals(); } catch (e) {}
+      try { renderStats(); } catch (e) {}
+      showNotif(`Reopened "${g.name}"`, 'var(--text2)');
+    }
     function deleteArchivedGoal(goalId) {
       const g = (state.goals || []).find(x => x && x.id == goalId);
       if (!g) return;
@@ -16324,19 +16360,129 @@ create trigger trg_user_state_updated_at
       if (s.type === 'long') return 80;
       return 60;
     }
-    // A doable-any-day nudge when a goal has no session scheduled today.
+    // T110.3 — Progression-aware goal quest. Old version emitted "Log Pull-Up
+    // reps" for a "10 unassisted pull-ups" goal, which is dumb — the whole
+    // reason it's a goal is you can't hit the target yet. Now the daily quest
+    // is a *step* toward the goal (progressive overload, sub-max volume,
+    // accessory work, pacing work) with the target as reference. Rotates by
+    // day-of-year so repeat visits don't see the same nudge every day, and
+    // uses current-vs-target gap where it can compute one.
+    //
+    // NB: kept side-effect-free so tests can call it against any goal without
+    // touching state.xp / state.streak / etc.
     function generateGoalChallenge(g) {
       const cur = parseGoalValue(g.current), tgt = parseGoalValue(g.target);
       const kind = detectGoalKind(g, cur, tgt);
       const ex = toTitleCase(exerciseShortName(g.name)) || 'this goal';
-      switch (kind) {
-        case 'weightlift': return { name: `Log a ${ex} set`, desc: 'Get a working set in and log it — it auto-updates this goal.', xp: 40 };
-        case 'reps': return { name: `Log ${ex} reps`, desc: `Do a set of ${ex} and log your reps.`, xp: 40 };
-        case 'distance':
-        case 'pace': return { name: 'Get a run in', desc: `Log a run toward "${toTitleCase(g.name)}".`, xp: 40 };
-        case 'duration': return { name: `Train ${ex}`, desc: 'Log a session toward this goal.', xp: 40 };
-        default: return { name: `Advance ${toTitleCase(g.name)}`, desc: 'Take one concrete step toward this goal today.', xp: 35 };
+      const goalTitle = toTitleCase(g.name);
+      // Rotate templates by day so the nudge changes across the week even
+      // when the underlying goal doesn't. Deterministic — same day, same pick.
+      const day = new Date();
+      const doy = Math.floor((day - new Date(day.getFullYear(), 0, 0)) / 86400000);
+      const pick = (arr) => arr[doy % arr.length];
+      // Reps goals — the flagship "smarter" branch. Current rep max drives
+      // suggestions; when we can't parse a number, we fall back to safe
+      // progression prompts that still push a step (not the target).
+      if (kind === 'reps') {
+        const curN = (cur && isFinite(cur.value)) ? Math.max(0, Math.round(cur.value)) : null;
+        const tgtN = (tgt && isFinite(tgt.value)) ? Math.max(1, Math.round(tgt.value)) : null;
+        // Bodyweight vs weighted flavor picks the template pool.
+        const isBw = /pull.?up|chin.?up|push.?up|sit.?up|dip\b|burpee|muscle.?up|pistol|handstand/.test((g.name || '').toLowerCase());
+        if (isBw) {
+          // Bodyweight rep goals — pullups, dips, pushups. Progressions include
+          // negatives, assisted variants, ladders, rest-pause, back-off volume.
+          const bwTemplates = curN !== null && curN > 0 ? [
+            { name: `${ex} ladder: 1, 2, ${curN}`, desc: `Ramp up 1 rep, rest 30s, 2 reps, rest 30s, ${curN} reps. Density under your current max — no failure.`, xp: 50 },
+            { name: `${ex} negatives × 5`, desc: `5 sets of 3 slow (5s) negatives. Eccentric strength is the fastest wire from ${curN} → ${tgtN || 'goal'} reps.`, xp: 50 },
+            { name: `${ex} rest-pause: 5 mini-sets`, desc: `Do ${Math.max(1, curN - 1)} reps, rest 20s, repeat 5×. Total volume + short rest = the strongest driver toward more reps.`, xp: 50 },
+            { name: `Sub-max ${ex} volume: ${Math.max(1, Math.floor(curN * 0.6))} × 6 sets`, desc: `Six sets of ${Math.max(1, Math.floor(curN * 0.6))} with 90s rest. Volume without draining the CNS.`, xp: 45 },
+            { name: `Push past ${curN}: one all-out set`, desc: `Warm up, then ${curN}-and-hold at the top. Try for +1 rep beyond your usual. Everything else today is optional.`, xp: 50 },
+          ] : [
+            { name: `Grease-the-groove ${ex}`, desc: `4–6 low-effort sets throughout the day (never to failure). Frequent submax practice is the fastest builder when current max is low.`, xp: 40 },
+            { name: `Assisted ${ex}: 3 × 8`, desc: `Use a band, machine, or partner spot. Three sets of 8 clean reps builds the strength base to test unassisted.`, xp: 40 },
+            { name: `${ex} negatives × 5`, desc: `5 slow (5s) negatives. Best single wire to the first unassisted rep.`, xp: 45 },
+          ];
+          return pick(bwTemplates);
+        }
+        // Weighted rep goals — bench for reps, DB row for reps, etc.
+        const wTemplates = curN !== null && curN > 0 ? [
+          { name: `${ex}: ${Math.max(1, curN - 2)} × 4 sets`, desc: `4 sets of ${Math.max(1, curN - 2)} reps, 2 min rest. Back-off volume — builds reps without frying the CNS.`, xp: 45 },
+          { name: `Beat ${curN}: one top set`, desc: `Warm up, then hit ONE all-out set — aim for ${curN + 1}. Log the actual number, whatever it is.`, xp: 50 },
+          { name: `${ex} rest-pause`, desc: `Do ${curN} reps, 15s rest, as many more as possible, 15s, one more mini-set. Then done.`, xp: 45 },
+        ] : [
+          { name: `${ex}: 3 sets to a hard 8`, desc: `Three sets of 8 at a weight that leaves 1–2 reps in reserve on the last set. Log the weight — it seeds progression.`, xp: 40 },
+          { name: `Volume day: ${ex} 5 × 5`, desc: `Five sets of five at a moderate weight. Log the weight; next week you'll add 5lb.`, xp: 40 },
+        ];
+        return pick(wTemplates);
       }
+      // Weightlift goals — hitting a target 1RM / working weight. Suggest
+      // sub-max volume, top singles, or wave loading based on the day.
+      if (kind === 'weightlift') {
+        const curLb = (cur && isFinite(cur.value)) ? Math.round(cur.value) : null;
+        const tgtLb = (tgt && isFinite(tgt.value)) ? Math.round(tgt.value) : null;
+        if (curLb && curLb > 0) {
+          const backoff = snapToPlate(curLb * 0.8);
+          const speed = snapToPlate(curLb * 0.65);
+          const step = tgtLb ? Math.min(15, Math.max(5, Math.round((tgtLb - curLb) / 6))) : 5;
+          const topSingle = snapToPlate(curLb + step);
+          const wTemplates = [
+            { name: `${ex}: work up to ${topSingle} lb`, desc: `Ramp singles: ${snapToPlate(curLb * 0.7)} × 3, ${snapToPlate(curLb * 0.85)} × 1, ${curLb} × 1, then ${topSingle} × 1 if it moves cleanly.`, xp: 55 },
+            { name: `${ex} volume: 5 × 3 @ ${backoff} lb`, desc: `Five sets of three at ${backoff} (~80% of current). Rest 2–3 min. Volume is the base under your future PR.`, xp: 50 },
+            { name: `${ex} speed work: 6 × 3 @ ${speed} lb`, desc: `Six sets of three at ${speed} (~65%). Focus on bar speed and clean setup. Rest 90s.`, xp: 45 },
+            { name: `${ex} pause reps: 4 × 3 @ ${snapToPlate(curLb * 0.75)} lb`, desc: `Four sets of three with a 2s pause in the hardest position. Builds strength through the sticking point.`, xp: 50 },
+          ];
+          return pick(wTemplates);
+        }
+        return { name: `Establish a ${ex} baseline`, desc: `Warm up, then work up to a hard-but-clean set of 5. Log the weight — it seeds every future ${ex} suggestion.`, xp: 45 };
+      }
+      // Endurance — pace + distance goals. Nudge toward the training pace,
+      // not the goal pace (which the runner can't hit yet by definition).
+      if (kind === 'pace') {
+        const templates = [
+          { name: `Easy conversational run · 30 min`, desc: `Zone 2 base — you can hold a full sentence. Aerobic base is the biggest lever on race-day pace.`, xp: 50 },
+          { name: `Tempo effort · 20 min`, desc: `Comfortably hard — you could speak in short phrases. Bridges base pace and race pace.`, xp: 55 },
+          { name: `Intervals: 4 × 800m`, desc: `Four hard 800m efforts, jog 400m between. Directly improves the anaerobic capacity that shortens your times.`, xp: 60 },
+          { name: `Long slow distance`, desc: `Longer than usual, slower than usual. Time on feet builds the engine for race pace to become sustainable.`, xp: 55 },
+        ];
+        return pick(templates);
+      }
+      if (kind === 'distance') {
+        const curMi = (cur && cur.format === 'distance' && isFinite(cur.value)) ? cur.value : null;
+        const tgtMi = (tgt && tgt.format === 'distance' && isFinite(tgt.value)) ? tgt.value : null;
+        const stepMi = curMi && tgtMi ? Math.min(1, Math.max(0.5, +(((tgtMi - curMi) / 8).toFixed(1)))) : null;
+        const templates = [
+          { name: stepMi ? `Extend to ${(+((curMi || 0) + stepMi).toFixed(1))} mi` : `Distance day`, desc: `Bump today's long effort by a small step. Distance grows in 10% chunks, not leaps.`, xp: 55 },
+          { name: `Steady 60% distance`, desc: `Run about 60% of your goal distance at an easy pace. Log the miles — recovery-friendly, aerobic-bank-building.`, xp: 45 },
+          { name: `Terrain change`, desc: `Take the same distance you did last time onto hills or trails. New stimulus, same time on feet.`, xp: 45 },
+        ];
+        return pick(templates);
+      }
+      if (kind === 'duration') {
+        const curS = (cur && cur.format === 'duration' && isFinite(cur.value)) ? cur.value : null;
+        const readable = (s) => s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} hr`;
+        if (curS && curS > 0) {
+          const step = Math.max(3, Math.round(curS * 0.15));
+          const templates = [
+            { name: `${ex} for ${readable(curS + step)}`, desc: `About 15% longer than your current best. Micro-progress compounds — no need to leap.`, xp: 50 },
+            { name: `Density: ${ex} × 5`, desc: `Five sets at ${readable(Math.round(curS * 0.7))} each with short rests. Volume, not maximum, is today's goal.`, xp: 45 },
+            { name: `Fresh attempt at ${ex}`, desc: `Fully rested, best conditions, one all-out effort. Log the number — it becomes your new baseline.`, xp: 50 },
+          ];
+          return pick(templates);
+        }
+        return { name: `Establish a ${ex} baseline`, desc: `Log a single all-out effort so future prompts can build from your actual number.`, xp: 40 };
+      }
+      if (kind === 'bodyweight' || kind === 'bodyfat') {
+        return pick([
+          { name: `Hit today's macros`, desc: `Nutrition — not lifting — is what moves ${kind === 'bodyfat' ? 'body fat' : 'body weight'}. Log every meal.`, xp: 40 },
+          { name: `20-min Zone 2 walk`, desc: `Low-intensity cardio adds daily deficit without raising hunger. Habit stack it onto lunch.`, xp: 30 },
+          { name: `Weigh in`, desc: `Log this morning's weight (or afternoon if that's your normal). Trend > single day; consistency of measurement matters more than time of day.`, xp: 25 },
+        ]);
+      }
+      // Fallback for custom / habit / unclassified goals.
+      return pick([
+        { name: `Advance "${goalTitle}"`, desc: `Take one concrete step toward this goal — the smallest doable one you can log.`, xp: 35 },
+        { name: `Note a blocker for "${goalTitle}"`, desc: `What's stopping progress this week? Write it in the goal notes. Naming friction is the first step to removing it.`, xp: 30 },
+      ]);
     }
     // Resolve the goal's quest for today.
     function goalQuestForToday(g) {
@@ -16410,7 +16556,59 @@ create trigger trg_user_state_updated_at
       return sess.length > 0 && sess.every(x => x.session.done);
     }
     function renderGoals() { renderGoalsInto(document.getElementById('goals-list')); }
-    function renderGoalsInto(list) {
+    // T110.5 — Returns a Set of goal IDs that are "in scope" for today, based
+    // on either a scheduled plan session OR the goal category matching today's
+    // workout split. The Quest tab uses this to filter the goal cards so it
+    // behaves as a daily board — not a duplicate of the Goals page.
+    //
+    // Selection rules:
+    //   * ALWAYS include: any goal with a plan session dated today.
+    //   * ALWAYS include: body / habit / custom goals (every-day work).
+    //   * Endurance goals: include on cardio days ("Flexibility / Cardio").
+    //   * Strength goals: include if the goal's exercise maps to a muscle
+    //     group targeted by today's workoutSplit (via muscleGroupForExercise
+    //     + a split → muscle-group table).
+    //   * Completed goals: excluded (they belong on the Goals page).
+    function todaysGoalIds() {
+      const today = todayStr();
+      const dow = (typeof dayOfWeek === 'function') ? dayOfWeek() : '';
+      const rawSplit = (state.workoutSplit && state.workoutSplit[dow]) || 'Rest';
+      const splitType = (typeof injurySafeWorkoutType === 'function') ? injurySafeWorkoutType(rawSplit) : rawSplit;
+      const splitMuscles = {
+        'Upper Push': new Set(['Chest', 'Shoulders', 'Arms']),
+        'Upper Pull': new Set(['Back', 'Arms']),
+        'Lower Body': new Set(['Legs', 'Core']),
+        'Full Body':  new Set(['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']),
+        'Flexibility / Cardio': new Set(),
+        'Mobility':   new Set(),
+        'Rest':       new Set(),
+      };
+      const musclesToday = splitMuscles[splitType] || new Set();
+      const isCardioDay = splitType === 'Flexibility / Cardio';
+      const isRestDay = splitType === 'Rest';
+      const out = new Set();
+      (state.goals || []).forEach(g => {
+        if (!g || g.archived || g.completedAt) return;
+        // Scheduled plan session today wins immediately.
+        if (g.plan && Array.isArray(g.plan.sessions) && g.plan.sessions.some(s => s.date === today)) {
+          out.add(g.id); return;
+        }
+        // Always-on categories.
+        if (g.cat === 'body' || g.cat === 'habit' || g.cat === 'custom') { out.add(g.id); return; }
+        // Endurance only on cardio days.
+        if (g.cat === 'endurance') { if (isCardioDay) out.add(g.id); return; }
+        // Strength: match by muscle group. Rest days show nothing extra.
+        if (g.cat === 'strength' && !isRestDay) {
+          const muscle = (typeof muscleGroupForExercise === 'function')
+            ? muscleGroupForExercise(g.name) : 'Other';
+          if (musclesToday.has(muscle)) out.add(g.id);
+        }
+      });
+      return out;
+    }
+    // Second-arg signature: renderGoalsInto(list, { filterIds }). Backward-
+    // compatible — calls with no options render the full active set.
+    function renderGoalsInto(list, opts) {
       if (!list) return;
       // Backfill milestones for any legacy goals that have none AND regenerate any
       // auto milestones from an older schema version (so parser fixes roll forward).
@@ -16430,23 +16628,55 @@ create trigger trg_user_state_updated_at
       if (backfilled) save();
       const active = activeGoals();
       const archived = archivedGoals();
+      // T110.1 — Auto-stamp completedAt the first time a goal hits 100%.
+      // Idempotent; skipped for archived goals (they don't count as "completed").
+      let stamped = false;
+      active.forEach(g => {
+        const pct = Math.min(100, g.progress || 0);
+        if (pct >= 100 && !g.completedAt) { g.completedAt = todayStr(); stamped = true; }
+        // Also unset it if progress fell back below 100 (e.g. user edited target
+        // up mid-cycle) — keeps "completed" honest.
+        if (pct < 100 && g.completedAt) { g.completedAt = null; stamped = true; }
+      });
+      if (stamped) save();
+      // T110.1 — Split active into incomplete (categorized) + completed (own section).
+      let incomplete = active.filter(g => !g.completedAt);
+      let completed  = active.filter(g =>  g.completedAt);
+      // T110.5 — Optional filter (used by the Quest tab to show only goals
+      // whose scheduled session or workout-split match today). Applied AFTER
+      // completed split so the Completed section stays view-scoped: hidden
+      // on Quest tab, visible on Goals tab.
+      const filterMode = opts && opts.filter;
+      const filterIds = (filterMode === 'today') ? todaysGoalIds() : null;
+      if (filterIds) {
+        incomplete = incomplete.filter(g => filterIds.has(g.id));
+        completed = []; // Quest tab: never show completed goals in the day board.
+      }
       if (active.length === 0 && archived.length === 0) {
         list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);font-size:14px;">No goals yet.<br>Add your first objective above.</div>';
         return;
       }
-      const cats = [...new Set(active.map(g => g.cat))];
+      // T110.5 — Quest tab empty state: no goals matched today's programming.
+      if (filterIds && incomplete.length === 0) {
+        list.innerHTML = `<div style="text-align:center;padding:24px 20px;color:var(--text3);font-size:13px;line-height:1.5;">
+          Nothing programmed for today's split.<br>
+          <span style="color:var(--text3);font-size:11px;">Rest, cross-train, or open <a href="javascript:switchTab('progress');switchProgressTab('goals')" style="color:var(--accent);text-decoration:none;">Progress → Goals</a> to work ahead on any goal.</span>
+        </div>`;
+        return;
+      }
+      const cats = [...new Set(incomplete.map(g => g.cat))];
       const catLabels = { endurance: 'ENDURANCE', strength: 'STRENGTH', body: 'BODY COMPOSITION', habit: 'HABIT / LIFESTYLE', custom: 'CUSTOM' };
       list.innerHTML = '';
-      if (active.length === 0) {
+      if (incomplete.length === 0 && completed.length === 0) {
         const empty = document.createElement('div');
         empty.style.cssText = 'text-align:center;padding:20px;color:var(--text3);font-size:13px;';
         empty.textContent = 'No active goals. Restore one below or add a new objective.';
         list.appendChild(empty);
       }
       cats.forEach(cat => {
-        const catGoals = active.filter(g => g.cat === cat);
+        const catGoals = incomplete.filter(g => g.cat === cat);
         const label = document.createElement('div');
-        label.className = 'section-label';
+        label.className = 'section-label goals-cat-label';
         label.textContent = catLabels[cat] || cat.toUpperCase();
         list.appendChild(label);
         catGoals.forEach(goal => {
@@ -16509,6 +16739,38 @@ create trigger trg_user_state_updated_at
           list.appendChild(div);
         });
       });
+      // T110.1 — "Completed" collapsible section. Sibling of Inactive, but
+      // for goals that hit 100% (completedAt stamped). Green accent to celebrate;
+      // Restore is via "un-complete" (drop the completedAt so it returns to its
+      // category), Archive keeps it out of the active board without deleting.
+      if (completed.length > 0) {
+        const wrap = document.createElement('details');
+        wrap.open = false;
+        wrap.style.cssText = 'margin-top:18px;background:var(--bg2);border:1px solid var(--green);border-radius:8px;padding:10px 12px;';
+        wrap.innerHTML = `
+          <summary style="cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:500;letter-spacing:1.2px;font-size:12px;color:var(--green2);text-transform:uppercase;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span class="icon-title-slot" data-icon="check" data-icon-size="14"></span>
+            Completed
+            <span style="color:var(--text3);font-weight:400;letter-spacing:0;text-transform:none;">${completed.length}</span>
+          </summary>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+            ${completed.map(g => `
+              <div style="background:var(--bg);border:1px solid var(--green);border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;color:var(--text);font-weight:600;display:inline-flex;align-items:center;gap:6px;">${escapeHtml(toTitleCase(g.name))} <span style="color:var(--green2);font-family:'Rajdhani',sans-serif;font-size:11px;letter-spacing:1px;">· 100%</span></div>
+                  <div style="font-size:11px;color:var(--text3);">${g.cat ? (g.cat[0].toUpperCase() + g.cat.slice(1)) : 'Goal'}${g.completedAt ? ` · hit ${g.completedAt}` : ''}${g.date ? ` · target was ${g.date}` : ''}</div>
+                  <div class="bar-wrap" style="height:5px;margin-top:6px;"><div class="bar-fill" style="width:100%;background:var(--green);"></div></div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-sm" onclick="uncompleteGoal(${JSON.stringify(g.id)})" style="font-size:11px;padding:4px 10px;color:var(--text2);">Reopen</button>
+                  <button class="btn btn-sm" onclick="archiveGoal(${JSON.stringify(g.id)})" style="font-size:11px;padding:4px 10px;color:var(--text3);">Archive</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>`;
+        list.appendChild(wrap);
+        try { hydrateIcons(wrap); } catch (e) {}
+      }
       // T86.2 — "Inactive goals" collapsible section. Renders only when at
       // least one goal is archived. Collapsed by default so it doesn't add
       // noise; expand to see + restore + permanently delete.
