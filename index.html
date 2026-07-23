@@ -16536,6 +16536,13 @@ create trigger trg_user_state_updated_at
       }
       save();
       renderGoals();
+      // T110.7 — Also refresh the Quest tab. renderGoals() only touches the
+      // Goals-tab container (#goals-list); the Quest tab renders its own copy
+      // into #quest-list-container via renderGoalsInto(goalsWrap, {filter}).
+      // Without this call, tapping the check bubble on a challenge-kind quest
+      // updates state + fires the notif but leaves the bubble on the Quest
+      // tab visually stale until you navigate away and back.
+      try { renderQuests(); } catch (e) {}
       try { renderStats(); } catch (e) {}
       try { renderProfile(); } catch (e) {}
     }
